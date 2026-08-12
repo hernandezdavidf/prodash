@@ -437,6 +437,15 @@ body.view-reports .board-only{display:none}
       <button class="pill sync" id="syncBtn"><i></i><span id="syncTxt">Local only</span></button>
       <div class="synced-note" id="syncNote"></div>
     </div>
+    <div>
+      <!-- Separate from the OneDrive pill above: File System Access API
+           (that one) doesn't exist on any phone browser at all, so this is
+           the sync path that actually reaches a phone. The two are
+           independent and can both be on at once - whichever writes last
+           wins via the same updatedAt/adopt() logic either way. -->
+      <button class="pill sync" id="cloudBtn"><i></i><span id="cloudTxt">Cloud: not set up</span></button>
+      <div class="synced-note" id="cloudNote"></div>
+    </div>
   </div>
 
   <div id="nudges" class="board-only"></div>
@@ -641,6 +650,7 @@ function save(){
   try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
   stamp(fileHandle?"saving…":"saved");
   scheduleWrite();
+  cloudPush();
 }
 
 /* ---------- OneDrive file sync (Chrome/Edge desktop) ----------
@@ -701,6 +711,77 @@ function adopt(d){
   d=norm(d);
   if(d.updatedAt>=S.updatedAt){S=d;try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}renderAll();return true;}
   return false;
+}
+
+/* ---------- cloud sync (a tiny Cloudflare Worker) ----------
+   The OneDrive path above needs the File System Access API, which no phone
+   browser supports at all - this is the path that actually reaches a phone.
+   URL and password are per-device (localStorage only, never in S / the
+   synced JSON itself - they must never round-trip through export, import,
+   or the Worker's own storage). Reuses adopt() exactly as the OneDrive path
+   does, so "whichever copy is newer wins" is one rule, not two. */
+var CLOUD_URL_KEY="prodash.cloudUrl", CLOUD_PW_KEY="prodash.cloudPw";
+// Guarded like every other localStorage read in this file (see load()) -
+// an unguarded read here throws synchronously at parse time in any context
+// where storage is blocked (private browsing, strict cookie settings, this
+// preview tool's sandbox), which would abort the ENTIRE boot script before
+// renderAll() ever runs. Found by testing, not by inspection - worth the
+// reminder that every top-level statement in this file runs unprotected.
+var cloudUrl="", cloudPw="";
+try{ cloudUrl=localStorage.getItem(CLOUD_URL_KEY)||""; cloudPw=localStorage.getItem(CLOUD_PW_KEY)||""; }catch(e){}
+var cloudBusy=false, cloudPushTimer=null;
+
+function setCloud(state,note){
+  var b=document.getElementById("cloudBtn"),t=document.getElementById("cloudTxt"),n=document.getElementById("cloudNote");
+  if(!b)return;
+  b.className="pill sync"+(state==="synced"?" ok":(state==="error"?" warn":""));
+  t.textContent = state==="synced" ? "Cloud synced"
+                : state==="error"  ? "Cloud sync error"
+                : cloudUrl         ? "Cloud: tap to sync"
+                :                    "Cloud: not set up";
+  n.textContent = note||"";
+}
+function cloudHeaders(){ return {"Authorization":"Bearer "+cloudPw,"Content-Type":"application/json"}; }
+
+function connectCloud(){
+  var url=prompt("Cloudflare Worker URL (from your dashboard, e.g.\nhttps://prodash-sync.yourname.workers.dev):",cloudUrl||"https://");
+  if(url===null)return;
+  url=url.trim().replace(/\/+$/,"");
+  if(!url)return;
+  var pw=prompt("Sync password (the same one set as SYNC_PASSWORD on the Worker):","");
+  if(pw===null)return;
+  cloudUrl=url; cloudPw=pw;
+  try{ localStorage.setItem(CLOUD_URL_KEY,cloudUrl); localStorage.setItem(CLOUD_PW_KEY,cloudPw); }catch(e){}
+  setCloud("local","Connecting…");
+  cloudPull();
+}
+function disconnectCloud(){
+  if(!confirm("Disconnect cloud sync on this device? Data already saved to the Worker is untouched - this only stops this device talking to it."))return;
+  cloudUrl="";cloudPw="";
+  try{ localStorage.removeItem(CLOUD_URL_KEY); localStorage.removeItem(CLOUD_PW_KEY); }catch(e){}
+  setCloud("off");
+}
+function cloudPull(){
+  if(!cloudUrl||!cloudPw||cloudBusy)return Promise.resolve();
+  cloudBusy=true;
+  return fetch(cloudUrl+"/data",{headers:cloudHeaders()})
+    .then(function(r){ if(!r.ok)throw new Error("HTTP "+r.status); return r.json(); })
+    .then(function(remote){
+      cloudBusy=false;
+      var adopted = remote && typeof remote==="object" && adopt(remote);
+      setCloud("synced",(adopted?"Pulled newer data · ":"Up to date · ")+new Date().toLocaleTimeString());
+    })
+    .catch(function(e){ cloudBusy=false; setCloud("error",e.message); });
+}
+function cloudPush(){
+  if(!cloudUrl||!cloudPw)return;
+  clearTimeout(cloudPushTimer);
+  cloudPushTimer=setTimeout(function(){
+    fetch(cloudUrl+"/data",{method:"PUT",headers:cloudHeaders(),body:JSON.stringify(S)})
+      .then(function(r){ if(!r.ok)throw new Error("HTTP "+r.status);
+        setCloud("synced","Saved · "+new Date().toLocaleTimeString()); })
+      .catch(function(e){ setCloud("error",e.message); });
+  },800);
 }
 function readFile(){
   if(!fileHandle||reading)return Promise.resolve();
@@ -1303,6 +1384,16 @@ document.getElementById("syncBtn").addEventListener("click",function(){
 window.addEventListener("focus",function(){if(fileHandle)readFile();});
 document.addEventListener("visibilitychange",function(){if(!document.hidden&&fileHandle)readFile();});
 
+document.getElementById("cloudBtn").addEventListener("click",function(){
+  if(cloudUrl) disconnectCloud(); else connectCloud();
+});
+// same triggers as the OneDrive path above: on regaining focus, on the tab
+// becoming visible again, so a change made on the phone shows up on the PC
+// (and back) without waiting for the periodic interval further down.
+window.addEventListener("focus",function(){if(cloudUrl)cloudPull();});
+document.addEventListener("visibilitychange",function(){if(!document.hidden&&cloudUrl)cloudPull();});
+setCloud(cloudUrl?"local":"off");
+
 /* ============================================================
    Reports — a read-only view over S.tasks, grouped by lane.
    "Reports" (top): everything ADDED within a date range, split
@@ -1566,6 +1657,7 @@ renderAll();
 restore();
 setInterval(function(){renderHeader();renderNow();renderTimeline();renderLanes();renderNudges();},60000);
 setInterval(function(){if(fileHandle&&!document.hidden)readFile();},120000);
+setInterval(function(){if(cloudUrl&&!document.hidden)cloudPull();},120000);
 
 // Registers only where it's actually usable (a real https origin, or the
 // browser's specific localhost exception) - file:// is not a secure context,
