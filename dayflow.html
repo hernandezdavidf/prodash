@@ -25,6 +25,9 @@
   --sage:#64748B; --olive:#16A34A; --olive-lt:#DCFCE7;
   --ivory:#F6F7F9; --paper:#ffffff; --on-brand:#F0FDF4;
   --terra:#EA580C; --terra-lt:#FFEDD5; --terra-ink:#9A3412;
+  /* text that sits ON an orange fill. Orange is light in both themes, so this
+     stays near-black in both and is deliberately NOT overridden in dark. */
+  --on-warm:#231206;
   --night:#312E81; --night-ink:#312E81;
   --line:#E2E8F0; --ink:#0F172A; --muted:#5D6B7E;
   --ln-conduent:#2563EB; --ln-afc:#4F46E5; --ln-cmit:#0284C7;
@@ -182,6 +185,24 @@ header h1{font-size:26px;letter-spacing:.3px}
 .blk.past{opacity:.4}
 .blk.sleepb .blk-n{color:var(--night-ink)}
 
+/* one-off appointments in the timeline */
+.blk.ev{background:linear-gradient(90deg,rgba(234,88,12,.10),transparent);border-radius:6px;padding-left:6px;margin-left:-6px}
+.blk.ev .blk-n{color:var(--terra-ink)}
+.blk .x{color:var(--sage);font-size:15px;line-height:1;padding:0 4px;align-self:center}
+.blk .x:hover{color:var(--terra-ink)}
+.apt{background:var(--terra);color:var(--on-warm);font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border-radius:4px;padding:1px 5px}
+.apt-add{margin-top:11px;padding-top:11px;border-top:1px dashed var(--line);display:flex;flex-direction:column;gap:7px}
+.apt-add input,.apt-add select{border:1px solid var(--line);border-radius:7px;padding:6px 9px;background:var(--ivory);color:var(--ink);outline:none;min-width:0}
+.apt-add input:focus,.apt-add select:focus{border-color:var(--olive);background:var(--paper)}
+.apt-add>input{width:100%}
+.apt-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.apt-row input[type=time]{width:104px}
+.apt-row input[type=date]{width:140px}
+.apt-dash{color:var(--muted);font-size:12px}
+.apt-must{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted);white-space:nowrap}
+.apt-must input{width:14px;height:14px;padding:0}
+#aptBtn{background:var(--forest);color:var(--on-brand);border-radius:7px;padding:7px 13px;font-weight:700;margin-left:auto}
+
 .lanes{display:grid;grid-template-columns:repeat(auto-fit,minmax(224px,1fr));gap:13px}
 .lane{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:13px;transition:.25s}
 .lane-h{display:flex;align-items:center;gap:8px;margin-bottom:3px}
@@ -307,6 +328,18 @@ textarea.note:focus{border-color:var(--olive);background:var(--paper)}
         <h2>Shift timeline <span class="cnt">7:00am → 7:00am</span></h2>
         <div class="sub">Your day rolls over at 7am, not midnight — so 3am work logs to the right shift.</div>
         <div id="timeline"></div>
+        <div class="apt-add">
+          <input id="aptN" placeholder="Appointment — what and where">
+          <div class="apt-row">
+            <input id="aptD" type="date" title="Date">
+            <input id="aptS" type="time" value="10:00" title="Start">
+            <span class="apt-dash">→</span>
+            <input id="aptE" type="time" value="11:00" title="End">
+            <select id="aptL" title="Which part of your life"></select>
+            <label class="apt-must"><input type="checkbox" id="aptM"> must attend</label>
+            <button id="aptBtn">Add</button>
+          </div>
+        </div>
       </div>
 
       <div class="card">
@@ -358,22 +391,26 @@ var LANES=[
  {id:"other",   name:"HOA / Low",  color:"var(--ln-other)",    ritual:"Batch once a week"}
 ];
 
-// clock times; converted to shift-minutes internally
+// The recurring backbone. Clock times, converted to shift-minutes internally.
+// days:[1..5] = Mon–Fri only; omit the field to mean every day.
+// One-off appointments live in S.events and use these same field names, so
+// dayBlocks() can merge the two and every renderer treats them alike.
+var WD=[1,2,3,4,5];
 var BLOCKS=[
  {s:"07:00",e:"12:15",n:"Sleep",              d:"Protected. Single point of failure.", lane:null, sleep:1},
  {s:"12:15",e:"12:45",n:"Wake + prep",        d:"Light, food, sun if you can",         lane:null},
- {s:"12:45",e:"13:00",n:"School drop-off",    d:"Classes 1pm–4pm",                lane:null},
- {s:"13:00",e:"14:00",n:"My Company",         d:"Protected. Before clients start.",    lane:"biz"},
- {s:"14:00",e:"15:30",n:"Conduent",           d:"Hardest items — you're freshest now", lane:"conduent"},
- {s:"15:30",e:"16:15",n:"School fetch",       d:"Flex out of Conduent",                lane:null},
- {s:"16:15",e:"19:00",n:"Conduent",           d:"Main block",                          lane:"conduent"},
+ {s:"12:45",e:"13:00",n:"School drop-off",    d:"Classes 1pm–4pm",                lane:null, days:WD},
+ {s:"13:00",e:"14:00",n:"My Company",         d:"Protected. Before clients start.",    lane:"biz", days:WD},
+ {s:"14:00",e:"15:30",n:"Conduent",           d:"Hardest items — you're freshest now", lane:"conduent", days:WD},
+ {s:"15:30",e:"16:15",n:"School fetch",       d:"Flex out of Conduent",                lane:null, days:WD},
+ {s:"16:15",e:"19:00",n:"Conduent",           d:"Main block",                          lane:"conduent", days:WD},
  {s:"19:00",e:"19:30",n:"Dinner",             d:"Real break",                          lane:null},
- {s:"19:30",e:"22:30",n:"Conduent",           d:"Clear the list, update to-complete",  lane:"conduent"},
- {s:"22:30",e:"23:00",n:"Conduent wrap + CMIT open", d:"Handover — one switch",   lane:"cmit"},
- {s:"23:00",e:"02:30",n:"AFC + CMIT",         d:"Dual shift — both live",  lane:"afc", lane2:"cmit", dual:1},
- {s:"02:30",e:"06:00",n:"AFC + CMIT · low ebb", d:"Mechanical work only. Don't decide anything big.", lane:"afc", lane2:"cmit", dual:1, nadir:1},
- {s:"06:00",e:"06:30",n:"CMIT to-do writeup", d:"Tomorrow's list, while it's fresh",   lane:"cmit"},
- {s:"06:30",e:"07:00",n:"AFC EOD + shutdown", d:"Send it, log the shift, then sleep",  lane:"afc"}
+ {s:"19:30",e:"22:30",n:"Conduent",           d:"Clear the list, update to-complete",  lane:"conduent", days:WD},
+ {s:"22:30",e:"23:00",n:"Conduent wrap + CMIT open", d:"Handover — one switch",   lane:"cmit", days:WD},
+ {s:"23:00",e:"02:30",n:"AFC + CMIT",         d:"Dual shift — both live",  lane:"afc", lane2:"cmit", dual:1, days:WD},
+ {s:"02:30",e:"06:00",n:"AFC + CMIT · low ebb", d:"Mechanical work only. Don't decide anything big.", lane:"afc", lane2:"cmit", dual:1, nadir:1, days:WD},
+ {s:"06:00",e:"06:30",n:"CMIT to-do writeup", d:"Tomorrow's list, while it's fresh",   lane:"cmit", days:WD},
+ {s:"06:30",e:"07:00",n:"AFC EOD + shutdown", d:"Send it, log the shift, then sleep",  lane:"afc", days:WD}
 ];
 
 var RITUALS=[
@@ -406,6 +443,7 @@ function norm(s){
   if(!s.log)s.log={};
   if(!s.days)s.days={};
   if(typeof s.focus!=="boolean")s.focus=false;
+  if(!Array.isArray(s.events))s.events=[];
   if(["auto","dark","light"].indexOf(s.theme)<0)s.theme="auto";
   if(typeof s.updatedAt!=="number")s.updatedAt=0;
   return s;
@@ -548,9 +586,23 @@ function smEnd(hhmm){var v=sm(hhmm);return v===0?1440:v;}        // 07:00 as an 
 function nowSm(){var d=new Date();return (d.getHours()*60+d.getMinutes()-ROLL+1440)%1440;}
 function fmt(hhmm){var p=hhmm.split(":"),h=+p[0],m=p[1],ap=h<12?"am":"pm",hh=h%12;if(hh===0)hh=12;return hh+":"+m+ap;}
 
+function dowOf(k){var p=k.split("-");return new Date(+p[0],+p[1]-1,+p[2]).getDay();}
+
+// The shift as actually lived: recurring blocks that apply to this weekday,
+// plus any one-off appointments booked for this date, in clock order.
+function dayBlocks(k){
+  k=k||today();
+  var dow=dowOf(k);
+  var out=BLOCKS.filter(function(b){return !b.days||b.days.indexOf(dow)>=0;});
+  S.events.forEach(function(e){if(e.date===k)out.push(e);});
+  return out.sort(function(a,b){return sm(a.s)-sm(b.s);});
+}
+
 function currentBlock(){
-  var n=nowSm();
-  for(var i=0;i<BLOCKS.length;i++){if(n>=sm(BLOCKS[i].s)&&n<smEnd(BLOCKS[i].e))return BLOCKS[i];}
+  var n=nowSm(),L=dayBlocks();
+  // an appointment wins over the routine block it sits inside
+  for(var i=0;i<L.length;i++){if(L[i].ev&&n>=sm(L[i].s)&&n<smEnd(L[i].e))return L[i];}
+  for(var j=0;j<L.length;j++){if(n>=sm(L[j].s)&&n<smEnd(L[j].e))return L[j];}
   return null;
 }
 
@@ -647,6 +699,17 @@ function renderNudges(){
     out.push(["","<b>School fetch unchecked</b> — it's past 4:15pm."]);
   if(n>sm("06:30")&&!l.afc)
     out.push(["","<b>AFC EOD report still open</b> and the shift ends at 7am."]);
+  // appointments he said he has to be at — the whole point of booking one
+  dayBlocks().forEach(function(b){
+    if(!b.ev||!b.must)return;
+    var st=sm(b.s),mins=st-n;
+    if(mins>0&&mins<=120)
+      out.push(["","<b>"+esc(b.n)+" at "+fmt(b.s)+" — in "+
+        (mins>=60?Math.floor(mins/60)+"h "+(mins%60)+"m":mins+" min")+".</b> "+
+        "You marked this one must-attend. Start closing down what you're on now."]);
+    else if(n>=st&&n<smEnd(b.e))
+      out.push(["","<b>"+esc(b.n)+" is happening now</b> — until "+fmt(b.e)+"."]);
+  });
   var stale=S.tasks.filter(function(t){return !t.done&&ageOf(t)>=3;}).length;
   if(stale)out.push(["","<b>"+stale+" task"+(stale>1?"s have":" has")+" been open 3+ shifts.</b> Do it, delegate it, or delete it."]);
 
@@ -713,16 +776,22 @@ function renderWeekly(){
 function renderTimeline(){
   var c=document.getElementById("timeline"),n=nowSm();
   c.innerHTML="";
-  BLOCKS.forEach(function(b){
+  dayBlocks().forEach(function(b){
     var st=sm(b.s),en=smEnd(b.e);
     var isNow=n>=st&&n<en, isPast=n>=en;
     var lane=LANES.filter(function(L){return L.id===b.lane;})[0];
     var el=document.createElement("div");
-    el.className="blk"+(isNow?" now":"")+(isPast?" past":"")+(b.sleep?" sleepb":"");
+    el.className="blk"+(isNow?" now":"")+(isPast?" past":"")+(b.sleep?" sleepb":"")+(b.ev?" ev":"");
     el.innerHTML='<div class="blk-t">'+fmt(b.s)+"–"+fmt(b.e)+'</div>'+
       '<div class="blk-b" style="background:'+(b.sleep?"var(--night)":(lane?lane.color:"var(--sage)"))+'"></div>'+
-      '<div><div class="blk-n">'+esc(b.n)+(b.dual?' <span class="dual">dual</span>':'')+'</div>'+
-      '<div class="blk-d">'+esc(b.d)+'</div></div>';
+      '<div style="flex:1;min-width:0"><div class="blk-n">'+esc(b.n)+
+        (b.dual?' <span class="dual">dual</span>':'')+
+        (b.ev?' <span class="apt">'+(b.must?"must attend":"appointment")+'</span>':'')+'</div>'+
+      '<div class="blk-d">'+esc(b.d||"")+'</div></div>'+
+      (b.ev?'<button class="x" title="Remove this appointment">&times;</button>':'');
+    if(b.ev) el.querySelector(".x").addEventListener("click",function(){
+      S.events=S.events.filter(function(x){return x.id!==b.id;});
+      save();renderAll();});
     c.appendChild(el);
   });
 }
@@ -828,6 +897,30 @@ document.getElementById("sleepHrs").addEventListener("input",function(){
   document.getElementById(id).addEventListener("input",function(){meta().t3[i]=this.value;save();});});
 document.getElementById("wins").addEventListener("input",function(){meta().wins=this.value;save();});
 document.getElementById("focusBtn").addEventListener("click",function(){S.focus=!S.focus;save();renderAll();});
+// ---------- appointments ----------
+(function initApt(){
+  document.getElementById("aptL").innerHTML=
+    '<option value="">No lane</option>'+LANES.map(function(L){
+      return '<option value="'+L.id+'">'+esc(L.name)+'</option>';}).join("");
+  document.getElementById("aptD").value=today();
+})();
+function addApt(){
+  var n=document.getElementById("aptN"),s=document.getElementById("aptS"),
+      e=document.getElementById("aptE"),l=document.getElementById("aptL"),
+      m=document.getElementById("aptM"),d=document.getElementById("aptD");
+  var title=n.value.trim();
+  if(!title){n.focus();return;}
+  if(!s.value||!e.value){alert("An appointment needs a start and an end time.");return;}
+  if(s.value===e.value){alert("Start and end are the same time.");return;}
+  S.events.push({id:"evt_"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+    n:title, d:"", s:s.value, e:e.value, lane:l.value||null,
+    must:m.checked, ev:true, date:d.value||today()});
+  n.value="";m.checked=false;
+  save();renderAll();
+}
+document.getElementById("aptBtn").addEventListener("click",addApt);
+document.getElementById("aptN").addEventListener("keydown",function(ev){if(ev.key==="Enter")addApt();});
+
 document.getElementById("themeBtn").addEventListener("click",function(){
   S.theme = S.theme==="auto" ? "dark" : (S.theme==="dark" ? "light" : "auto");
   save();applyTheme();});
@@ -859,6 +952,9 @@ document.getElementById("syncBtn").addEventListener("click",function(){
 // pick up edits made on another PC once OneDrive has synced the file down
 window.addEventListener("focus",function(){if(fileHandle)readFile();});
 document.addEventListener("visibilitychange",function(){if(!document.hidden&&fileHandle)readFile();});
+
+// console hooks:  dfDebug.dayBlocks("2026-08-15")  ·  dfDebug.state()
+window.dfDebug={dayBlocks:dayBlocks,today:today,norm:norm,state:function(){return S;}};
 
 applyTheme();   // before first paint, so a dark session doesn't flash white
 renderAll();
