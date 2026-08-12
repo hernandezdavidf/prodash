@@ -1,0 +1,17 @@
+{
+  "name": "How's our Dave looking? — ProDash",
+  "short_name": "ProDash",
+  "description": "Personal shift, task and habit tracker for the 2pm-7am schedule.",
+  "start_url": "./dayflow.html",
+  "scope": "./",
+  "id": "./dayflow.html",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#F6F7F9",
+  "theme_color": "#15803D",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

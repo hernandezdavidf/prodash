@@ -4,6 +4,22 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>How's our Dave looking? · ProDash</title>
+
+<!-- PWA installability. Needs real https hosting to actually install or
+     register the service worker - both silently no-op under file://, which
+     is fine, that's still how this opens on desktop today. -->
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#15803D">
+<link rel="icon" href="./icons/favicon-32.png" sizes="32x32">
+
+<!-- iOS ignores most of the manifest spec above and needs its own tags for a
+     home-screen launch that hides Safari's chrome and picks a matching
+     status bar, rather than behaving like a plain bookmark. -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="ProDash">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+
 <style>
 /* Palette. Variable NAMES are historical (forest/sage/olive/terra) but the values
    are the strong green/blue/yellow/orange scheme. Roles, not hues:
@@ -1550,6 +1566,15 @@ renderAll();
 restore();
 setInterval(function(){renderHeader();renderNow();renderTimeline();renderLanes();renderNudges();},60000);
 setInterval(function(){if(fileHandle&&!document.hidden)readFile();},120000);
+
+// Registers only where it's actually usable (a real https origin, or the
+// browser's specific localhost exception) - file:// is not a secure context,
+// so this would otherwise fail on every single desktop open. That's expected
+// while GitHub Pages hosting isn't live yet; the .catch keeps it silent
+// rather than logging a scary error on the one way this app opens today.
+if("serviceWorker" in navigator && location.protocol!=="file:"){
+  navigator.serviceWorker.register("./sw.js").catch(function(){});
+}
 })();
 </script>
 </body>
