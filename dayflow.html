@@ -729,9 +729,10 @@ var CLOUD_URL_KEY="prodash.cloudUrl", CLOUD_PW_KEY="prodash.cloudPw";
 // reminder that every top-level statement in this file runs unprotected.
 var cloudUrl="", cloudPw="";
 try{ cloudUrl=localStorage.getItem(CLOUD_URL_KEY)||""; cloudPw=localStorage.getItem(CLOUD_PW_KEY)||""; }catch(e){}
-var cloudBusy=false, cloudPushTimer=null;
+var cloudBusy=false, cloudPushTimer=null, cloudState="off";
 
 function setCloud(state,note){
+  cloudState=state;
   var b=document.getElementById("cloudBtn"),t=document.getElementById("cloudTxt"),n=document.getElementById("cloudNote");
   if(!b)return;
   b.className="pill sync"+(state==="synced"?" ok":(state==="error"?" warn":""));
@@ -750,6 +751,7 @@ function connectCloud(){
   if(!url)return;
   var pw=prompt("Sync password (the same one set as SYNC_PASSWORD on the Worker):","");
   if(pw===null)return;
+  pw=pw.trim();  // a stray leading/trailing space here silently mismatches the Worker's copy
   cloudUrl=url; cloudPw=pw;
   try{ localStorage.setItem(CLOUD_URL_KEY,cloudUrl); localStorage.setItem(CLOUD_PW_KEY,cloudPw); }catch(e){}
   setCloud("local","Connecting…");
@@ -1385,7 +1387,12 @@ window.addEventListener("focus",function(){if(fileHandle)readFile();});
 document.addEventListener("visibilitychange",function(){if(!document.hidden&&fileHandle)readFile();});
 
 document.getElementById("cloudBtn").addEventListener("click",function(){
-  if(cloudUrl) disconnectCloud(); else connectCloud();
+  // Only offer to disconnect once it's actually working. If it's off, or
+  // stuck in error (wrong password, etc.), clicking should let you re-enter
+  // credentials, not force a disconnect confirmation first - that was the
+  // original bug: an error state and a working state used the same click
+  // behaviour, so there was no way to just fix a typo'd password.
+  if(cloudState==="synced") disconnectCloud(); else connectCloud();
 });
 // same triggers as the OneDrive path above: on regaining focus, on the tab
 // becoming visible again, so a change made on the phone shows up on the PC
