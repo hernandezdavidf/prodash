@@ -217,7 +217,14 @@ header h1{font-size:26px;letter-spacing:.3px}
 .grip:active{cursor:grabbing}
 .dot{width:9px;height:9px;border-radius:50%;min-width:9px}
 .lane-h h3{font-size:14px;flex:1}
+.lane-name-edit{flex:1;min-width:0;font-family:var(--serif);font-weight:700;font-size:14px;
+  border:1px solid var(--olive);border-radius:6px;padding:2px 6px;background:var(--paper);
+  color:var(--ink);outline:none}
 .lane-n{font-size:11px;color:var(--muted);background:var(--ivory);border-radius:999px;padding:1px 7px;border:1px solid var(--line)}
+.lane-edit,.lane-del{flex:none;color:var(--sage);font-size:13px;line-height:1;padding:2px 3px;border-radius:5px}
+.lane-edit:hover{color:var(--forest-ink);background:var(--olive-lt)}
+.lane-del{font-size:16px;font-weight:700}
+.lane-del:hover{color:var(--terra-ink);background:var(--terra-lt)}
 .lane-s{font-size:10.5px;color:var(--muted);margin-bottom:9px;min-height:14px}
 .lane.dim{opacity:.32;filter:grayscale(.65)}
 .lane.active{box-shadow:0 0 0 2px var(--forest-ink)}
@@ -857,6 +864,10 @@ function renderTimeline(){
 // ---- add-lane tile: state survives a rebuild (e.g. the 60s tick, or window
 // regaining focus) so an in-progress name/ritual/colour choice isn't lost ----
 var laneFormOpen=false, laneDraft={name:"",ritual:"",color:LANE_PALETTE[0]};
+// same reason: which lane (if any) is mid-rename, and what's typed so far,
+// survives a renderLanes() rebuild triggered by something unrelated (ticking
+// a task in a different lane, the 60s tick, a file sync landing).
+var laneRenamingId=null, laneRenamingDraft="";
 
 function renderLanes(){
   var c=document.getElementById("lanes"),cur=currentBlock();
@@ -871,9 +882,16 @@ function renderLanes(){
     el.className="lane"+(S.focus&&act.length&&!isAct?" dim":"")+(isAct?" active":"");
     el.draggable=true;
     el.dataset.id=L.id;
+    var renaming=laneRenamingId===L.id;
     var h='<div class="lane-h"><span class="grip" title="Drag to reorder">&#9776;</span>'+
       '<div class="dot" style="background:'+L.color+'"></div>'+
-      '<h3>'+esc(L.name)+'</h3><div class="lane-n">'+open.length+'</div></div>'+
+      (renaming
+        ? '<input class="lane-name-edit" id="lnEdit" value="'+esc(laneRenamingDraft)+'">'
+        : '<h3>'+esc(L.name)+'</h3>')+
+      '<div class="lane-n">'+open.length+'</div>'+
+      (renaming?'':'<button class="lane-edit" data-lact="rename" title="Rename lane" aria-label="Rename lane">&#9998;</button>'+
+      '<button class="lane-del" data-lact="delete" title="Remove lane" aria-label="Remove lane">&times;</button>')+
+      '</div>'+
       '<div class="lane-s">'+esc(L.ritual)+'</div>';
     var body=mine.length
       ? mine.slice().sort(function(a,b){return (a.done?1:0)-(b.done?1:0);}).map(function(t){
@@ -888,6 +906,15 @@ function renderLanes(){
     el.innerHTML=h+body+'<div class="addrow"><input placeholder="Add to '+esc(L.name)+'..."><button>+</button></div>';
 
     el.addEventListener("click",function(e){
+      var lact=e.target.closest("[data-lact]");
+      if(lact){
+        var la=lact.getAttribute("data-lact");
+        if(la==="rename"){
+          laneRenamingId=L.id;laneRenamingDraft=L.name;renderLanes();
+          var lnI=document.getElementById("lnEdit");if(lnI){lnI.focus();lnI.select();}
+        }else if(la==="delete")deleteLane(L.id);
+        return;
+      }
       var a=e.target.getAttribute("data-act");if(!a)return;
       var row=e.target.closest(".tsk");if(!row)return;
       var id=row.getAttribute("data-id");
@@ -900,6 +927,15 @@ function renderLanes(){
       else if(a==="del")S.tasks=S.tasks.filter(function(t){return t.id!==id;});
       save();renderAll();
     });
+    if(renaming){
+      var lnEdit=el.querySelector("#lnEdit");
+      lnEdit.addEventListener("input",function(){laneRenamingDraft=this.value;});
+      lnEdit.addEventListener("keydown",function(e){
+        if(e.key==="Enter")commitRename(L.id);
+        else if(e.key==="Escape")cancelRename();
+      });
+      lnEdit.addEventListener("blur",function(){if(laneRenamingId===L.id)commitRename(L.id);});
+    }
     var inp=el.querySelector(".addrow input"),btn=el.querySelector(".addrow button");
     function add_(){
       var v=inp.value.trim();if(!v)return;
@@ -968,6 +1004,42 @@ function saveLane(){
   S.lanes.push({id:"lane_"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
     name:name,color:laneDraft.color,ritual:laneDraft.ritual.trim(),custom:true});
   laneFormOpen=false;laneDraft={name:"",ritual:"",color:LANE_PALETTE[0]};
+  save();renderAll();
+}
+
+// ---- rename: click the pencil, edit in place, Enter/blur saves, Esc cancels.
+// Only the name changes - id (what tasks/blocks/appointments actually point
+// at) never does, so renaming can't orphan anything. ----
+function commitRename(id){
+  var name=laneRenamingDraft.trim();
+  if(name){
+    var L=S.lanes.filter(function(x){return x.id===id;})[0];
+    if(L)L.name=name;
+    save();
+  }
+  laneRenamingId=null;laneRenamingDraft="";
+  renderAll();
+}
+function cancelRename(){
+  laneRenamingId=null;laneRenamingDraft="";
+  renderLanes();
+}
+
+// ---- delete: allowed on any lane, including the original six - this is
+// destructive (matches how deleting a single task already works with no
+// undo in this app), so it's the one lane action gated behind confirm().
+// Recurring shift BLOCKS are hardcoded in source, not in S, so a deleted
+// lane's shift block simply falls back to the neutral grey fill already
+// used for "no lane" everywhere else - nothing crashes, nothing to migrate. ----
+function deleteLane(id){
+  var L=S.lanes.filter(function(x){return x.id===id;})[0];
+  if(!L)return;
+  var n=S.tasks.filter(function(t){return t.lane===id;}).length;
+  var msg='Remove the "'+L.name+'" lane?'+
+    (n?(" This deletes "+n+" task"+(n===1?"":"s")+" in it too — there is no undo."):" There is no undo.");
+  if(!confirm(msg))return;
+  S.lanes=S.lanes.filter(function(x){return x.id!==id;});
+  S.tasks=S.tasks.filter(function(t){return t.lane!==id;});
   save();renderAll();
 }
 
