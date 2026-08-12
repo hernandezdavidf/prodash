@@ -2,6 +2,44 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-08-13 — Mobile app groundwork: responsive layout, installable PWA, cloud sync
+
+Three phases toward running ProDash as a real app on a phone, kept updated
+across every device (GitHub Pages hosting, the fourth and last phase, still
+needs David's account details before it can happen).
+
+**Phase 1 — mobile layout.** Fixed a real horizontal-overflow bug: `.cols`
+used bare `1fr` grid tracks, whose implicit minimum is their content's
+min-content size rather than 0, so one unbreakable row anywhere inside could
+force the whole page wider than the viewport - the tell was many unrelated
+elements all reporting the identical overflow amount. Fixed with
+`minmax(0, ...)`; verified zero overflow down to 320px. New `(pointer:
+coarse)` block enlarges touch targets without bloating desktop. New up/down
+buttons reorder a lane by tap, since native HTML5 drag has no touch
+equivalent on any mobile browser.
+
+**Phase 2 — installable (PWA).** `manifest.json`, `sw.js` (network-first for
+the frequently-edited app shell, cache-first for icons, versioned cache
+cleanup), five hand-drawn icons (a canvas-rendered checkmark on the brand
+green, no external tool needed), and the iOS-specific meta tags Safari
+requires for a real home-screen launch. Actual installing needs Phase 3's
+https hosting - file:// cannot register a service worker or trigger an
+install prompt, so this is scaffolded and verified as far as possible without
+it.
+
+**Phase 4 (code) — cloud sync.** OneDrive sync needs the File System Access
+API, which no phone browser supports. Added a second, independent path: a
+~60-line Cloudflare Worker (`cloud-worker/worker.js`, plus
+`workflows/cloud-sync-setup.md`) holding one JSON blob behind a password,
+reached with plain `fetch()`. Reuses the existing `adopt()`/`updatedAt`
+newer-wins logic rather than inventing a second conflict rule. Found and
+fixed a real bug while testing: the new sync's `localStorage` reads ran
+unguarded at top-level script scope, so in any context where storage throws
+(private browsing, this tool's preview sandbox) the entire app failed to
+boot before ever reaching `renderAll()` - every other localStorage access in
+this file was already wrapped in try/catch for exactly this reason, this one
+was missed and is now fixed to match.
+
 ## 2026-08-13 — Merge Non-negotiables and Weekly targets; add/remove non-negotiables
 
 One card now: Non-negotiables on top with an add row (name + optional tag)
