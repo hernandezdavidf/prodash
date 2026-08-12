@@ -138,19 +138,13 @@ header h1{font-size:26px;letter-spacing:.3px}
 .sub{font-size:11.5px;color:var(--muted);margin:2px 0 11px}
 
 /* sleep card */
-.sleepcard{border-left:4px solid var(--night)}
-.sleep-in{display:flex;align-items:center;gap:9px;margin-bottom:11px}
-.sleep-in input{width:62px;border:1px solid var(--line);border-radius:7px;padding:7px 9px;background:var(--ivory);outline:none;text-align:center;font-size:16px;font-family:var(--serif);font-weight:700}
-.sleep-in input:focus{border-color:var(--night-ink);background:var(--paper)}
-.sleep-in label{font-size:12px;color:var(--muted);flex:1}
-.debt{display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:5px}
-.debt b{font-family:var(--serif);font-size:15px}
-.sleepbars{display:flex;gap:4px;height:38px;align-items:flex-end;margin-top:9px}
-.sb{flex:1;background:var(--ivory);border:1px solid var(--line);border-radius:4px 4px 0 0;position:relative;height:100%;overflow:hidden}
-.sb i{position:absolute;bottom:0;left:0;right:0;background:var(--night);display:block}
-.sb.low i{background:var(--terra)}
-.sb-l{display:flex;gap:4px;margin-top:3px}
-.sb-l span{flex:1;text-align:center;font-size:9px;color:var(--muted)}
+/* Shift timeline now sits in the narrow left column, so the time column shrinks
+   and the description wraps under the name instead of being squeezed beside it. */
+.timelinecard{border-left:4px solid var(--night)}
+/* 84px + nowrap: "12:15pm–12:45pm" is the widest label and needs 78px flat,
+   so anything tighter wraps it to two lines and the rows go ragged. */
+.timelinecard .blk-t{width:84px;min-width:84px;font-size:10px;white-space:nowrap}
+.timelinecard .blk{gap:8px}
 
 .rit{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px dashed var(--line)}
 .rit:last-child{border-bottom:none}
@@ -264,7 +258,6 @@ textarea.note:focus{border-color:var(--olive);background:var(--paper)}
         <div class="hdr-date" id="hdrDate"></div>
       </div>
       <div class="hdr-stats">
-        <div class="stat"><b id="sSleep">—</b><span>Sleep 7d avg</span></div>
         <div class="stat"><b id="sRit">0%</b><span>Rituals</span></div>
         <div class="stat"><b id="sTask">0</b><span>Open</span></div>
         <div class="stat"><b id="sStreak">0</b><span>Streak</span></div>
@@ -295,17 +288,24 @@ textarea.note:focus{border-color:var(--olive);background:var(--paper)}
 
   <div class="cols">
     <div>
-      <div class="card sleepcard">
-        <h2>Sleep</h2>
-        <div class="sub">Your only window is 7:00am–12:15pm. There is no second one.</div>
-        <div class="sleep-in">
-          <input id="sleepHrs" type="number" min="0" max="14" step="0.5" placeholder="—">
-          <label>hours slept before this shift</label>
+      <div class="card timelinecard">
+        <h2>Shift timeline <span class="cnt">7:00am → 7:00am</span></h2>
+        <div class="sub">Your day rolls over at 7am, not midnight — so 3am work logs to the right shift.</div>
+        <div id="timeline"></div>
+        <div class="apt-add">
+          <input id="aptN" placeholder="Appointment — what and where">
+          <div class="apt-row">
+            <input id="aptD" type="date" title="Date">
+            <input id="aptS" type="time" value="10:00" title="Start">
+            <span class="apt-dash">→</span>
+            <input id="aptE" type="time" value="11:00" title="End">
+          </div>
+          <div class="apt-row">
+            <select id="aptL" title="Which part of your life"></select>
+            <label class="apt-must"><input type="checkbox" id="aptM"> must attend</label>
+            <button id="aptBtn">Add</button>
+          </div>
         </div>
-        <div class="debt"><span>7-day average</span><b id="slAvg">—</b></div>
-        <div class="debt"><span>Debt vs 7h target</span><b id="slDebt">—</b></div>
-        <div class="sleepbars" id="slBars"></div>
-        <div class="sb-l" id="slLbls"></div>
       </div>
 
       <div class="card">
@@ -325,24 +325,6 @@ textarea.note:focus{border-color:var(--olive);background:var(--paper)}
       <div class="lanes" id="lanes"></div>
 
       <div class="card" style="margin-top:14px">
-        <h2>Shift timeline <span class="cnt">7:00am → 7:00am</span></h2>
-        <div class="sub">Your day rolls over at 7am, not midnight — so 3am work logs to the right shift.</div>
-        <div id="timeline"></div>
-        <div class="apt-add">
-          <input id="aptN" placeholder="Appointment — what and where">
-          <div class="apt-row">
-            <input id="aptD" type="date" title="Date">
-            <input id="aptS" type="time" value="10:00" title="Start">
-            <span class="apt-dash">→</span>
-            <input id="aptE" type="time" value="11:00" title="End">
-            <select id="aptL" title="Which part of your life"></select>
-            <label class="apt-must"><input type="checkbox" id="aptM"> must attend</label>
-            <button id="aptBtn">Add</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
         <h2>Last 7 shifts</h2>
         <div class="sub">Percent of non-negotiables cleared.</div>
         <div class="week" id="week"></div>
@@ -375,7 +357,6 @@ textarea.note:focus{border-color:var(--olive);background:var(--paper)}
 "use strict";
 var KEY="dayflow.v2";
 var ROLL=7*60;          // logical day starts 07:00
-var SLEEP_TARGET=7;
 
 // Blue = the three client jobs. Green = his own company. Yellow = learning.
 // Slate = low priority, drained of colour on purpose. Orange is reserved for
@@ -624,17 +605,10 @@ function daysStreak(){
   while(pctFor(k)>=60){c++;k=shift(k,-1);}
   return c;
 }
-function sleepSeries(){
-  var out=[];
-  for(var i=6;i>=0;i--){var k=shift(today(),-i);var l=S.log[k];
-    out.push({k:k,h:(l&&typeof l.sleepHrs==="number")?l.sleepHrs:null});}
-  return out;
-}
-function sleepAvg(){
-  var s=sleepSeries().filter(function(x){return x.h!==null;});
-  if(!s.length)return null;
-  return s.reduce(function(a,b){return a+b.h;},0)/s.length;
-}
+// Sleep-hours tracking (the card, the 7-day average and the debt bars) was
+// removed on 2026-08-12 at David's request. Any sleepHrs already recorded in
+// S.log is left alone, so restoring the card would pick the history back up.
+// The "Slept 5+ hours" non-negotiable and the 7:00–12:15 Sleep block both stay.
 function weeklyCount(id){
   var c=0;for(var i=0;i<7;i++){var l=S.log[shift(today(),-i)];if(l&&l[id])c++;}
   return c;
@@ -658,8 +632,6 @@ function renderHeader(){
   document.getElementById("sRit").textContent=Math.round(done/RITUALS.length*100)+"%";
   document.getElementById("sTask").textContent=S.tasks.filter(function(t){return !t.done;}).length;
   document.getElementById("sStreak").textContent=daysStreak();
-  var av=sleepAvg();
-  document.getElementById("sSleep").textContent=av===null?"—":(Math.round(av*10)/10)+"h";
 
   var n=nowSm(),pc=Math.round(n/1440*100);
   document.getElementById("dayFill").style.width=pc+"%";
@@ -685,12 +657,9 @@ function renderNow(){
 
 function renderNudges(){
   var out=[],l=day(),n=nowSm(),b=currentBlock();
-  var av=sleepAvg();
 
   if(b&&b.sleep)
     out.push(["cool","<b>This is your sleep window.</b> It's the only one in the 24 hours. Anything you do now is borrowed against tomorrow's judgment, not found time."]);
-  if(av!==null&&av<5.5)
-    out.push(["cool","<b>7-day sleep average is "+(Math.round(av*10)/10)+"h.</b> Below about 6h, error rate and reaction time degrade measurably — on a dual shift that's the expensive kind of tired. This is the number to fix before any other optimization."]);
   if(b&&b.nadir)
     out.push(["","<b>2:30–6am is your circadian low.</b> Mechanical work only — tickets, logs, routine tasks. Don't send anything you can't unsend, and don't make calls you'd want to revisit."]);
   if(n>sm("14:00")&&!l.biz)
@@ -715,28 +684,6 @@ function renderNudges(){
 
   document.getElementById("nudges").innerHTML=out.map(function(x){
     return '<div class="nudge '+x[0]+'"><div>⚑</div><div>'+x[1]+'</div></div>';}).join("");
-}
-
-function renderSleep(){
-  var l=day(),el=document.getElementById("sleepHrs");
-  if(document.activeElement!==el)el.value=(typeof l.sleepHrs==="number")?l.sleepHrs:"";
-  var av=sleepAvg();
-  document.getElementById("slAvg").textContent=av===null?"—":(Math.round(av*10)/10)+"h";
-  var ser=sleepSeries(),logged=ser.filter(function(x){return x.h!==null;});
-  var debt=logged.reduce(function(a,b){return a+(SLEEP_TARGET-b.h);},0);
-  document.getElementById("slDebt").textContent=
-    logged.length?(debt>0?"−"+(Math.round(debt*10)/10)+"h":"+"+(Math.round(-debt*10)/10)+"h"):"—";
-  document.getElementById("slDebt").style.color=debt>7?"var(--terra)":"var(--ink)";
-
-  var bars="",lbls="",names=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-  ser.forEach(function(x){
-    var h=x.h===null?0:Math.min(100,x.h/9*100);
-    bars+='<div class="sb'+(x.h!==null&&x.h<5.5?" low":"")+'"><i style="height:'+h+'%"></i></div>';
-    var p=x.k.split("-");
-    lbls+='<span>'+names[new Date(+p[0],+p[1]-1,+p[2]).getDay()]+'</span>';
-  });
-  document.getElementById("slBars").innerHTML=bars;
-  document.getElementById("slLbls").innerHTML=lbls;
 }
 
 function renderRituals(){
@@ -878,7 +825,7 @@ function applyTheme(){
 }
 
 function renderAll(){
-  renderHeader();renderNow();renderNudges();renderSleep();renderRituals();
+  renderHeader();renderNow();renderNudges();renderRituals();
   renderWeekly();renderTimeline();renderLanes();renderWeek();renderShutdown();
   applyTheme();
   var fb=document.getElementById("focusBtn");
@@ -887,12 +834,6 @@ function renderAll(){
 }
 
 // ---------- wiring ----------
-document.getElementById("sleepHrs").addEventListener("input",function(){
-  var v=parseFloat(this.value),d=day();
-  if(isNaN(v)){delete d.sleepHrs;delete d.sleep;}
-  else{d.sleepHrs=v;if(v>=5)d.sleep=true;else delete d.sleep;}
-  save();renderHeader();renderSleep();renderRituals();renderNudges();renderWeek();
-});
 ["t3a","t3b","t3c"].forEach(function(id,i){
   document.getElementById(id).addEventListener("input",function(){meta().t3[i]=this.value;save();});});
 document.getElementById("wins").addEventListener("input",function(){meta().wins=this.value;save();});

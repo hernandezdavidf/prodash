@@ -2,6 +2,23 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-08-12 — Drop sleep tracking, move Shift timeline left
+
+- Removed the Sleep card entirely, along with the "Sleep 7d avg" header stat, the
+  7-day average, the debt-vs-7h figure and the bar chart.
+- **Shift timeline** moved into that slot — top of the narrow left column. Its
+  time column was retuned for the tighter width (84px, no-wrap: the widest label
+  "12:15pm–12:45pm" needs 78px flat, so anything less went ragged over two lines).
+  The appointment form now stacks onto two rows to fit.
+- Removed the code that went with it: `renderSleep()`, `sleepSeries()`,
+  `sleepAvg()`, `SLEEP_TARGET`, the input listener, the header line, the
+  low-sleep-average nudge and ~13 rules of orphaned CSS.
+
+**Kept on purpose:** the "Slept 5+ hours" non-negotiable, the 7:00–12:15 Sleep
+block in the timeline, and its "this is your sleep window" nudge. Any `sleepHrs`
+already recorded in `S.log` is left untouched, so restoring the card later would
+pick the history back up.
+
 ## 2026-08-12 — Back to DayFlow, now "How's our Dave looking? · ProDash"
 
 David preferred DayFlow over the v8 rebuild, so DayFlow is now the daily app.
