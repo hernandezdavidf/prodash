@@ -79,6 +79,23 @@ on when it happens, and pick one of the six colours offered — then it works
 exactly like Conduent or AFC: add tasks, tick them off, it counts toward
 Reports. Drag any lane by its **☰** grip to put it where you want on the board.
 
+## Renaming or removing a lane
+
+Every lane — including the original six — has a **✎** and a **×** in its
+header.
+
+- **✎** turns the name into an editable field. Enter or click elsewhere to
+  save, Escape to back out. Nothing else about the lane changes — its tasks,
+  its colour, its position all stay exactly where they were.
+- **×** removes the lane. If it has tasks in it, they're deleted with it —
+  you'll be asked to confirm and told how many. There's no undo, so if you
+  just want it out of the way for now, drag it to the end of the board
+  instead of deleting it.
+
+Deleting a lane that one of the three job shifts (Conduent/AFC/CMIT) belongs
+to doesn't touch the shift itself — it still shows up in the Shift timeline
+at its usual time, just in a neutral grey instead of its colour.
+
 ## Reports
 
 A second tab, next to **Board**, in the header.

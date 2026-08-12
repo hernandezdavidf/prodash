@@ -2,6 +2,20 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-08-12 — Rename and delete any lane on the Board
+
+Every lane header — including the original six, not just custom ones — now
+has a ✎ (rename, inline, Enter/blur saves, Escape cancels) and an × (delete).
+Only the lane's name changes on rename; its id is what tasks/appointments
+actually reference, so nothing gets orphaned. Delete removes the lane's tasks
+with it and is the one lane action gated behind `confirm()`, spelling out the
+task count — a lane can hold dozens of tasks and stands for a whole job or
+life area, so it doesn't get the no-confirmation treatment a single task
+delete does elsewhere in this app. A deleted lane's recurring shift block (if
+it had one) keeps showing up in the timeline at its usual time, just in
+neutral grey instead of its colour, since shift blocks live in hardcoded
+source, not state.
+
 ## 2026-08-12 — Editable lanes with drag reorder; a Reports tab with Excel export
 
 **Lanes are now data, not code.** They used to be a hardcoded `LANES` array;
