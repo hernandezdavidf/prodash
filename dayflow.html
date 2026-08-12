@@ -282,6 +282,42 @@ textarea.note:focus{border-color:var(--olive);background:var(--paper)}
 .nudge.cool{background:linear-gradient(90deg,rgba(49,46,129,.15),rgba(49,46,129,.03));border-color:rgba(49,46,129,.4);border-left-color:var(--night-ink)}
 .nudge.cool b{color:var(--night-ink)}
 .dual{background:var(--night);color:var(--on-brand);font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border-radius:4px;padding:1px 5px}
+
+/* ---- tabs: Board / Reports ---- */
+.tabbar{display:flex;gap:6px;margin:14px 0 0}
+.tab{padding:7px 16px;border-radius:999px;border:1px solid var(--line);background:var(--paper);
+  color:var(--muted);font-weight:600;font-size:12.5px}
+.tab:hover{background:var(--ivory)}
+.tab.on{background:var(--forest);color:var(--on-brand);border-color:var(--forest)}
+body.view-reports .board-only{display:none}
+/* #view-reports itself is shown/hidden by toggling its `hidden` attribute in
+   setView() - a CSS rule here can't win against the UA [hidden]{display:none}
+   without matching or exceeding its specificity, so don't add one. */
+
+/* ---- reports ---- */
+.rep-controls{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin:12px 0}
+.rep-fld{display:flex;flex-direction:column;gap:3px}
+.rep-fld label{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700}
+.rep-fld input,.rep-fld select{border:1px solid var(--line);border-radius:7px;padding:6px 9px;
+  background:var(--ivory);color:var(--ink);outline:none;font-size:12.5px}
+.rep-fld input:focus,.rep-fld select:focus{border-color:var(--olive);background:var(--paper)}
+.rep-quick{border:1px solid var(--line);border-radius:7px;padding:0 12px;font-size:12px;height:31px;
+  color:var(--forest-ink);font-weight:600;background:var(--paper)}
+.rep-quick:hover{background:var(--ivory)}
+.rep-totals{display:flex;gap:18px;font-size:12.5px;color:var(--muted);margin-bottom:12px;flex-wrap:wrap}
+.rep-totals b{font-family:var(--serif);font-size:17px;color:var(--ink);display:block;line-height:1.2}
+.rep-lane{margin-bottom:16px}
+.rep-lane:last-child{margin-bottom:0}
+.rep-lane-h{display:flex;align-items:center;gap:8px;padding-bottom:6px;border-bottom:1px solid var(--line);margin-bottom:5px}
+.rep-lane-h h3{font-size:13px;flex:1}
+.rep-counts{font-size:11px;color:var(--muted);white-space:nowrap}
+.rep-row{display:flex;gap:9px;align-items:center;padding:5px 0;border-bottom:1px dashed var(--line);font-size:12.5px}
+.rep-row:last-child{border-bottom:none}
+.rep-status{width:14px;text-align:center;color:var(--sage);font-weight:700}
+.rep-row.done .rep-status{color:var(--forest-ink)}
+.rep-row.done .rep-title{color:var(--muted);text-decoration:line-through}
+.rep-title{flex:1;word-break:break-word}
+.rep-date{font-size:10.5px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
@@ -306,7 +342,12 @@ textarea.note:focus{border-color:var(--olive);background:var(--paper)}
     </div>
   </header>
 
-  <div class="nowbar" id="nowbar">
+  <nav class="tabbar">
+    <button class="tab on" id="tabBoard">Board</button>
+    <button class="tab" id="tabReports">Reports</button>
+  </nav>
+
+  <div class="nowbar board-only" id="nowbar">
     <div>
       <div class="np" id="nowLbl">Now</div>
       <div class="nt" id="nowName">—</div>
@@ -321,9 +362,9 @@ textarea.note:focus{border-color:var(--olive);background:var(--paper)}
     </div>
   </div>
 
-  <div id="nudges"></div>
+  <div id="nudges" class="board-only"></div>
 
-  <div class="cols">
+  <div class="cols board-only">
     <div>
       <div class="card timelinecard">
         <h2>Shift timeline <span class="cnt">7:00am → 7:00am</span></h2>
@@ -377,6 +418,31 @@ textarea.note:focus{border-color:var(--olive);background:var(--paper)}
         <div style="font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--sage);font-weight:700;margin:13px 0 7px">What moved this shift?</div>
         <textarea class="note" id="wins" placeholder="Wins, blockers, anything to remember..."></textarea>
       </div>
+    </div>
+  </div>
+
+  <div id="view-reports" hidden>
+    <div class="card">
+      <h2>Reports <span class="cnt" id="repCount">0 tasks</span></h2>
+      <div class="sub">Completed and pending tasks recorded in the lanes, filtered by the date they were added.</div>
+      <div class="rep-controls">
+        <div class="rep-fld"><label for="repFrom">From</label><input type="date" id="repFrom"></div>
+        <div class="rep-fld"><label for="repTo">To</label><input type="date" id="repTo"></div>
+        <div class="rep-fld"><label for="repLane">Lane</label><select id="repLane"></select></div>
+        <button class="rep-quick" id="repThisWeek">Last 7 days</button>
+      </div>
+      <div id="repSummary"></div>
+      <div id="repBody"></div>
+    </div>
+
+    <div class="card">
+      <h2>Current Day Report <span class="cnt" id="cdrDate"></span></h2>
+      <div class="sub">What's done today, plus everything still sitting open — for one lane, or all of them.</div>
+      <div class="rep-controls">
+        <div class="rep-fld"><label for="cdrLane">Lane</label><select id="cdrLane"></select></div>
+        <button class="laf-save" id="cdrExport">Export to Excel</button>
+      </div>
+      <div id="cdrPreview"></div>
     </div>
   </div>
 
@@ -687,7 +753,7 @@ function renderHeader(){
 
 function renderNow(){
   var b=currentBlock(),bar=document.getElementById("nowbar");
-  bar.className="nowbar"+(b&&b.sleep?" sleep":"");
+  bar.className="nowbar board-only"+(b&&b.sleep?" sleep":"");
   document.getElementById("nowLbl").textContent=b&&b.sleep?"Should be asleep":"Now";
   if(b){
     document.getElementById("nowName").textContent=b.n;
@@ -825,7 +891,12 @@ function renderLanes(){
       var a=e.target.getAttribute("data-act");if(!a)return;
       var row=e.target.closest(".tsk");if(!row)return;
       var id=row.getAttribute("data-id");
-      if(a==="tog")S.tasks.forEach(function(t){if(t.id===id)t.done=!t.done;});
+      if(a==="tog")S.tasks.forEach(function(t){if(t.id===id){
+        t.done=!t.done;
+        // stamped so Reports can filter completions by date - "added" alone
+        // can't answer "what got done this week" once a task sits open for a while
+        if(t.done)t.completedAt=today(); else delete t.completedAt;
+      }});
       else if(a==="del")S.tasks=S.tasks.filter(function(t){return t.id!==id;});
       save();renderAll();
     });
@@ -967,6 +1038,7 @@ function renderAll(){
   renderHeader();renderNow();renderNudges();renderRituals();
   renderWeekly();renderTimeline();renderLanes();renderWeek();renderShutdown();
   renderAptLaneOptions();
+  if(document.body.classList.contains("view-reports"))renderReportsView();
   applyTheme();
   var fb=document.getElementById("focusBtn");
   fb.textContent="Focus mode: "+(S.focus?"on":"off");
@@ -1039,8 +1111,263 @@ document.getElementById("syncBtn").addEventListener("click",function(){
 window.addEventListener("focus",function(){if(fileHandle)readFile();});
 document.addEventListener("visibilitychange",function(){if(!document.hidden&&fileHandle)readFile();});
 
+/* ============================================================
+   Reports — a read-only view over S.tasks, grouped by lane.
+   "Reports" (top): everything ADDED within a date range, split
+     completed / pending.
+   "Current Day Report" (below): what got done TODAY plus every
+     currently open task, for one lane or all of them - exportable
+     as a real .xlsx.
+   ============================================================ */
+function laneNameOf(id){
+  var L=S.lanes.filter(function(x){return x.id===id;})[0];
+  return L?L.name:"No lane";
+}
+function laneColorOf(id){
+  var L=S.lanes.filter(function(x){return x.id===id;})[0];
+  return L?L.color:null;
+}
+/** Rebuilt every render (like the appointment lane <select>) so a lane added
+    mid-session shows up immediately; current selection is preserved. */
+function renderRepLaneOptions(selId,allLabel){
+  var sel=document.getElementById(selId);if(!sel)return;
+  var prev=sel.value;
+  sel.innerHTML='<option value="">'+allLabel+'</option>'+S.lanes.map(function(L){
+    return '<option value="'+L.id+'">'+esc(L.name)+'</option>';}).join("");
+  sel.value=(prev&&S.lanes.some(function(L){return L.id===prev;}))?prev:"";
+}
+function tasksAddedInRange(from,to,laneId){
+  return S.tasks.filter(function(t){
+    if(laneId&&t.lane!==laneId)return false;
+    var d=t.added||"";
+    return d>=from&&d<=to;
+  });
+}
+/** "Today" for a lane: completed today, plus every open task regardless of
+    when it was added - a pending item doesn't stop being today's problem
+    just because it's three days old. Mirrors how the lane cards already work. */
+function currentDayList(laneId){
+  var td=today();
+  return S.tasks.filter(function(t){
+    if(laneId&&t.lane!==laneId)return false;
+    return t.done?t.completedAt===td:true;
+  });
+}
+function groupByLaneOrdered(list){
+  var by={};
+  list.forEach(function(t){var k=t.lane||"";(by[k]=by[k]||[]).push(t);});
+  var order=S.lanes.map(function(L){return L.id;}).filter(function(id){return by[id];});
+  if(by[""])order.push("");
+  return {by:by,order:order};
+}
+function repRowsHtml(list){
+  var g=groupByLaneOrdered(list),body="";
+  g.order.forEach(function(id){
+    var items=g.by[id],done=items.filter(function(t){return t.done;}).length;
+    body+='<div class="rep-lane"><div class="rep-lane-h">'+
+      (id?'<div class="dot" style="background:'+laneColorOf(id)+'"></div>':'')+
+      '<h3>'+esc(id?laneNameOf(id):"No lane")+'</h3>'+
+      '<span class="rep-counts">'+done+' done · '+(items.length-done)+' pending</span></div>'+
+      items.slice().sort(function(a,b){return (b.added||"")<(a.added||"")?-1:1;}).map(function(t){
+        return '<div class="rep-row'+(t.done?" done":"")+'">'+
+          '<span class="rep-status">'+(t.done?"&#10003;":"&#9675;")+'</span>'+
+          '<span class="rep-title">'+esc(t.text)+'</span>'+
+          '<span class="rep-date">'+esc(t.done&&t.completedAt?t.completedAt:(t.added||""))+'</span></div>';
+      }).join("")+'</div>';
+  });
+  return body||'<div class="empty">Nothing recorded here yet.</div>';
+}
+function renderReportsView(){
+  renderRepLaneOptions("repLane","All lanes");
+  renderRepLaneOptions("cdrLane","All lanes");
+
+  var fromEl=document.getElementById("repFrom"),toEl=document.getElementById("repTo");
+  if(!fromEl.value)fromEl.value=shift(today(),-6);
+  if(!toEl.value)toEl.value=today();
+  var from=fromEl.value,to=toEl.value,laneId=document.getElementById("repLane").value;
+  var list=tasksAddedInRange(from,to,laneId||null);
+  var done=list.filter(function(t){return t.done;}).length,pending=list.length-done;
+  document.getElementById("repCount").textContent=list.length+" task"+(list.length===1?"":"s");
+  document.getElementById("repSummary").innerHTML=
+    '<div class="rep-totals"><span><b>'+done+'</b>completed</span>'+
+    '<span><b>'+pending+'</b>pending</span>'+
+    '<span><b>'+list.length+'</b>total, this range</span></div>';
+  document.getElementById("repBody").innerHTML=repRowsHtml(list);
+
+  document.getElementById("cdrDate").textContent=
+    parseKeyDate(today()).toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"});
+  var cdrLaneId=document.getElementById("cdrLane").value;
+  var cdrList=currentDayList(cdrLaneId||null);
+  var cdrDone=cdrList.filter(function(t){return t.done;}).length;
+  document.getElementById("cdrPreview").innerHTML=
+    '<div class="rep-totals"><span><b>'+cdrDone+'</b>completed today</span>'+
+    '<span><b>'+(cdrList.length-cdrDone)+'</b>still open</span>'+
+    '<span><b>'+cdrList.length+'</b>total</span></div>'+repRowsHtml(cdrList);
+}
+function parseKeyDate(k){var p=k.split("-");return new Date(+p[0],+p[1]-1,+p[2]);}
+
+document.getElementById("tabBoard").addEventListener("click",function(){setView("board");});
+document.getElementById("tabReports").addEventListener("click",function(){setView("reports");});
+function setView(v){
+  document.body.classList.toggle("view-reports",v==="reports");
+  // the CSS class alone can't win: the static `hidden` attribute in the markup
+  // forces display:none via the UA stylesheet no matter what a class-based
+  // rule says, so the attribute itself has to be flipped here.
+  document.getElementById("view-reports").hidden=(v!=="reports");
+  document.getElementById("tabBoard").classList.toggle("on",v==="board");
+  document.getElementById("tabReports").classList.toggle("on",v==="reports");
+  if(v==="reports")renderReportsView();
+}
+["repFrom","repTo","repLane"].forEach(function(id){
+  document.getElementById(id).addEventListener("change",renderReportsView);});
+document.getElementById("repThisWeek").addEventListener("click",function(){
+  document.getElementById("repFrom").value=shift(today(),-6);
+  document.getElementById("repTo").value=today();
+  renderReportsView();
+});
+document.getElementById("cdrLane").addEventListener("change",renderReportsView);
+
+/* ---- tiny, dependency-free .xlsx writer -----------------------------------
+   One worksheet, inline strings, ZIP "stored" (no compression) - valid per
+   spec, and it's the whole file format Excel actually needs to open cleanly.
+   No CDN, no library: consistent with the rest of this file. */
+var CRC_TABLE=(function(){
+  var t=new Uint32Array(256);
+  for(var n=0;n<256;n++){var c=n;for(var k=0;k<8;k++)c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);t[n]=c>>>0;}
+  return t;
+})();
+function crc32(bytes){
+  var c=0xFFFFFFFF;
+  for(var i=0;i<bytes.length;i++)c=CRC_TABLE[(c^bytes[i])&0xFF]^(c>>>8);
+  return (c^0xFFFFFFFF)>>>0;
+}
+function u16(v){return [v&0xFF,(v>>8)&0xFF];}
+function u32(v){return [v&0xFF,(v>>8)&0xFF,(v>>16)&0xFF,(v>>24)&0xFF];}
+function dosDT(d){
+  d=d||new Date();
+  return {time:((d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1))&0xFFFF,
+          date:(((d.getFullYear()-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate())&0xFFFF};
+}
+/** files: [{name, data:Uint8Array}]. Returns one Uint8Array: the whole .zip. */
+function buildZip(files){
+  var local=[],central=[],offset=0,dt=dosDT();
+  files.forEach(function(f){
+    var nameBytes=new TextEncoder().encode(f.name),data=f.data,crc=crc32(data),startOffset=offset;
+    var lh=new Uint8Array([].concat(
+      u32(0x04034b50),u16(20),u16(0),u16(0),u16(dt.time),u16(dt.date),
+      u32(crc),u32(data.length),u32(data.length),u16(nameBytes.length),u16(0)));
+    local.push(lh,nameBytes,data);
+    offset+=lh.length+nameBytes.length+data.length;
+    var ch=new Uint8Array([].concat(
+      u32(0x02014b50),u16(20),u16(20),u16(0),u16(0),u16(dt.time),u16(dt.date),
+      u32(crc),u32(data.length),u32(data.length),u16(nameBytes.length),
+      u16(0),u16(0),u16(0),u16(0),u32(0),u32(startOffset)));
+    central.push(ch,nameBytes);
+  });
+  var centralStart=offset,centralSize=central.reduce(function(a,c){return a+c.length;},0);
+  var eocd=new Uint8Array([].concat(
+    u32(0x06054b50),u16(0),u16(0),u16(files.length),u16(files.length),
+    u32(centralSize),u32(centralStart),u16(0)));
+  var all=local.concat(central,[eocd]);
+  var total=all.reduce(function(a,c){return a+c.length;},0);
+  var out=new Uint8Array(total),p=0;
+  all.forEach(function(a){out.set(a,p);p+=a.length;});
+  return out;
+}
+function colLetter(n){var s="";n++;while(n>0){var m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-1)/26);}return s;}
+function xlCell(rowIdx,colIdx,v){
+  var ref=colLetter(colIdx)+(rowIdx+1);
+  return '<c r="'+ref+'" t="inlineStr"><is><t xml:space="preserve">'+esc(v==null?"":String(v))+'</t></is></c>';
+}
+function xlSheet(rows){
+  var body=rows.map(function(row,ri){
+    return '<row r="'+(ri+1)+'">'+row.map(function(v,ci){return xlCell(ri,ci,v);}).join("")+'</row>';
+  }).join("");
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
+    '<sheetData>'+body+'</sheetData></worksheet>';
+}
+function xlsxBlob(rows){
+  var enc=new TextEncoder(),files=[
+    {name:"[Content_Types].xml",data:enc.encode(
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'+
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'+
+      '<Default Extension="xml" ContentType="application/xml"/>'+
+      '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'+
+      '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'+
+      '</Types>')},
+    {name:"_rels/.rels",data:enc.encode(
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'+
+      '</Relationships>')},
+    {name:"xl/workbook.xml",data:enc.encode(
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+      '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '+
+      'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'+
+      '<sheets><sheet name="Report" sheetId="1" r:id="rId1"/></sheets></workbook>')},
+    {name:"xl/_rels/workbook.xml.rels",data:enc.encode(
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'+
+      '</Relationships>')},
+    {name:"xl/worksheets/sheet1.xml",data:enc.encode(xlSheet(rows))}
+  ];
+  return new Blob([buildZip(files)],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+}
+function downloadXlsx(rows,filename){
+  var a=document.createElement("a");
+  a.href=URL.createObjectURL(xlsxBlob(rows));a.download=filename;a.click();
+  setTimeout(function(){URL.revokeObjectURL(a.href);},1000);
+}
+document.getElementById("cdrExport").addEventListener("click",function(){
+  var laneId=document.getElementById("cdrLane").value;
+  var list=currentDayList(laneId||null);
+  var rows=[["Lane","Task","Status","Added","Completed"]];
+  list.slice().sort(function(a,b){return laneNameOf(a.lane)<laneNameOf(b.lane)?-1:1;}).forEach(function(t){
+    rows.push([laneNameOf(t.lane),t.text,t.done?"Done":"Pending",t.added||"",t.done?(t.completedAt||""):""]);
+  });
+  var label=(laneId?laneNameOf(laneId):"All_lanes").replace(/[^\w-]+/g,"_");
+  downloadXlsx(rows,"prodash-"+label+"-"+today()+".xlsx");
+});
+
 // console hooks:  dfDebug.dayBlocks("2026-08-15")  ·  dfDebug.state()
-window.dfDebug={dayBlocks:dayBlocks,today:today,norm:norm,state:function(){return S;}};
+window.dfDebug={dayBlocks:dayBlocks,today:today,norm:norm,state:function(){return S;},
+  xlsxBlob:xlsxBlob,buildZip:buildZip,crc32:crc32,
+  /** Round-trips a built .xlsx back through a hand-written ZIP reader and
+      confirms every part's CRC32 matches and every XML part parses cleanly.
+      This is the real test - if this passes, Excel opening it isn't luck. */
+  verifyXlsx:function(blob){
+    return blob.arrayBuffer().then(function(buf){
+      var b=new Uint8Array(buf),dv=new DataView(buf);
+      var eocdSig=0x06054b50,i=b.length-22;
+      while(i>=0&&dv.getUint32(i,true)!==eocdSig)i--;
+      if(i<0)return {ok:false,error:"no EOCD signature found"};
+      var count=dv.getUint16(i+10,true),cdOffset=dv.getUint32(i+16,true);
+      var parts=[],p=cdOffset,ok=true,errs=[];
+      for(var f=0;f<count;f++){
+        if(dv.getUint32(p,true)!==0x02014b50){ok=false;errs.push("bad central header @"+p);break;}
+        var crcRec=dv.getUint32(p+16,true),compSize=dv.getUint32(p+20,true),
+            nameLen=dv.getUint16(p+28,true),lho=dv.getUint32(p+42,true);
+        var name=new TextDecoder().decode(b.slice(p+46,p+46+nameLen));
+        if(dv.getUint32(lho,true)!==0x04034b50){ok=false;errs.push(name+": bad local header");}
+        var lNameLen=dv.getUint16(lho+26,true),dataStart=lho+30+lNameLen;
+        var data=b.slice(dataStart,dataStart+compSize);
+        var crcActual=crc32(data);
+        if(crcActual!==crcRec){ok=false;errs.push(name+": CRC mismatch");}
+        var isXml=/\.xml$|\.rels$/.test(name);
+        if(isXml){
+          var xml=new TextDecoder().decode(data);
+          var doc=new DOMParser().parseFromString(xml,"application/xml");
+          if(doc.querySelector("parsererror")){ok=false;errs.push(name+": XML did not parse");}
+        }
+        parts.push(name);
+        p+=46+nameLen;
+      }
+      return {ok:ok,parts:parts,errors:errs};
+    });
+  }};
 
 applyTheme();   // before first paint, so a dark session doesn't flash white
 renderAll();
