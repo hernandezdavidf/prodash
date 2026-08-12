@@ -72,6 +72,27 @@ part of your life it belongs to, tick **must attend** if you have to be there.
 
 Weekends only show Sleep, Wake + prep and Dinner — the client shifts are Mon–Fri.
 
+## Adding your own lane
+
+Click **+ Add lane** at the end of the board. Give it a name, an optional note
+on when it happens, and pick one of the six colours offered — then it works
+exactly like Conduent or AFC: add tasks, tick them off, it counts toward
+Reports. Drag any lane by its **☰** grip to put it where you want on the board.
+
+## Reports
+
+A second tab, next to **Board**, in the header.
+
+- **Reports** — pick a date range (defaults to the last 7 days) and, optionally,
+  one lane. Shows every task *added* in that window, split into completed and
+  pending, grouped by lane.
+- **Current Day Report** — what got done today, plus everything still open,
+  for one lane or all of them. This one isn't date-limited on the pending side
+  — a task doesn't stop being today's problem just because you added it three
+  days ago.
+- **Export to Excel** on the Current Day Report downloads a real `.xlsx` —
+  Lane, Task, Status, Added, Completed — for whichever lane is selected.
+
 ## Colours
 
 Blue = the three client jobs (Conduent, CMIT, AFC in three tints). Green = your

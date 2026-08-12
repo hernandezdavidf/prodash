@@ -2,6 +2,31 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-08-12 — Editable lanes with drag reorder; a Reports tab with Excel export
+
+**Lanes are now data, not code.** They used to be a hardcoded `LANES` array;
+they're `S.lanes` now, live and persisted through the file sync.
+- **"+ Add lane"** tile at the end of the board opens an inline form (name,
+  optional ritual, 6-swatch colour picker) matching the existing addrow idiom.
+- **Drag any lane by its grip (☰)** to reorder the whole board. Native HTML5
+  drag-and-drop, no library.
+- New palette (`--ln-x1..x6`: rose/teal/violet/fuchsia/cyan/lime) offered for
+  custom lanes — never orange, which stays reserved for attention.
+- Existing `dayflow-data.json` migrates automatically to the same 6 lanes in
+  the same order the first time it's opened with no `lanes` key.
+
+**New Reports tab**, next to Board in the header.
+- **Reports**: date-range view (default last 7 days) over every task *added*
+  in that window, split completed/pending, grouped by lane.
+- **Current Day Report**: what's done today plus everything still open, for
+  one lane or all — deliberately not date-filtered on the pending side, since
+  an open task doesn't stop being today's problem just because it's old.
+- **Export to Excel** on the Current Day Report writes a real `.xlsx` —
+  hand-rolled ZIP + minimal OOXML, zero dependencies, verified by round-
+  tripping it through a hand-written reader (CRC32 + XML parse) before ship.
+- Tasks now stamp `completedAt` when checked off, so reports can answer "what
+  got done this week" instead of only "what was added this week."
+
 ## 2026-08-12 — Drop sleep tracking, move Shift timeline left
 
 - Removed the Sleep card entirely, along with the "Sleep 7d avg" header stat, the
