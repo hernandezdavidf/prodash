@@ -166,8 +166,22 @@ header h1{font-size:26px;letter-spacing:.3px}
 .rit-l{flex:1;font-size:13px}
 .rit.done .rit-l{color:var(--muted);text-decoration:line-through}
 .rit-tag{font-size:9.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--sage);font-weight:700}
+.rit .x{color:var(--sage);font-size:15px;line-height:1;padding:0 2px;flex:none}
+.rit:hover .x{color:var(--terra-ink)}
 .streak{font-size:11px;color:var(--terra-ink);font-weight:700;white-space:nowrap}
 .streak.zero{color:var(--sage)}
+.rit-add{display:flex;gap:6px;margin-top:9px}
+.rit-add input{border:1px solid var(--line);border-radius:7px;padding:6px 9px;background:var(--ivory);
+  color:var(--ink);outline:none;min-width:0}
+.rit-add input:focus{border-color:var(--olive);background:var(--paper)}
+.rit-add input.rit-name{flex:1}
+.rit-add input.rit-tagin{flex:0 0 112px}
+.rit-add button{background:var(--forest);color:var(--on-brand);border-radius:7px;padding:6px 11px;font-weight:700}
+
+/* Weekly targets, merged into the same card as Non-negotiables - same divider
+   idiom already used for apt-add (a sub-form appended after a list). */
+.weekly-sub{margin-top:16px;padding-top:13px;border-top:1px dashed var(--line)}
+.subhead{font-size:13px;margin-bottom:2px}
 
 .wk{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px dashed var(--line)}
 .wk:last-child{border-bottom:none}
@@ -397,12 +411,17 @@ body.view-reports .board-only{display:none}
         <h2>Non-negotiables <span class="cnt" id="ritCnt"></span></h2>
         <div class="sub">Seven, not nine. A list you can't finish teaches you to ignore it.</div>
         <div id="rituals"></div>
-      </div>
+        <div class="rit-add" id="ritAdd">
+          <input id="ritName" class="rit-name" placeholder="Add a non-negotiable...">
+          <input id="ritTag" class="rit-tagin" placeholder="Tag (optional)">
+          <button id="ritAddBtn">+</button>
+        </div>
 
-      <div class="card">
-        <h2>Weekly targets</h2>
-        <div class="sub">These don't fit daily on this schedule. Weekly, they do.</div>
-        <div id="weekly"></div>
+        <div class="weekly-sub">
+          <h3 class="subhead">Weekly targets</h3>
+          <div class="sub">These don't fit daily on this schedule. Weekly, they do.</div>
+          <div id="weekly"></div>
+        </div>
       </div>
     </div>
 
@@ -510,7 +529,10 @@ var BLOCKS=[
  {s:"06:30",e:"07:00",n:"AFC EOD + shutdown", d:"Send it, log the shift, then sleep",  lane:"afc", days:WD}
 ];
 
-var RITUALS=[
+// Seed only - the live, editable list is S.rituals (see norm()). Same pattern
+// as DEFAULT_LANES: this is read once, the first time norm() meets a data
+// file with no "rituals" key yet.
+var DEFAULT_RITUALS=[
  {id:"sleep",l:"Slept 5+ hours",            tag:"Health"},
  {id:"drop", l:"School drop-off",           tag:"Family"},
  {id:"fetch",l:"School fetch",              tag:"Family"},
@@ -543,6 +565,8 @@ function norm(s){
   if(!Array.isArray(s.events))s.events=[];
   if(!Array.isArray(s.lanes)||!s.lanes.length)
     s.lanes=DEFAULT_LANES.map(function(L){return {id:L.id,name:L.name,color:L.color,ritual:L.ritual};});
+  if(!Array.isArray(s.rituals))
+    s.rituals=DEFAULT_RITUALS.map(function(r){return {id:r.id,l:r.l,tag:r.tag};});
   if(["auto","dark","light"].indexOf(s.theme)<0)s.theme="auto";
   if(typeof s.updatedAt!=="number")s.updatedAt=0;
   return s;
@@ -713,9 +737,9 @@ function streakOf(id){
   return c;
 }
 function pctFor(k){
-  var l=S.log[k];if(!l)return 0;var c=0;
-  RITUALS.forEach(function(r){if(l[r.id])c++;});
-  return Math.round(c/RITUALS.length*100);
+  var l=S.log[k];if(!l||!S.rituals.length)return 0;var c=0;
+  S.rituals.forEach(function(r){if(l[r.id])c++;});
+  return Math.round(c/S.rituals.length*100);
 }
 function daysStreak(){
   var c=0,k=today();
@@ -746,8 +770,8 @@ function renderHeader(){
   document.getElementById("hdrDate").textContent=
     d.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"})+" shift · 7:00am → 7:00am";
   var done=0,l=day();
-  RITUALS.forEach(function(r){if(l[r.id])done++;});
-  document.getElementById("sRit").textContent=Math.round(done/RITUALS.length*100)+"%";
+  S.rituals.forEach(function(r){if(l[r.id])done++;});
+  document.getElementById("sRit").textContent=(S.rituals.length?Math.round(done/S.rituals.length*100):0)+"%";
   document.getElementById("sTask").textContent=S.tasks.filter(function(t){return !t.done;}).length;
   document.getElementById("sStreak").textContent=daysStreak();
 
@@ -807,19 +831,35 @@ function renderNudges(){
 function renderRituals(){
   var l=day(),c=document.getElementById("rituals"),done=0;
   c.innerHTML="";
-  RITUALS.forEach(function(r){
+  S.rituals.forEach(function(r){
     var on=!!l[r.id];if(on)done++;
     var st=streakOf(r.id);
     var row=document.createElement("div");
     row.className="rit"+(on?" done":"");
     row.innerHTML='<div class="box'+(on?" done":"")+'" role="checkbox" tabindex="0"></div>'+
-      '<div class="rit-l">'+esc(r.l)+'<div class="rit-tag">'+esc(r.tag)+'</div></div>'+
-      '<div class="streak'+(st?"":" zero")+'">'+(st?"🔥 "+st:"—")+'</div>';
+      '<div class="rit-l">'+esc(r.l)+(r.tag?'<div class="rit-tag">'+esc(r.tag)+'</div>':'')+'</div>'+
+      '<div class="streak'+(st?"":" zero")+'">'+(st?"🔥 "+st:"—")+'</div>'+
+      '<button class="x" data-ract="del" aria-label="Remove non-negotiable">×</button>';
     row.querySelector(".box").addEventListener("click",function(){
       var d=day();d[r.id]=!d[r.id];if(!d[r.id])delete d[r.id];save();renderAll();});
+    row.querySelector("[data-ract=del]").addEventListener("click",function(){
+      // history (S.log entries, streaks) is left alone - it just stops
+      // corresponding to anything rendered, same as a deleted lane's tasks
+      S.rituals=S.rituals.filter(function(x){return x.id!==r.id;});
+      save();renderAll();
+    });
     c.appendChild(row);
   });
-  document.getElementById("ritCnt").textContent=done+"/"+RITUALS.length;
+  document.getElementById("ritCnt").textContent=done+"/"+S.rituals.length;
+}
+function addRitual(){
+  var nameI=document.getElementById("ritName"),tagI=document.getElementById("ritTag");
+  var l=nameI.value.trim();if(!l){nameI.focus();return;}
+  S.rituals.push({id:"rit_"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+    l:l,tag:tagI.value.trim()});
+  nameI.value="";tagI.value="";
+  save();renderAll();
+  nameI.focus();
 }
 
 function renderWeekly(){
@@ -1122,6 +1162,9 @@ function renderAll(){
   document.getElementById(id).addEventListener("input",function(){meta().t3[i]=this.value;save();});});
 document.getElementById("wins").addEventListener("input",function(){meta().wins=this.value;save();});
 document.getElementById("focusBtn").addEventListener("click",function(){S.focus=!S.focus;save();renderAll();});
+document.getElementById("ritAddBtn").addEventListener("click",addRitual);
+["ritName","ritTag"].forEach(function(id){
+  document.getElementById(id).addEventListener("keydown",function(e){if(e.key==="Enter")addRitual();});});
 // ---------- appointments ----------
 // Rebuilt on every renderAll() (not just once) so a lane added after boot
 // shows up as a choice immediately. Preserves whatever was already picked.
