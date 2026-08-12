@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>How's our Dave Looking?</title>
+<title>How's our Dave looking? · ProDash</title>
 <style>
 /* Palette. Variable NAMES are historical (forest/sage/olive/terra) but the values
    are the strong green/blue/yellow/orange scheme. Roles, not hues:
@@ -15,17 +15,77 @@
      --sage      neutral slate for secondary labels
      --night     deep indigo, sleep only
    Lane hues (blue/sky/indigo/green/yellow/slate) live in the LANES array in JS. */
+/* Tokens ending -ink are TEXT versions of a colour; the plain token is the FILL.
+   They must stay separate: a hue dark enough to carry white text is too dark to
+   BE text on a dark card, and vice versa. Same for --on-brand, which is the text
+   that sits on brand-coloured fills and stays light in both themes. */
 :root{
   color-scheme: light;
-  --forest:#15803D; --forest-dk:#14532D;
+  --forest:#15803D; --forest-dk:#14532D; --forest-ink:#15803D;
   --sage:#64748B; --olive:#16A34A; --olive-lt:#DCFCE7;
-  --ivory:#F6F7F9; --paper:#ffffff;
+  --ivory:#F6F7F9; --paper:#ffffff; --on-brand:#F0FDF4;
   --terra:#EA580C; --terra-lt:#FFEDD5; --terra-ink:#9A3412;
-  --night:#312E81;
+  --night:#312E81; --night-ink:#312E81;
   --line:#E2E8F0; --ink:#0F172A; --muted:#5D6B7E;
+  --ln-conduent:#2563EB; --ln-afc:#4F46E5; --ln-cmit:#0284C7;
+  --ln-biz:#16A34A;      --ln-grow:#CA8A04; --ln-other:#64748B;
   --serif:Georgia,"Times New Roman",serif;
   --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
 }
+
+/* ---- DARK ----------------------------------------------------------------
+   The two blocks below MUST hold identical values. One follows the OS setting,
+   the other the manual toggle; if they drift, the toggle and the system theme
+   disagree and the page half-changes. (This exact bug bit us once already.)
+   Edit them together, always.                                              */
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --forest:#166534; --forest-dk:#14532D; --forest-ink:#4ADE80;
+    --sage:#94A3B8; --olive:#4ADE80; --olive-lt:#14532D;
+    --ivory:#0B1120; --paper:#131C2E; --on-brand:#F0FDF4;
+    --terra:#FB923C; --terra-lt:#431407; --terra-ink:#FDBA74;
+    --night:#4F46E5; --night-ink:#A5B4FC;
+    --line:#243044; --ink:#E9EEF6; --muted:#8A99AD;
+    --ln-conduent:#60A5FA; --ln-afc:#818CF8; --ln-cmit:#38BDF8;
+    --ln-biz:#4ADE80;      --ln-grow:#FACC15; --ln-other:#94A3B8;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --forest:#166534; --forest-dk:#14532D; --forest-ink:#4ADE80;
+  --sage:#94A3B8; --olive:#4ADE80; --olive-lt:#14532D;
+  --ivory:#0B1120; --paper:#131C2E; --on-brand:#F0FDF4;
+  --terra:#FB923C; --terra-lt:#431407; --terra-ink:#FDBA74;
+  --night:#4F46E5; --night-ink:#A5B4FC;
+  --line:#243044; --ink:#E9EEF6; --muted:#8A99AD;
+  --ln-conduent:#60A5FA; --ln-afc:#818CF8; --ln-cmit:#38BDF8;
+  --ln-biz:#4ADE80;      --ln-grow:#FACC15; --ln-other:#94A3B8;
+}
+/* Nudge washes are rgba literals, so they need a dark override of their own. */
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) .nudge{
+    background:linear-gradient(90deg,rgba(251,146,60,.15),rgba(251,146,60,.03));
+    border-color:rgba(251,146,60,.4)}
+  :root:not([data-theme="light"]) .nudge.cool{
+    background:linear-gradient(90deg,rgba(129,140,248,.15),rgba(129,140,248,.03));
+    border-color:rgba(129,140,248,.4)}
+  :root:not([data-theme="light"]) .blk.now{
+    background:linear-gradient(90deg,rgba(74,222,128,.18),transparent)}
+  :root:not([data-theme="light"]) header:after{
+    background:radial-gradient(circle,rgba(74,222,128,.22),transparent 70%)}
+}
+:root[data-theme="dark"] .nudge{
+  background:linear-gradient(90deg,rgba(251,146,60,.15),rgba(251,146,60,.03));
+  border-color:rgba(251,146,60,.4)}
+:root[data-theme="dark"] .nudge.cool{
+  background:linear-gradient(90deg,rgba(129,140,248,.15),rgba(129,140,248,.03));
+  border-color:rgba(129,140,248,.4)}
+:root[data-theme="dark"] .blk.now{
+  background:linear-gradient(90deg,rgba(74,222,128,.18),transparent)}
+:root[data-theme="dark"] header:after{
+  background:radial-gradient(circle,rgba(74,222,128,.22),transparent 70%)}
+
 *{box-sizing:border-box}
 body{margin:0;background:var(--ivory);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
 .wrap{max-width:1200px;margin:0 auto;padding:20px 20px 60px}
@@ -33,29 +93,33 @@ h1,h2,h3{font-family:var(--serif);font-weight:700;margin:0}
 button{font-family:var(--sans);cursor:pointer;border:none;background:none;color:inherit;font-size:inherit}
 input,textarea{font-family:var(--sans);font-size:14px;color:var(--ink)}
 
-header{background:var(--forest);color:var(--ivory);border-radius:14px;padding:20px 24px;margin-bottom:14px;position:relative;overflow:hidden}
+header{background:var(--forest);color:var(--on-brand);border-radius:14px;padding:20px 24px;margin-bottom:14px;position:relative;overflow:hidden}
 header:after{content:"";position:absolute;right:-40px;top:-40px;width:220px;height:220px;background:radial-gradient(circle,rgba(74,222,128,.32),transparent 70%)}
 .hdr-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;position:relative;z-index:1}
 header h1{font-size:26px;letter-spacing:.3px}
-.hdr-date{color:var(--olive-lt);font-size:13px;margin-top:3px}
+/* Header text sits on the brand green. Hierarchy comes from size/weight, NOT
+   opacity — fading --on-brand drops it under 4.5:1 against --forest. */
+.hdr-sub{font-size:11.5px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;color:var(--on-brand);margin-top:4px}
+.hdr-sub span{font-weight:600;letter-spacing:.4px}
+.hdr-date{color:var(--on-brand);font-size:13px;margin-top:5px}
 .hdr-stats{display:flex;gap:20px;text-align:right}
 .stat b{display:block;font-family:var(--serif);font-size:21px;line-height:1.1}
-.stat span{font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:var(--olive-lt)}
+.stat span{font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:var(--on-brand)}
 .daybar{margin-top:16px;position:relative;z-index:1}
 .daybar-track{height:6px;background:rgba(250,249,246,.2);border-radius:3px;overflow:hidden}
 .daybar-fill{height:100%;background:var(--olive);border-radius:3px;transition:width .4s}
-.daybar-lbl{display:flex;justify-content:space-between;font-size:11px;color:var(--olive-lt);margin-top:6px}
+.daybar-lbl{display:flex;justify-content:space-between;font-size:11px;color:var(--on-brand);margin-top:6px}
 
 .nowbar{display:flex;align-items:center;gap:14px;background:var(--paper);border:1px solid var(--line);border-left:5px solid var(--terra);border-radius:12px;padding:14px 18px;margin-bottom:14px;flex-wrap:wrap}
-.nowbar.sleep{border-left-color:var(--night)}
+.nowbar.sleep{border-left-color:var(--night-ink)}
 .nowbar .np{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--terra-ink);font-weight:700}
-.nowbar.sleep .np{color:var(--night)}
+.nowbar.sleep .np{color:var(--night-ink)}
 .nowbar .nt{font-family:var(--serif);font-size:19px;font-weight:700}
 .nowbar .nm{color:var(--muted);font-size:12.5px}
 .nowbar .spacer{flex:1}
-.pill{border:1px solid var(--line);border-radius:999px;padding:7px 15px;font-size:12.5px;font-weight:600;background:var(--paper);color:var(--forest);transition:.15s}
+.pill{border:1px solid var(--line);border-radius:999px;padding:7px 15px;font-size:12.5px;font-weight:600;background:var(--paper);color:var(--forest-ink);transition:.15s}
 .pill:hover{background:var(--olive-lt);border-color:var(--olive)}
-.pill.on{background:var(--forest);color:var(--ivory);border-color:var(--forest)}
+.pill.on{background:var(--forest);color:var(--on-brand);border-color:var(--forest-ink)}
 .pill.sync{display:flex;align-items:center;gap:7px}
 .pill.sync i{width:7px;height:7px;border-radius:50%;background:var(--line);display:block}
 .pill.sync.ok i{background:var(--olive)}
@@ -74,7 +138,7 @@ header h1{font-size:26px;letter-spacing:.3px}
 .sleepcard{border-left:4px solid var(--night)}
 .sleep-in{display:flex;align-items:center;gap:9px;margin-bottom:11px}
 .sleep-in input{width:62px;border:1px solid var(--line);border-radius:7px;padding:7px 9px;background:var(--ivory);outline:none;text-align:center;font-size:16px;font-family:var(--serif);font-weight:700}
-.sleep-in input:focus{border-color:var(--night);background:var(--paper)}
+.sleep-in input:focus{border-color:var(--night-ink);background:var(--paper)}
 .sleep-in label{font-size:12px;color:var(--muted);flex:1}
 .debt{display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:5px}
 .debt b{font-family:var(--serif);font-size:15px}
@@ -88,9 +152,9 @@ header h1{font-size:26px;letter-spacing:.3px}
 .rit{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px dashed var(--line)}
 .rit:last-child{border-bottom:none}
 .box{width:19px;height:19px;min-width:19px;border:2px solid var(--olive);border-radius:5px;display:flex;align-items:center;justify-content:center;transition:.15s;background:var(--paper)}
-.box:hover{border-color:var(--forest);background:var(--ivory)}
-.box.done{background:var(--forest);border-color:var(--forest)}
-.box.done:after{content:"";width:5px;height:9px;border:solid var(--ivory);border-width:0 2px 2px 0;transform:rotate(45deg) translate(-1px,-1px)}
+.box:hover{border-color:var(--forest-ink);background:var(--ivory)}
+.box.done{background:var(--forest);border-color:var(--forest-ink)}
+.box.done:after{content:"";width:5px;height:9px;border:solid var(--on-brand);border-width:0 2px 2px 0;transform:rotate(45deg) translate(-1px,-1px)}
 .rit-l{flex:1;font-size:13px}
 .rit.done .rit-l{color:var(--muted);text-decoration:line-through}
 .rit-tag{font-size:9.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--sage);font-weight:700}
@@ -102,21 +166,21 @@ header h1{font-size:26px;letter-spacing:.3px}
 .wk-l{flex:1;font-size:13px}
 .wk-p{display:flex;gap:3px}
 .wk-p i{width:13px;height:13px;border-radius:3px;border:1.5px solid var(--olive);display:block}
-.wk-p i.on{background:var(--forest);border-color:var(--forest)}
-.wk-add{font-size:11px;font-weight:700;color:var(--forest);border:1px solid var(--line);border-radius:6px;padding:2px 8px}
+.wk-p i.on{background:var(--forest);border-color:var(--forest-ink)}
+.wk-add{font-size:11px;font-weight:700;color:var(--forest-ink);border:1px solid var(--line);border-radius:6px;padding:2px 8px}
 .wk-add:hover{background:var(--olive-lt)}
 
 .blk{display:flex;gap:11px;padding:7px 0;border-bottom:1px dashed var(--line);align-items:flex-start}
 .blk:last-child{border-bottom:none}
 .blk-t{font-size:10.5px;color:var(--muted);width:94px;min-width:94px;font-variant-numeric:tabular-nums;padding-top:2px}
-.blk-b{width:3px;border-radius:2px;background:var(--olive-lt);align-self:stretch;min-height:20px}
+.blk-b{width:3px;border-radius:2px;background:var(--sage);align-self:stretch;min-height:20px}
 .blk-n{font-size:12.5px;font-weight:600}
 .blk-d{font-size:10.5px;color:var(--muted)}
 .blk.now{background:linear-gradient(90deg,rgba(22,163,74,.22),transparent);border-radius:6px;padding-left:6px;margin-left:-6px}
 .blk.now .blk-b{background:var(--terra)}
-.blk.now .blk-n{color:var(--forest)}
+.blk.now .blk-n{color:var(--forest-ink)}
 .blk.past{opacity:.4}
-.blk.sleepb .blk-n{color:var(--night)}
+.blk.sleepb .blk-n{color:var(--night-ink)}
 
 .lanes{display:grid;grid-template-columns:repeat(auto-fit,minmax(224px,1fr));gap:13px}
 .lane{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:13px;transition:.25s}
@@ -126,7 +190,7 @@ header h1{font-size:26px;letter-spacing:.3px}
 .lane-n{font-size:11px;color:var(--muted);background:var(--ivory);border-radius:999px;padding:1px 7px;border:1px solid var(--line)}
 .lane-s{font-size:10.5px;color:var(--muted);margin-bottom:9px;min-height:14px}
 .lane.dim{opacity:.32;filter:grayscale(.65)}
-.lane.active{box-shadow:0 0 0 2px var(--forest)}
+.lane.active{box-shadow:0 0 0 2px var(--forest-ink)}
 .tsk{display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px dashed var(--line)}
 .tsk:last-of-type{border-bottom:none}
 .tsk-l{flex:1;font-size:12.5px;word-break:break-word}
@@ -137,7 +201,7 @@ header h1{font-size:26px;letter-spacing:.3px}
 .addrow{display:flex;gap:6px;margin-top:9px}
 .addrow input{flex:1;border:1px solid var(--line);border-radius:7px;padding:6px 9px;background:var(--ivory);outline:none;min-width:0}
 .addrow input:focus{border-color:var(--olive);background:var(--paper)}
-.addrow button{background:var(--forest);color:var(--ivory);border-radius:7px;padding:6px 11px;font-weight:700}
+.addrow button{background:var(--forest);color:var(--on-brand);border-radius:7px;padding:6px 11px;font-weight:700}
 .empty{font-size:11.5px;color:var(--muted);font-style:italic;padding:7px 0}
 
 .week{display:flex;gap:6px;margin-top:4px}
@@ -147,11 +211,11 @@ header h1{font-size:26px;letter-spacing:.3px}
 .wd-fill.low{background:var(--terra)}
 .wd-fill.mid{background:var(--sage)}
 .wd-l{font-size:9.5px;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:.4px}
-.wd.today .wd-l{color:var(--forest);font-weight:700}
+.wd.today .wd-l{color:var(--forest-ink);font-weight:700}
 .wd-p{font-size:9.5px;color:var(--muted)}
 
 .top3{display:flex;gap:8px;align-items:center;margin-bottom:7px}
-.top3 span{width:17px;height:17px;min-width:17px;border-radius:50%;background:var(--forest);color:var(--ivory);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.top3 span{width:17px;height:17px;min-width:17px;border-radius:50%;background:var(--forest);color:var(--on-brand);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center}
 .top3 input{flex:1;border:none;border-bottom:1px solid var(--line);padding:4px 2px;background:none;outline:none}
 .top3 input:focus{border-color:var(--olive)}
 textarea.note{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px;background:var(--ivory);resize:vertical;min-height:58px;outline:none;line-height:1.5}
@@ -159,13 +223,13 @@ textarea.note:focus{border-color:var(--olive);background:var(--paper)}
 
 .foot{display:flex;gap:10px;justify-content:center;margin-top:16px;flex-wrap:wrap}
 .foot button{font-size:11.5px;color:var(--muted);border-bottom:1px solid transparent}
-.foot button:hover{color:var(--forest);border-color:var(--olive)}
+.foot button:hover{color:var(--forest-ink);border-color:var(--olive)}
 .saved{text-align:center;font-size:11px;color:var(--olive);height:14px;margin-top:6px}
 .nudge{background:linear-gradient(90deg,rgba(234,88,12,.17),rgba(234,88,12,.04));border:1px solid rgba(234,88,12,.45);border-left:4px solid var(--terra);border-radius:9px;padding:9px 12px;font-size:12px;margin-bottom:10px;display:flex;gap:9px;align-items:flex-start}
 .nudge b{color:var(--terra-ink)}
-.nudge.cool{background:linear-gradient(90deg,rgba(49,46,129,.15),rgba(49,46,129,.03));border-color:rgba(49,46,129,.4);border-left-color:var(--night)}
-.nudge.cool b{color:var(--night)}
-.dual{background:var(--night);color:var(--ivory);font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border-radius:4px;padding:1px 5px}
+.nudge.cool{background:linear-gradient(90deg,rgba(49,46,129,.15),rgba(49,46,129,.03));border-color:rgba(49,46,129,.4);border-left-color:var(--night-ink)}
+.nudge.cool b{color:var(--night-ink)}
+.dual{background:var(--night);color:var(--on-brand);font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border-radius:4px;padding:1px 5px}
 </style>
 </head>
 <body>
@@ -174,7 +238,8 @@ textarea.note:focus{border-color:var(--olive);background:var(--paper)}
   <header>
     <div class="hdr-top">
       <div>
-        <h1>How's our Dave Looking?</h1>
+        <h1>How's our Dave looking?</h1>
+        <div class="hdr-sub">Productivity Dashboard <span>(ProDash)</span></div>
         <div class="hdr-date" id="hdrDate"></div>
       </div>
       <div class="hdr-stats">
@@ -198,6 +263,7 @@ textarea.note:focus{border-color:var(--olive);background:var(--paper)}
     </div>
     <div class="spacer"></div>
     <button class="pill" id="focusBtn">Focus mode: off</button>
+    <button class="pill" id="themeBtn" title="Light / dark / follow the system">Theme: auto</button>
     <div>
       <button class="pill sync" id="syncBtn"><i></i><span id="syncTxt">Local only</span></button>
       <div class="synced-note" id="syncNote"></div>
@@ -281,13 +347,15 @@ var SLEEP_TARGET=7;
 // Blue = the three client jobs. Green = his own company. Yellow = learning.
 // Slate = low priority, drained of colour on purpose. Orange is reserved for
 // attention (see --terra) and is deliberately never a lane.
+// Colours are CSS variables, not hex, so switching theme re-tints every lane dot
+// and timeline bar with no re-render. Values live in the :root blocks above.
 var LANES=[
- {id:"conduent",name:"Conduent",   color:"#2563EB", ritual:"2pm–11pm · clear items + to-complete list"},
- {id:"afc",     name:"AFC",        color:"#4F46E5", ritual:"11pm–7am · EOD report before you sleep"},
- {id:"cmit",    name:"CMIT",       color:"#0284C7", ritual:"10:30pm–6:30am · write tomorrow's to-dos"},
- {id:"biz",     name:"My Company", color:"#16A34A", ritual:"1pm–2pm · the only hour nobody else owns"},
- {id:"grow",    name:"Learning",   color:"#CA8A04", ritual:"2× a week, not daily"},
- {id:"other",   name:"HOA / Low",  color:"#64748B", ritual:"Batch once a week"}
+ {id:"conduent",name:"Conduent",   color:"var(--ln-conduent)", ritual:"2pm–11pm · clear items + to-complete list"},
+ {id:"afc",     name:"AFC",        color:"var(--ln-afc)",      ritual:"11pm–7am · EOD report before you sleep"},
+ {id:"cmit",    name:"CMIT",       color:"var(--ln-cmit)",     ritual:"10:30pm–6:30am · write tomorrow's to-dos"},
+ {id:"biz",     name:"My Company", color:"var(--ln-biz)",      ritual:"1pm–2pm · the only hour nobody else owns"},
+ {id:"grow",    name:"Learning",   color:"var(--ln-grow)",     ritual:"2× a week, not daily"},
+ {id:"other",   name:"HOA / Low",  color:"var(--ln-other)",    ritual:"Batch once a week"}
 ];
 
 // clock times; converted to shift-minutes internally
@@ -338,6 +406,7 @@ function norm(s){
   if(!s.log)s.log={};
   if(!s.days)s.days={};
   if(typeof s.focus!=="boolean")s.focus=false;
+  if(["auto","dark","light"].indexOf(s.theme)<0)s.theme="auto";
   if(typeof s.updatedAt!=="number")s.updatedAt=0;
   return s;
 }
@@ -651,7 +720,7 @@ function renderTimeline(){
     var el=document.createElement("div");
     el.className="blk"+(isNow?" now":"")+(isPast?" past":"")+(b.sleep?" sleepb":"");
     el.innerHTML='<div class="blk-t">'+fmt(b.s)+"–"+fmt(b.e)+'</div>'+
-      '<div class="blk-b" style="background:'+(b.sleep?"var(--night)":(lane?lane.color:"var(--olive-lt)"))+'"></div>'+
+      '<div class="blk-b" style="background:'+(b.sleep?"var(--night)":(lane?lane.color:"var(--sage)"))+'"></div>'+
       '<div><div class="blk-n">'+esc(b.n)+(b.dual?' <span class="dual">dual</span>':'')+'</div>'+
       '<div class="blk-d">'+esc(b.d)+'</div></div>';
     c.appendChild(el);
@@ -729,9 +798,20 @@ function renderShutdown(){
   if(document.activeElement!==w)w.value=m.wins||"";
 }
 
+// auto = follow the OS. Explicit choices stamp data-theme, which wins over the
+// prefers-color-scheme block in both directions.
+function applyTheme(){
+  if(S.theme==="auto")document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.setAttribute("data-theme",S.theme);
+  var tb=document.getElementById("themeBtn");
+  tb.textContent="Theme: "+S.theme;
+  tb.className="pill"+(S.theme==="dark"?" on":"");
+}
+
 function renderAll(){
   renderHeader();renderNow();renderNudges();renderSleep();renderRituals();
   renderWeekly();renderTimeline();renderLanes();renderWeek();renderShutdown();
+  applyTheme();
   var fb=document.getElementById("focusBtn");
   fb.textContent="Focus mode: "+(S.focus?"on":"off");
   fb.className="pill"+(S.focus?" on":"");
@@ -748,6 +828,9 @@ document.getElementById("sleepHrs").addEventListener("input",function(){
   document.getElementById(id).addEventListener("input",function(){meta().t3[i]=this.value;save();});});
 document.getElementById("wins").addEventListener("input",function(){meta().wins=this.value;save();});
 document.getElementById("focusBtn").addEventListener("click",function(){S.focus=!S.focus;save();renderAll();});
+document.getElementById("themeBtn").addEventListener("click",function(){
+  S.theme = S.theme==="auto" ? "dark" : (S.theme==="dark" ? "light" : "auto");
+  save();applyTheme();});
 document.getElementById("resetBtn").addEventListener("click",function(){
   if(!confirm("Clear this shift's checkmarks and notes? Tasks are kept."))return;
   delete S.log[today()];delete S.days[today()];save();renderAll();});
@@ -777,6 +860,7 @@ document.getElementById("syncBtn").addEventListener("click",function(){
 window.addEventListener("focus",function(){if(fileHandle)readFile();});
 document.addEventListener("visibilitychange",function(){if(!document.hidden&&fileHandle)readFile();});
 
+applyTheme();   // before first paint, so a dark session doesn't flash white
 renderAll();
 restore();
 setInterval(function(){renderHeader();renderNow();renderTimeline();renderLanes();renderNudges();},60000);
