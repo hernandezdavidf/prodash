@@ -96,6 +96,17 @@ Deleting a lane that one of the three job shifts (Conduent/AFC/CMIT) belongs
 to doesn't touch the shift itself — it still shows up in the Shift timeline
 at its usual time, just in a neutral grey instead of its colour.
 
+## Non-negotiables
+
+One card now, with Weekly targets underneath it. Add a new non-negotiable
+with the row at the bottom of the list — a name, and an optional tag like
+"Health" or "Family". Remove one with the **×** on its row; unlike removing a
+lane, this doesn't ask you to confirm, the same as deleting a task. Its past
+history stays in the day log even after you remove it, it just stops
+counting toward anything going forward.
+
+Weekly targets (Exercise, Learn something new) are still fixed for now.
+
 ## Reports
 
 A second tab, next to **Board**, in the header.

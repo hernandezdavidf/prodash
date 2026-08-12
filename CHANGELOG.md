@@ -2,6 +2,20 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-08-13 — Merge Non-negotiables and Weekly targets; add/remove non-negotiables
+
+One card now: Non-negotiables on top with an add row (name + optional tag)
+pinned under the list, a dashed divider, then Weekly targets below.
+Non-negotiables became editable data (`S.rituals`, migrated from the old
+hardcoded `RITUALS`), same pattern as lanes — add one, or remove any of them
+(including the original seven) with the × on its row, no confirmation, same
+as deleting a task. Deleting one leaves its history in the day log alone; it
+just stops corresponding to anything rendered. The header's Rituals % and the
+week review bars both guard against zero rituals (0%, not NaN) — checked by
+deleting every non-negotiable and confirming nothing breaks, then re-adding
+one. Weekly targets themselves are unchanged: still fixed at Exercise ×3 and
+Learn ×2, no add/remove — only Non-negotiables were asked to be editable.
+
 ## 2026-08-12 — Rename and delete any lane on the Board
 
 Every lane header — including the original six, not just custom ones — now
