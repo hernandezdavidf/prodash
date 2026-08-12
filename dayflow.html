@@ -3,16 +3,26 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DayFlow</title>
+<title>How's our Dave Looking?</title>
 <style>
+/* Palette. Variable NAMES are historical (forest/sage/olive/terra) but the values
+   are the strong green/blue/yellow/orange scheme. Roles, not hues:
+     --forest    brand green — header, buttons, checkboxes, progress fills
+     --olive     vivid green accent — borders, focus rings
+     --olive-lt  light green wash — hovers, gradients
+     --terra     ORANGE, the single attention colour: nudges, streaks, now-marker,
+                 overdue. Never used for a lane, so orange always means "look here".
+     --sage      neutral slate for secondary labels
+     --night     deep indigo, sleep only
+   Lane hues (blue/sky/indigo/green/yellow/slate) live in the LANES array in JS. */
 :root{
   color-scheme: light;
-  --forest:#2d4a2b; --forest-dk:#1e321d;
-  --sage:#7d8471; --olive:#a4ac86; --olive-lt:#c9cfb4;
-  --ivory:#faf9f6; --paper:#ffffff;
-  --terra:#b5654a; --terra-lt:#e8d5cd;
-  --night:#3a4a5c;
-  --line:#e3e2da; --ink:#23291f; --muted:#6d7266;
+  --forest:#15803D; --forest-dk:#14532D;
+  --sage:#64748B; --olive:#16A34A; --olive-lt:#DCFCE7;
+  --ivory:#F6F7F9; --paper:#ffffff;
+  --terra:#EA580C; --terra-lt:#FFEDD5; --terra-ink:#9A3412;
+  --night:#312E81;
+  --line:#E2E8F0; --ink:#0F172A; --muted:#5D6B7E;
   --serif:Georgia,"Times New Roman",serif;
   --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
 }
@@ -24,7 +34,7 @@ button{font-family:var(--sans);cursor:pointer;border:none;background:none;color:
 input,textarea{font-family:var(--sans);font-size:14px;color:var(--ink)}
 
 header{background:var(--forest);color:var(--ivory);border-radius:14px;padding:20px 24px;margin-bottom:14px;position:relative;overflow:hidden}
-header:after{content:"";position:absolute;right:-40px;top:-40px;width:220px;height:220px;background:radial-gradient(circle,rgba(164,172,134,.28),transparent 70%)}
+header:after{content:"";position:absolute;right:-40px;top:-40px;width:220px;height:220px;background:radial-gradient(circle,rgba(74,222,128,.32),transparent 70%)}
 .hdr-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;position:relative;z-index:1}
 header h1{font-size:26px;letter-spacing:.3px}
 .hdr-date{color:var(--olive-lt);font-size:13px;margin-top:3px}
@@ -38,7 +48,7 @@ header h1{font-size:26px;letter-spacing:.3px}
 
 .nowbar{display:flex;align-items:center;gap:14px;background:var(--paper);border:1px solid var(--line);border-left:5px solid var(--terra);border-radius:12px;padding:14px 18px;margin-bottom:14px;flex-wrap:wrap}
 .nowbar.sleep{border-left-color:var(--night)}
-.nowbar .np{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--terra);font-weight:700}
+.nowbar .np{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--terra-ink);font-weight:700}
 .nowbar.sleep .np{color:var(--night)}
 .nowbar .nt{font-family:var(--serif);font-size:19px;font-weight:700}
 .nowbar .nm{color:var(--muted);font-size:12.5px}
@@ -48,7 +58,7 @@ header h1{font-size:26px;letter-spacing:.3px}
 .pill.on{background:var(--forest);color:var(--ivory);border-color:var(--forest)}
 .pill.sync{display:flex;align-items:center;gap:7px}
 .pill.sync i{width:7px;height:7px;border-radius:50%;background:var(--line);display:block}
-.pill.sync.ok i{background:#3f7d3a}
+.pill.sync.ok i{background:var(--olive)}
 .pill.sync.warn i{background:var(--terra)}
 .pill.sync.ok{border-color:var(--olive)}
 .synced-note{font-size:10.5px;color:var(--muted);text-align:right;margin-top:3px;max-width:230px}
@@ -84,8 +94,8 @@ header h1{font-size:26px;letter-spacing:.3px}
 .rit-l{flex:1;font-size:13px}
 .rit.done .rit-l{color:var(--muted);text-decoration:line-through}
 .rit-tag{font-size:9.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--sage);font-weight:700}
-.streak{font-size:11px;color:var(--terra);font-weight:700;white-space:nowrap}
-.streak.zero{color:var(--line)}
+.streak{font-size:11px;color:var(--terra-ink);font-weight:700;white-space:nowrap}
+.streak.zero{color:var(--sage)}
 
 .wk{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px dashed var(--line)}
 .wk:last-child{border-bottom:none}
@@ -102,7 +112,7 @@ header h1{font-size:26px;letter-spacing:.3px}
 .blk-b{width:3px;border-radius:2px;background:var(--olive-lt);align-self:stretch;min-height:20px}
 .blk-n{font-size:12.5px;font-weight:600}
 .blk-d{font-size:10.5px;color:var(--muted)}
-.blk.now{background:linear-gradient(90deg,rgba(164,172,134,.24),transparent);border-radius:6px;padding-left:6px;margin-left:-6px}
+.blk.now{background:linear-gradient(90deg,rgba(22,163,74,.22),transparent);border-radius:6px;padding-left:6px;margin-left:-6px}
 .blk.now .blk-b{background:var(--terra)}
 .blk.now .blk-n{color:var(--forest)}
 .blk.past{opacity:.4}
@@ -121,14 +131,14 @@ header h1{font-size:26px;letter-spacing:.3px}
 .tsk:last-of-type{border-bottom:none}
 .tsk-l{flex:1;font-size:12.5px;word-break:break-word}
 .tsk.done .tsk-l{color:var(--muted);text-decoration:line-through}
-.tsk .age{font-size:9.5px;color:var(--terra);font-weight:700;white-space:nowrap;padding-top:2px}
-.tsk .x{color:var(--line);font-size:15px;line-height:1;padding:0 2px}
+.tsk .age{font-size:9.5px;color:var(--terra-ink);font-weight:700;white-space:nowrap;padding-top:2px}
+.tsk .x{color:var(--sage);font-size:15px;line-height:1;padding:0 2px}
 .tsk:hover .x{color:var(--terra)}
 .addrow{display:flex;gap:6px;margin-top:9px}
 .addrow input{flex:1;border:1px solid var(--line);border-radius:7px;padding:6px 9px;background:var(--ivory);outline:none;min-width:0}
 .addrow input:focus{border-color:var(--olive);background:var(--paper)}
 .addrow button{background:var(--forest);color:var(--ivory);border-radius:7px;padding:6px 11px;font-weight:700}
-.empty{font-size:11.5px;color:var(--olive);font-style:italic;padding:7px 0}
+.empty{font-size:11.5px;color:var(--muted);font-style:italic;padding:7px 0}
 
 .week{display:flex;gap:6px;margin-top:4px}
 .wd{flex:1;text-align:center}
@@ -151,9 +161,9 @@ textarea.note:focus{border-color:var(--olive);background:var(--paper)}
 .foot button{font-size:11.5px;color:var(--muted);border-bottom:1px solid transparent}
 .foot button:hover{color:var(--forest);border-color:var(--olive)}
 .saved{text-align:center;font-size:11px;color:var(--olive);height:14px;margin-top:6px}
-.nudge{background:linear-gradient(90deg,rgba(181,101,74,.1),rgba(181,101,74,.02));border:1px solid rgba(181,101,74,.3);border-radius:9px;padding:9px 12px;font-size:12px;margin-bottom:10px;display:flex;gap:9px;align-items:flex-start}
-.nudge b{color:var(--terra)}
-.nudge.cool{background:linear-gradient(90deg,rgba(58,74,92,.09),rgba(58,74,92,.02));border-color:rgba(58,74,92,.3)}
+.nudge{background:linear-gradient(90deg,rgba(234,88,12,.17),rgba(234,88,12,.04));border:1px solid rgba(234,88,12,.45);border-left:4px solid var(--terra);border-radius:9px;padding:9px 12px;font-size:12px;margin-bottom:10px;display:flex;gap:9px;align-items:flex-start}
+.nudge b{color:var(--terra-ink)}
+.nudge.cool{background:linear-gradient(90deg,rgba(49,46,129,.15),rgba(49,46,129,.03));border-color:rgba(49,46,129,.4);border-left-color:var(--night)}
 .nudge.cool b{color:var(--night)}
 .dual{background:var(--night);color:var(--ivory);font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border-radius:4px;padding:1px 5px}
 </style>
@@ -164,7 +174,7 @@ textarea.note:focus{border-color:var(--olive);background:var(--paper)}
   <header>
     <div class="hdr-top">
       <div>
-        <h1>DayFlow</h1>
+        <h1>How's our Dave Looking?</h1>
         <div class="hdr-date" id="hdrDate"></div>
       </div>
       <div class="hdr-stats">
@@ -268,13 +278,16 @@ var KEY="dayflow.v2";
 var ROLL=7*60;          // logical day starts 07:00
 var SLEEP_TARGET=7;
 
+// Blue = the three client jobs. Green = his own company. Yellow = learning.
+// Slate = low priority, drained of colour on purpose. Orange is reserved for
+// attention (see --terra) and is deliberately never a lane.
 var LANES=[
- {id:"conduent",name:"Conduent",   color:"#2d4a2b", ritual:"2pm–11pm · clear items + to-complete list"},
- {id:"afc",     name:"AFC",        color:"#7d8471", ritual:"11pm–7am · EOD report before you sleep"},
- {id:"cmit",    name:"CMIT",       color:"#a4ac86", ritual:"10:30pm–6:30am · write tomorrow's to-dos"},
- {id:"biz",     name:"My Company", color:"#b5654a", ritual:"1pm–2pm · the only hour nobody else owns"},
- {id:"grow",    name:"Learning",   color:"#4a6b58", ritual:"2× a week, not daily"},
- {id:"other",   name:"HOA / Low",  color:"#9a9a8c", ritual:"Batch once a week"}
+ {id:"conduent",name:"Conduent",   color:"#2563EB", ritual:"2pm–11pm · clear items + to-complete list"},
+ {id:"afc",     name:"AFC",        color:"#4F46E5", ritual:"11pm–7am · EOD report before you sleep"},
+ {id:"cmit",    name:"CMIT",       color:"#0284C7", ritual:"10:30pm–6:30am · write tomorrow's to-dos"},
+ {id:"biz",     name:"My Company", color:"#16A34A", ritual:"1pm–2pm · the only hour nobody else owns"},
+ {id:"grow",    name:"Learning",   color:"#CA8A04", ritual:"2× a week, not daily"},
+ {id:"other",   name:"HOA / Low",  color:"#64748B", ritual:"Batch once a week"}
 ];
 
 // clock times; converted to shift-minutes internally
