@@ -1,4 +1,13 @@
-# Workflow: Running the day with the dashboard
+# Workflow: Running the day with dashboard.html (v8) — NOT the daily app
+
+> **Superseded 2026-08-12.** David went back to DayFlow, now
+> **"How's our Dave looking? · ProDash"** (`dayflow.html`). See
+> [prodash-usage.md](prodash-usage.md) for the app you actually open each day.
+>
+> This document describes `dashboard.html`, which is kept only as the reference
+> implementation to port features from — its week grid and conflict/free-time
+> engine have not been moved over yet. Do not log your day in it; you would split
+> your history across two apps.
 
 **Objective:** capture what needs doing, cross it off, and see where the hours actually go.
 

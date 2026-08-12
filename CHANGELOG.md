@@ -2,6 +2,46 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-08-12 — Back to DayFlow, now "How's our Dave looking? · ProDash"
+
+David preferred DayFlow over the v8 rebuild, so DayFlow is now the daily app.
+`dashboard.html` (v8) stays as the reference to port features from.
+
+**Brought under version control.** `dayflow.html` copied from
+`00 - EVESYS\Schedule and Tasks\` and committed byte-identical before any edit.
+The original stays there untouched as a fallback. Both point at the same
+`dayflow-data.json` in OneDrive, so no data migration was needed.
+
+**Renamed** to "How's our Dave looking?" with a "Productivity Dashboard (ProDash)"
+subtitle.
+
+**Stronger palette.** Green/blue/yellow/orange at full saturation replacing the
+muted earth tones. Conduent blue, CMIT sky, AFC indigo, My Company green,
+Learning yellow, HOA slate. Orange became the single attention colour — nudges,
+streaks, now-marker, ageing tasks — and is deliberately never a lane, so orange
+always means "look here". Variable names were kept, so 150 lines of CSS didn't
+need rewriting.
+
+**Dark mode** with an auto/dark/light toggle, persisted in `S.theme` so the
+choice syncs through the data file to other PCs. This required splitting tokens
+that were doing double duty as both a fill and as text on that fill
+(`--forest`/`--forest-ink`, `--night`/`--night-ink`, `--ivory`/`--on-brand`,
+`--terra`/`--terra-ink`/`--on-warm`) — a hue dark enough to carry white text is
+too dark to *be* text on a dark card. Lane colours moved into CSS variables so a
+theme switch re-tints every dot and bar with no re-render.
+
+**Appointments with real times.** The schedule blocks were hardcoded in source,
+so booking a dentist appointment was impossible. Added `S.events`, merged with
+the recurring backbone by `dayBlocks()`. Must-attend appointments raise a nudge
+within 2 hours. Inline add row, delete with an ×.
+
+**Fixed:** the schedule had no day-of-week awareness, so Conduent, CMIT and AFC
+rendered on Saturdays and Sundays. Weekends now show only Sleep, Wake + prep and
+Dinner.
+
+**Verification:** 162 text elements measured at ≥4.5:1 contrast in both themes.
+Console hooks `dfDebug.dayBlocks(date)` and `dfDebug.state()` added for testing.
+
 ## 2026-08-12 — Productivity Dashboard v8
 
 Built `dashboard.html`, a single standalone file that opens by double-clicking and works
