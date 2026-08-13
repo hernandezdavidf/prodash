@@ -3,9 +3,6 @@
 **App:** `dayflow.html` — "How's our Dave looking? · Productivity Dashboard (ProDash)".
 Double-click it. No internet, no install, no login.
 
-**This is the daily app.** `dashboard.html` (v8) is kept only as a parts bin —
-don't log anything in it, or your history splits across two places.
-
 ---
 
 ## First run — connect the data file
@@ -29,7 +26,7 @@ storage and you should use Export backup instead.
 ## The 7am rule
 
 **The day rolls over at 7:00am, not midnight.** At 3am on Tuesday, ProDash still
-says Monday — because Monday's AFC shift is still running. Work you log at 3am
+says Monday — because Monday's Night Client A shift is still running. Work you log at 3am
 counts against the right shift. Everything in the app follows this.
 
 ---
@@ -76,7 +73,7 @@ Weekends only show Sleep, Wake + prep and Dinner — the client shifts are Mon�
 
 Click **+ Add lane** at the end of the board. Give it a name, an optional note
 on when it happens, and pick one of the six colours offered — then it works
-exactly like Conduent or AFC: add tasks, tick them off, it counts toward
+exactly like Day Client or Night Client A: add tasks, tick them off, it counts toward
 Reports. Drag any lane by its **☰** grip to put it where you want on the board.
 
 ## Renaming or removing a lane
@@ -92,8 +89,8 @@ header.
   just want it out of the way for now, drag it to the end of the board
   instead of deleting it.
 
-Deleting a lane that one of the three job shifts (Conduent/AFC/CMIT) belongs
-to doesn't touch the shift itself — it still shows up in the Shift timeline
+Deleting a lane that one of the three job shifts (Day Client/Night Client A/
+Night Client B) belongs to doesn't touch the shift itself — it still shows up in the Shift timeline
 at its usual time, just in a neutral grey instead of its colour.
 
 ## Non-negotiables
@@ -123,7 +120,7 @@ A second tab, next to **Board**, in the header.
 
 ## Colours
 
-Blue = the three client jobs (Conduent, CMIT, AFC in three tints). Green = your
+Blue = the three client jobs (Day Client, Night Client A, Night Client B in three tints). Green = your
 company. Yellow = learning. Slate = HOA and low priority, drained on purpose.
 
 **Orange is never a lane.** It's reserved for attention: nudges, streaks, the

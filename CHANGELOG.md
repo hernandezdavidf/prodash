@@ -2,6 +2,34 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-08-13 — Anonymized employer names; removed the deprecated v8 file; noreply email
+
+Prep for going public (GitHub Pages, Phase 3).
+
+**Employer names anonymized** everywhere in the repo — source code, docs, and
+this changelog's history. David's real task data was never in the repo and
+keeps using real names privately; this was purely about what a stranger
+reading the public repo would see. Renamed by shift role rather than to
+fully generic labels, so the structure (one day job, two overlapping night
+jobs) stays legible without naming anyone: Conduent → Day Client,
+AFC → Night Client A, CMIT → Night Client B. Applied to lane ids, CSS
+variable names, and labels alike, not just display text — a careful reader
+could still infer an employer from `--ln-conduent` even with the visible
+name changed.
+
+**Deleted `dashboard.html` (v8) and its two docs** (`dashboard-usage.md`,
+`dashboard-maintenance.md`), plus the now-pointless `backups/` folder. It was
+already superseded by `dayflow.html` and kept only as a reference to port
+features from — dark mode and appointments were ported months ago; the week
+grid and conflict engine were always optional extras. Recoverable from git
+history if ever needed again; not worth re-anonymizing a file already headed
+for deletion.
+
+**Commit history rewritten to use a GitHub noreply email**
+(`hernandezdavidf@users.noreply.github.com`) instead of David's real address,
+across all commits — safe to do since no remote has ever been configured on
+this repo, so nothing has left this machine yet.
+
 ## 2026-08-13 — Cloudflare Worker connected; two personal-data leaks scrubbed from git
 
 **Cloud sync is live** on David's real Worker (`prodash-sync.jobs-hernandezdavidf.workers.dev`).
@@ -157,7 +185,7 @@ The original stays there untouched as a fallback. Both point at the same
 subtitle.
 
 **Stronger palette.** Green/blue/yellow/orange at full saturation replacing the
-muted earth tones. Conduent blue, CMIT sky, AFC indigo, My Company green,
+muted earth tones. Day Client blue, Night Client B sky, Night Client A indigo, My Company green,
 Learning yellow, HOA slate. Orange became the single attention colour — nudges,
 streaks, now-marker, ageing tasks — and is deliberately never a lane, so orange
 always means "look here". Variable names were kept, so 150 lines of CSS didn't
@@ -176,7 +204,7 @@ so booking a dentist appointment was impossible. Added `S.events`, merged with
 the recurring backbone by `dayBlocks()`. Must-attend appointments raise a nudge
 within 2 hours. Inline add row, delete with an ×.
 
-**Fixed:** the schedule had no day-of-week awareness, so Conduent, CMIT and AFC
+**Fixed:** the schedule had no day-of-week awareness, so Day Client, Night Client A and Night Client B
 rendered on Saturdays and Sundays. Weekends now show only Sleep, Wake + prep and
 Dinner.
 
@@ -189,7 +217,7 @@ Built `dashboard.html`, a single standalone file that opens by double-clicking a
 offline. Replaces the earlier `dayflow.html`, which stays untouched as a fallback.
 
 **Core model**
-- The logical day runs 07:00 → 07:00, so the Conduent / CMIT / AFC shifts render as
+- The logical day runs 07:00 → 07:00, so the Day Client / Night Client A / Night Client B shifts render as
   unbroken blocks in one day column instead of being sliced at midnight.
 - Recurring definitions are stored separately from completion state; instances are
   derived at render time and keyed `b:<id>@<date>`, so history cannot duplicate or drift.
@@ -199,11 +227,11 @@ offline. Replaces the earlier `dayflow.html`, which stays untouched as a fallbac
 - Today panel: must-do, scheduled tasks, per-employer shift checklists, daily
   non-negotiables with streaks, weekly targets (exercise ×3, learning ×2), appointments,
   and a categorised backlog. Completing an item strikes it through and sinks it.
-- Week grid with four fixed lanes per day (Life / Conduent / CMIT / AFC), free-time
-  shading, a now-line, and red hatching wherever two lanes collide.
+- Week grid with four fixed lanes per day (Life / Day Client / Night Client A / Night Client B),
+  free-time shading, a now-line, and red hatching wherever two lanes collide.
 - Conflict and free-time engine. Reports the arithmetic plainly: Monday is 28h scheduled
   inside 24h, 9h15m double-booked, largest free run 7am–12:15pm, below the 7h rest target.
-  The permanent AFC × CMIT overlap is 450 min/night.
+  The permanent Night Client A × Night Client B overlap is 450 min/night.
 - Quick-add with a small grammar (`Dentist 3pm-4pm #life !`), editor dialog, delete with
   6-second undo, per-occurrence skip/retime, and "this and all future" for recurring edits.
 - JSON export/import with a pre-import snapshot, local-storage backup copy, and a
