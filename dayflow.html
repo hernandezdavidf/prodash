@@ -47,7 +47,7 @@
   --on-warm:#231206;
   --night:#312E81; --night-ink:#312E81;
   --line:#E2E8F0; --ink:#0F172A; --muted:#5D6B7E;
-  --ln-conduent:#2563EB; --ln-afc:#4F46E5; --ln-cmit:#0284C7;
+  --ln-dayclient:#2563EB; --ln-nightclienta:#4F46E5; --ln-nightclientb:#0284C7;
   --ln-biz:#16A34A;      --ln-grow:#CA8A04; --ln-other:#64748B;
   /* Swatch palette offered when adding a custom lane. Decorative fills only
      (a 9px dot, a 3px bar) - never text, so no -ink pair is needed. Deliberately
@@ -73,7 +73,7 @@
     --terra:#FB923C; --terra-lt:#431407; --terra-ink:#FDBA74;
     --night:#4F46E5; --night-ink:#A5B4FC;
     --line:#243044; --ink:#E9EEF6; --muted:#8A99AD;
-    --ln-conduent:#60A5FA; --ln-afc:#818CF8; --ln-cmit:#38BDF8;
+    --ln-dayclient:#60A5FA; --ln-nightclienta:#818CF8; --ln-nightclientb:#38BDF8;
     --ln-biz:#4ADE80;      --ln-grow:#FACC15; --ln-other:#94A3B8;
     --ln-x1:#FB7185; --ln-x2:#2DD4BF; --ln-x3:#A78BFA;
     --ln-x4:#E879F9; --ln-x5:#22D3EE; --ln-x6:#A3E635;
@@ -87,7 +87,7 @@
   --terra:#FB923C; --terra-lt:#431407; --terra-ink:#FDBA74;
   --night:#4F46E5; --night-ink:#A5B4FC;
   --line:#243044; --ink:#E9EEF6; --muted:#8A99AD;
-  --ln-conduent:#60A5FA; --ln-afc:#818CF8; --ln-cmit:#38BDF8;
+  --ln-dayclient:#60A5FA; --ln-nightclienta:#818CF8; --ln-nightclientb:#38BDF8;
   --ln-biz:#4ADE80;      --ln-grow:#FACC15; --ln-other:#94A3B8;
   --ln-x1:#FB7185; --ln-x2:#2DD4BF; --ln-x3:#A78BFA;
   --ln-x4:#E879F9; --ln-x5:#22D3EE; --ln-x6:#A3E635;
@@ -561,9 +561,9 @@ var ROLL=7*60;          // logical day starts 07:00
 // S.lanes (see norm()). Nothing here is read at runtime except by norm() the
 // first time it meets a data file with no "lanes" key yet.
 var DEFAULT_LANES=[
- {id:"conduent",name:"Conduent",   color:"var(--ln-conduent)", ritual:"2pm–11pm · clear items + to-complete list"},
- {id:"afc",     name:"AFC",        color:"var(--ln-afc)",      ritual:"11pm–7am · EOD report before you sleep"},
- {id:"cmit",    name:"CMIT",       color:"var(--ln-cmit)",     ritual:"10:30pm–6:30am · write tomorrow's to-dos"},
+ {id:"dayclient",    name:"Day Client",     color:"var(--ln-dayclient)",     ritual:"2pm–11pm · clear items + to-complete list"},
+ {id:"nightclienta", name:"Night Client A", color:"var(--ln-nightclienta)", ritual:"11pm–7am · EOD report before you sleep"},
+ {id:"nightclientb", name:"Night Client B", color:"var(--ln-nightclientb)", ritual:"10:30pm–6:30am · write tomorrow's to-dos"},
  {id:"biz",     name:"My Company", color:"var(--ln-biz)",      ritual:"1pm–2pm · the only hour nobody else owns"},
  {id:"grow",    name:"Learning",   color:"var(--ln-grow)",     ritual:"2× a week, not daily"},
  {id:"other",   name:"HOA / Low",  color:"var(--ln-other)",    ritual:"Batch once a week"}
@@ -582,16 +582,16 @@ var BLOCKS=[
  {s:"12:15",e:"12:45",n:"Wake + prep",        d:"Light, food, sun if you can",         lane:null},
  {s:"12:45",e:"13:00",n:"School drop-off",    d:"Classes 1pm–4pm",                lane:null, days:WD},
  {s:"13:00",e:"14:00",n:"My Company",         d:"Protected. Before clients start.",    lane:"biz", days:WD},
- {s:"14:00",e:"15:30",n:"Conduent",           d:"Hardest items — you're freshest now", lane:"conduent", days:WD},
- {s:"15:30",e:"16:15",n:"School fetch",       d:"Flex out of Conduent",                lane:null, days:WD},
- {s:"16:15",e:"19:00",n:"Conduent",           d:"Main block",                          lane:"conduent", days:WD},
- {s:"19:00",e:"19:30",n:"Dinner",             d:"Real break",                          lane:null},
- {s:"19:30",e:"22:30",n:"Conduent",           d:"Clear the list, update to-complete",  lane:"conduent", days:WD},
- {s:"22:30",e:"23:00",n:"Conduent wrap + CMIT open", d:"Handover — one switch",   lane:"cmit", days:WD},
- {s:"23:00",e:"02:30",n:"AFC + CMIT",         d:"Dual shift — both live",  lane:"afc", lane2:"cmit", dual:1, days:WD},
- {s:"02:30",e:"06:00",n:"AFC + CMIT · low ebb", d:"Mechanical work only. Don't decide anything big.", lane:"afc", lane2:"cmit", dual:1, nadir:1, days:WD},
- {s:"06:00",e:"06:30",n:"CMIT to-do writeup", d:"Tomorrow's list, while it's fresh",   lane:"cmit", days:WD},
- {s:"06:30",e:"07:00",n:"AFC EOD + shutdown", d:"Send it, log the shift, then sleep",  lane:"afc", days:WD}
+ {s:"14:00",e:"15:30",n:"Day Client",           d:"Hardest items — you're freshest now", lane:"dayclient", days:WD},
+ {s:"15:30",e:"16:15",n:"School fetch",         d:"Flex out of Day Client",              lane:null, days:WD},
+ {s:"16:15",e:"19:00",n:"Day Client",           d:"Main block",                          lane:"dayclient", days:WD},
+ {s:"19:00",e:"19:30",n:"Dinner",               d:"Real break",                          lane:null},
+ {s:"19:30",e:"22:30",n:"Day Client",           d:"Clear the list, update to-complete",  lane:"dayclient", days:WD},
+ {s:"22:30",e:"23:00",n:"Day Client wrap + Night Client B open", d:"Handover — one switch", lane:"nightclientb", days:WD},
+ {s:"23:00",e:"02:30",n:"Night Client A + Night Client B",       d:"Dual shift — both live", lane:"nightclienta", lane2:"nightclientb", dual:1, days:WD},
+ {s:"02:30",e:"06:00",n:"Night Client A + Night Client B · low ebb", d:"Mechanical work only. Don't decide anything big.", lane:"nightclienta", lane2:"nightclientb", dual:1, nadir:1, days:WD},
+ {s:"06:00",e:"06:30",n:"Night Client B to-do writeup", d:"Tomorrow's list, while it's fresh",   lane:"nightclientb", days:WD},
+ {s:"06:30",e:"07:00",n:"Night Client A EOD + shutdown", d:"Send it, log the shift, then sleep",  lane:"nightclienta", days:WD}
 ];
 
 // Seed only - the live, editable list is S.rituals (see norm()). Same pattern
@@ -602,9 +602,9 @@ var DEFAULT_RITUALS=[
  {id:"drop", l:"School drop-off",           tag:"Family"},
  {id:"fetch",l:"School fetch",              tag:"Family"},
  {id:"biz",  l:"My company — 30 min",  tag:"Business"},
- {id:"con",  l:"Conduent items cleared",    tag:"Conduent"},
- {id:"cmit", l:"CMIT to-do list written",   tag:"CMIT"},
- {id:"afc",  l:"AFC EOD report sent",       tag:"AFC"}
+ {id:"dayclient",    l:"Day Client items cleared",         tag:"Day Client"},
+ {id:"nightclientb", l:"Night Client B to-do list written", tag:"Night Client B"},
+ {id:"nightclienta", l:"Night Client A EOD report sent",    tag:"Night Client A"}
 ];
 
 var WEEKLY=[
@@ -944,11 +944,11 @@ function renderNudges(){
   if(b&&b.nadir)
     out.push(["","<b>2:30–6am is your circadian low.</b> Mechanical work only — tickets, logs, routine tasks. Don't send anything you can't unsend, and don't make calls you'd want to revisit."]);
   if(n>sm("14:00")&&!l.biz)
-    out.push(["","<b>Your company didn't get its hour.</b> 1–2pm is the only slot in the day nobody else has a claim on. Once Conduent starts it's gone."]);
+    out.push(["","<b>Your company didn't get its hour.</b> 1–2pm is the only slot in the day nobody else has a claim on. Once Day Client starts it's gone."]);
   if(n>sm("16:15")&&!l.fetch)
     out.push(["","<b>School fetch unchecked</b> — it's past 4:15pm."]);
-  if(n>sm("06:30")&&!l.afc)
-    out.push(["","<b>AFC EOD report still open</b> and the shift ends at 7am."]);
+  if(n>sm("06:30")&&!l.nightclienta)
+    out.push(["","<b>Night Client A EOD report still open</b> and the shift ends at 7am."]);
   // appointments he said he has to be at — the whole point of booking one
   dayBlocks().forEach(function(b){
     if(!b.ev||!b.must)return;
