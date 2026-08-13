@@ -101,7 +101,8 @@
     background:linear-gradient(90deg,rgba(129,140,248,.15),rgba(129,140,248,.03));
     border-color:rgba(129,140,248,.4)}
   :root:not([data-theme="light"]) .blk.now{
-    background:linear-gradient(90deg,rgba(74,222,128,.18),transparent)}
+    background:linear-gradient(90deg,rgba(74,222,128,.25),rgba(74,222,128,.04));
+    box-shadow:0 1px 4px rgba(0,0,0,.35)}
   :root:not([data-theme="light"]) header:after{
     background:radial-gradient(circle,rgba(74,222,128,.22),transparent 70%)}
 }
@@ -112,7 +113,8 @@
   background:linear-gradient(90deg,rgba(129,140,248,.15),rgba(129,140,248,.03));
   border-color:rgba(129,140,248,.4)}
 :root[data-theme="dark"] .blk.now{
-  background:linear-gradient(90deg,rgba(74,222,128,.18),transparent)}
+  background:linear-gradient(90deg,rgba(74,222,128,.25),rgba(74,222,128,.04));
+  box-shadow:0 1px 4px rgba(0,0,0,.35)}
 :root[data-theme="dark"] header:after{
   background:radial-gradient(circle,rgba(74,222,128,.22),transparent 70%)}
 
@@ -178,6 +180,13 @@ header h1{font-size:26px;letter-spacing:.3px}
    so anything tighter wraps it to two lines and the rows go ragged. */
 .timelinecard .blk-t{width:84px;min-width:84px;font-size:10px;white-space:nowrap}
 .timelinecard .blk{gap:8px}
+/* Resizable height, fixed position: "resize" only ever changes the box's
+   size, never where it sits in the page, so there's no way for this to end
+   up somewhere else on the board - only taller or shorter. Vertical only
+   (no horizontal drag) so it can't fight the card's own width. */
+#timeline{height:280px;min-height:140px;max-height:65vh;
+  overflow-y:auto;overflow-x:hidden;resize:vertical;
+  border-radius:6px;scroll-behavior:smooth}
 
 .rit{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px dashed var(--line)}
 .rit:last-child{border-bottom:none}
@@ -220,9 +229,15 @@ header h1{font-size:26px;letter-spacing:.3px}
 .blk-b{width:3px;border-radius:2px;background:var(--sage);align-self:stretch;min-height:20px}
 .blk-n{font-size:12.5px;font-weight:600}
 .blk-d{font-size:10.5px;color:var(--muted)}
-.blk.now{background:linear-gradient(90deg,rgba(22,163,74,.22),transparent);border-radius:6px;padding-left:6px;margin-left:-6px}
+.blk.now{background:linear-gradient(90deg,rgba(22,163,74,.3),rgba(22,163,74,.05));
+  border-radius:6px;padding:6px 6px 6px 9px;margin:0 -6px;
+  border-left:3px solid var(--terra);
+  box-shadow:0 1px 4px rgba(22,163,74,.18)}
 .blk.now .blk-b{background:var(--terra)}
-.blk.now .blk-n{color:var(--forest-ink)}
+.blk.now .blk-n{color:var(--forest-ink);font-weight:800}
+.now-badge{display:inline-block;font-size:8.5px;font-weight:800;letter-spacing:.6px;
+  text-transform:uppercase;color:var(--on-warm);background:var(--terra);
+  padding:1.5px 6px;border-radius:999px;margin-left:5px;vertical-align:1px}
 .blk.past{opacity:.4}
 .blk.sleepb .blk-n{color:var(--night-ink)}
 
@@ -1017,8 +1032,21 @@ function renderWeekly(){
   });
 }
 
-function renderTimeline(){
-  var c=document.getElementById("timeline"),n=nowSm();
+// Which block was "now" last time we rendered - lets us tell a genuine
+// transition (Day Client -> Dinner) apart from a routine re-render (ticking
+// a task, the 60s clock tick) that happens to run while the same block is
+// still current. Only a real transition re-centers the scroll; re-centering
+// on every render would fight anyone who scrolled up to check an earlier
+// block mid-shift.
+var lastNowKey=null;
+function renderTimeline(forceCenter){
+  var c=document.getElementById("timeline"),n=nowSm(),nowEl=null;
+  // c.innerHTML="" below throws away scroll position along with the old
+  // DOM, every single render - so without saving it first, any render that
+  // happens to run while "now" is unchanged (a task ticked elsewhere, the
+  // 60s clock tick) would silently reset the list to the top instead of
+  // leaving it where centering (or the user) put it.
+  var savedScroll=c.scrollTop;
   c.innerHTML="";
   dayBlocks().forEach(function(b){
     var st=sm(b.s),en=smEnd(b.e);
@@ -1029,6 +1057,7 @@ function renderTimeline(){
     el.innerHTML='<div class="blk-t">'+fmt(b.s)+"–"+fmt(b.e)+'</div>'+
       '<div class="blk-b" style="background:'+(b.sleep?"var(--night)":(lane?lane.color:"var(--sage)"))+'"></div>'+
       '<div style="flex:1;min-width:0"><div class="blk-n">'+esc(b.n)+
+        (isNow?' <span class="now-badge">now</span>':'')+
         (b.dual?' <span class="dual">dual</span>':'')+
         (b.ev?' <span class="apt">'+(b.must?"must attend":"appointment")+'</span>':'')+'</div>'+
       '<div class="blk-d">'+esc(b.d||"")+'</div></div>'+
@@ -1036,8 +1065,33 @@ function renderTimeline(){
     if(b.ev) el.querySelector(".x").addEventListener("click",function(){
       S.events=S.events.filter(function(x){return x.id!==b.id;});
       save();renderAll();});
+    if(isNow){ nowEl=el; }
     c.appendChild(el);
   });
+  if(nowEl){
+    var key=(nowEl.querySelector(".blk-t").textContent)+"|"+(nowEl.querySelector(".blk-n").textContent);
+    if(key!==lastNowKey||forceCenter){
+      lastNowKey=key;
+      // centre it in the scrollable box, not just scrollIntoView (which only
+      // guarantees the edge is visible) - this is what keeps it findable at
+      // a glance no matter where in the list "now" currently falls.
+      // getBoundingClientRect(), not offsetTop: offsetTop is relative to the
+      // nearest POSITIONED ancestor, which #timeline isn't (no position set),
+      // so it silently measures against the wrong element and undershoots.
+      // Rects are viewport-relative regardless of positioning, so combining
+      // the current scrollTop with the rect delta gives the true offset
+      // within the scrollable content.
+      var cRect=c.getBoundingClientRect(), bRect=nowEl.getBoundingClientRect();
+      var blockTopInContent=c.scrollTop+(bRect.top-cRect.top);
+      var target=blockTopInContent-(c.clientHeight/2)+(nowEl.offsetHeight/2);
+      c.scrollTop=Math.max(0,target);
+    }else{
+      // "now" hasn't changed since last render - put the scroll position
+      // right back where it was (centred, or wherever the user left it)
+      // instead of letting the innerHTML rebuild silently reset it to 0.
+      c.scrollTop=savedScroll;
+    }
+  }
 }
 
 // ---- add-lane tile: state survives a rebuild (e.g. the 60s tick, or window
@@ -1662,6 +1716,13 @@ window.dfDebug={dayBlocks:dayBlocks,today:today,norm:norm,state:function(){retur
 applyTheme();   // before first paint, so a dark session doesn't flash white
 renderAll();
 restore();
+// The very first renderTimeline() above runs synchronously during initial
+// script execution, before the browser necessarily has a committed layout
+// to scroll within - a scrollTop set that early can silently fail to stick.
+// Re-center once, for real, after two animation frames (the standard way to
+// guarantee both layout AND paint have completed) rather than trusting the
+// boot-time attempt.
+requestAnimationFrame(function(){requestAnimationFrame(function(){renderTimeline(true);});});
 setInterval(function(){renderHeader();renderNow();renderTimeline();renderLanes();renderNudges();},60000);
 setInterval(function(){if(fileHandle&&!document.hidden)readFile();},120000);
 setInterval(function(){if(cloudUrl&&!document.hidden)cloudPull();},120000);
