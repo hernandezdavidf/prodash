@@ -3,6 +3,13 @@
 credentials.json
 token.json
 
+# David's personal task data — never commit this, whatever folder it lands
+# in. This bit us once already: a stray copy in Reports/New folder/ got
+# swept into a commit by `git add -A` and had to be un-committed by hand.
+dayflow-data.json
+**/dayflow-data.json
+Reports/
+
 # Disposable / regenerated
 .tmp/
 
