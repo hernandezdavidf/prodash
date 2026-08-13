@@ -2,6 +2,39 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-08-13 — Cloudflare Worker connected; two personal-data leaks scrubbed from git
+
+**Cloud sync is live** on David's real Worker (`prodash-sync.jobs-hernandezdavidf.workers.dev`).
+Getting there surfaced a genuine Cloudflare gotcha, now documented in
+`workflows/cloud-sync-setup.md`: the newer Workers dashboard saves each
+settings change as a new *version* but does not auto-promote it to serve
+traffic. The "Active deployment" box can keep running an older version for
+minutes with zero warning — looks exactly like a wrong password (a clean
+`401 unauthorized`) but isn't one. Fix: after any variable/secret/binding
+change, go to **Deployments** and explicitly promote the newest version.
+
+**Two accidental commits of David's real data got caught and removed** before
+anything was ever pushed anywhere (no remote has ever been configured on this
+repo):
+- A stray `Reports/New folder/dayflow-data.json` swept in by `git add -A` —
+  removed by amending the one commit it was in.
+- A `Reports/*.xlsx` report export, committed several commits earlier,
+  requiring a full `git filter-branch` rewrite across all 22 commits to
+  scrub it from history, not just the working tree.
+- Both `Reports/` and `dayflow-data.json` are now in `.gitignore` so this
+  can't recur.
+
+**One real mistake made and disclosed:** `git filter-branch` doesn't only
+rewrite git's internal history — on the currently checked-out branch it also
+checks out the result into the working directory. Since the `.xlsx` was
+being removed from history, that checkout deleted it from disk too. This
+wasn't anticipated before running the rewrite. The file was a regenerable
+report export (not primary data — David's real task data was never touched
+by any of this), so it was rebuilt from the still-intact `dayflow-data.json`
+snapshot using the app's own `xlsxBlob()`/`buildZip()` functions for exact
+fidelity, verified via zip-integrity check and a full cell-content read-back
+against the original filter logic.
+
 ## 2026-08-13 — Mobile app groundwork: responsive layout, installable PWA, cloud sync
 
 Three phases toward running ProDash as a real app on a phone, kept updated
