@@ -2,6 +2,19 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-08-13 — Resizable Shift timeline that auto-centres on "now"
+
+The timeline used to just grow to fit every block in the shift - no way to
+see what's happening right now without scrolling past everything before it.
+Now it's a fixed-position box you can resize taller or shorter (drag the
+corner; it can only ever change height, never move elsewhere on the board),
+and the current block gets real emphasis - a stronger tint, an orange edge,
+and a "now" badge - centred automatically in the visible area on load and
+whenever the shift actually moves on to the next block. Deliberately doesn't
+re-centre on every minor update (ticking a task, the clock ticking over)
+while the same block is still current, so it won't fight you if you've
+scrolled up to check an earlier item.
+
 ## 2026-08-13 — Anonymized employer names; removed the deprecated v8 file; noreply email
 
 Prep for going public (GitHub Pages, Phase 3).
