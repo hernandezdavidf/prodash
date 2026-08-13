@@ -42,6 +42,28 @@ password afterward.
 2. Name: `SYNC_PASSWORD` (must match exactly). Value: any password you'll
    remember — this is what every device will need to type in once. Mark it
    **Encrypt** if offered. Save and redeploy if prompted.
+3. **Then go to the Deployments tab and confirm your change is actually live**
+   (see the gotcha below — this bit us during the real setup and is the most
+   likely thing to go wrong).
+
+> **Gotcha, confirmed the hard way:** Cloudflare's newer Workers dashboard
+> saves each Settings change (a new/updated variable, a binding) as a new
+> **version**, but does **not** automatically push it live. The **Active
+> deployment** box on the Deployments tab can keep serving an *older* version
+> for several minutes after you've saved a "newer" one in Version History —
+> there's no error, no warning, it just silently keeps using the old
+> config. Symptom: the Worker responds and looks healthy, but every request
+> gets `401 {"error":"unauthorized"}` no matter how carefully the password is
+> re-entered, because the live code is still checking the *previous* value.
+>
+> **The fix:** after saving any variable/secret/binding change, go to
+> **Deployments**, find the newest entry in Version History, open its **⋯**
+> menu, and explicitly **Deploy** / **promote to Active** it. Only then does
+> the "Active deployment" box at the top update to that version and 100% of
+> traffic. Verify with a plain unauthenticated request first — an
+> unauthenticated `GET /data` should return `401`, which confirms the Worker
+> itself is live, before spending time chasing what looks like a password
+> problem but might just be an unpromoted deployment.
 
 ## 5. Get your Worker's URL
 
