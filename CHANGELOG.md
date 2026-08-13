@@ -2,6 +2,33 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-08-13 — Header redesign: stats moved under the date, nudges moved into the header
+
+Board UI pass ahead of the GitHub Pages push. Two changes, both from user
+screenshots pointing at where things should live:
+
+**Rituals/Open/Streak stats** moved out of the header's top-right corner and
+into a row directly under the date, under the title block, so the whole
+header reads as one connected group instead of a split two-column layout.
+
+**Nudges (the flag notifications)** moved from a floating card stack — first
+built as a 300px absolutely-positioned bubble near the header corner, with a
+solid card, asymmetric "message bubble" corner radius, and heavy shadow —
+into a plain sub-header lane built into the header itself, directly under
+the stats row and above the day-progress bar. Tried three directions as
+mockups (a header lane, a translucent floating chip, a smaller solid
+floating card) and the header lane won: it never overlaps or floats over
+page content on any screen width, the header just grows to fit however many
+nudges are active, and it collapses to nothing (`:empty`, no dangling
+divider) when there are none. Each nudge is now a flat translucent chip
+(`rgba(11,17,10,.18)` over the header's green) with a coloured left border
+for type (orange = attention, indigo = sleep/cool) and uniform
+`var(--on-brand)` text — measured contrast ~6.2:1 in both themes, comfortably
+above AA. Dropped the old floating-stack CSS entirely (`position:absolute`
+anchor, the `.wrap` `position:relative` it needed, the sub-700px static
+fallback) since a lane never needed a responsive fallback in the first
+place.
+
 ## 2026-08-13 — Resizable Shift timeline that auto-centres on "now"
 
 The timeline used to just grow to fit every block in the shift - no way to
