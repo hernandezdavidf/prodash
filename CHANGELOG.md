@@ -2,6 +2,102 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-08-15 — Accounts: log-in gate, Google Sheets user registry, per-user boards
+
+ProDash now authenticates before it opens. Each person gets an independent
+board, reachable from any device by logging in. The account registry is a
+Google Sheet; the boards stay in Cloudflare KV, one key per `board_id`.
+
+**The Worker had to become the auth server, and that is not incidental.**
+`dayflow.html` is a public static file, so any Google credential placed in it
+is readable by view-source — which would publish every password hash and secret
+answer in the sheet. Worse, requirement "user A cannot reach user B's board" is
+unenforceable if the browser is the only thing deciding which board to load. So
+the browser now holds no Google credential and no board id it can usefully
+change: it sends a signed session token, and the Worker reads the `board_id`
+out of that token's verified payload. Editing localStorage, the URL, or the
+request body reaches nothing.
+
+**Sheet layout** — one `Users` tab, columns A..S, addressed positionally by the
+Worker (`user_id`, names, `username`, `username_key`, email pair,
+`password_hash`, `secret_question`, `secret_answer_hash`, `role`, `status`,
+`failed_attempts`, `locked_until`, `board_id`, and three timestamps plus
+`session_epoch`). `username_key` is the uniqueness key — lowercased and
+space-stripped, so "David", "david" and " david " are one account, and both
+signup and login normalise through the same function so they cannot drift.
+
+**Passwords** — PBKDF2-HMAC-SHA256 with a per-user salt and a Worker-side
+pepper, stored self-describing as `pbkdf2-sha256$<iters>$<salt>$<hash>`.
+Verification reads the parameters out of the stored value rather than assuming
+today's settings, and login transparently re-hashes anything weaker than the
+current target. That is what makes raising the cost — or swapping the algorithm
+entirely — a config change instead of a forced reset for every user. Iteration
+count is deliberately 100k by default: Cloudflare's free plan allows ~10ms CPU
+per request and PBKDF2 is meant to be slow, so this is the setting most likely
+to need tuning, and it is an env var for exactly that reason. argon2/scrypt
+would need a WASM bundle, which the paste-into-Quick-Edit deployment this
+project relies on cannot carry.
+
+**Sessions** — HMAC-signed, 30-day, stateless. The signature alone proves the
+token is ours, so the common path costs no Sheets read. Two cheap KV reads
+cover what a signature cannot express: this device signed out (`rev:<sid>`) and
+the password changed (`epoch:<uid>`). A password reset bumps the epoch, which
+signs every open tab out everywhere — the point of a reset.
+
+**Offline is a first-class case, not an oversight.** ProDash is a daily driver
+at 3am. A stored, unexpired session opens the board immediately and revalidates
+with the Worker in the background; a *network* failure is explicitly not
+treated as a rejection, only a real 401/403 is. Dropping someone at a login
+screen because their connection died would be a worse failure than the one it
+guards against.
+
+**Lockout** — three consecutive failures locks for 15 minutes, counted in the
+sheet, cleared on success. An expired lock resets the counter, so it is three
+*consecutive* failures rather than three since the account was made. Wrong
+secret answers feed the same counter, so recovery is not a lockout-free side
+door into guessing. Telling the user they are locked does confirm the account
+exists; that is an accepted trade, since a silent lockout is worse for a real
+user than the enumeration it prevents.
+
+**Forgot password** requires the username *and* the registered email to match
+before it will show the secret question — without that second factor this is a
+free directory of which usernames exist and what guards them. Verification
+returns a 10-minute signed ticket bound to the current `session_epoch`, so one
+verified answer cannot be replayed into a second reset later.
+
+**Formula injection, worth calling out** — a value beginning `=`, `+`, `-` or
+`@` is executed as a formula by Sheets and by Excel if the sheet is downloaded.
+`valueInputOption=RAW` does not prevent this. Since the registry is read by the
+operator, a registration with the first name `=IMPORTXML(...)` would run against
+*them*. Every cell written is prefixed with an apostrophe when it starts with
+one of those characters.
+
+**Client changes** — a gate that runs before the board script, which now
+early-returns unless a session exists. Bailing out rather than rendering-and-
+hiding is what makes sign-out real: no board is read from storage, no interval
+starts, nothing reaches the DOM. localStorage is namespaced per user id, so two
+people on one browser get genuinely separate caches. The header carries a
+permanent identity chip, because "whose board is this?" has to be answerable at
+a glance on a shared machine.
+
+**Migration** — the old single-user blob under KV key `state` is inherited by
+the first account created while `LEGACY_CLAIM=1`; the browser independently
+carries its old `dayflow.v2` cache into the first account that signs in there.
+Between the two the board arrives from whichever side had it. The shared
+`SYNC_PASSWORD` is no longer read at all, and any stale copy in localStorage is
+deleted on sight rather than left lying around.
+
+**Admin is a seam, not a feature.** A `role` column, a `requireRole` check and
+an `/admin/*` route exist so the real admin system can be added without
+rearranging any of this. Everything behind it returns 501. The one-time
+`/admin/bootstrap` endpoint creates the placeholder account and is meant to be
+deleted immediately after use.
+
+Setup: [`workflows/auth-setup.md`](workflows/auth-setup.md).
+[`workflows/cloud-sync-setup.md`](workflows/cloud-sync-setup.md) is now partly
+superseded (its steps 1–3 still apply, step 4 does not) and carries a banner
+saying so.
+
 ## 2026-08-15 — Board History: added a plain-English "PRODASH Version History" tab
 
 A fifth sub-tab under Board History (**PRODASH Version History**), separate

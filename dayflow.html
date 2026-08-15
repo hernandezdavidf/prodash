@@ -121,7 +121,17 @@ header:after{content:"";position:absolute;right:-40px;top:-40px;width:220px;heig
 /* Used to be a two-column flex (title left, stats right); stats now lives
    under the date instead, so this is just the title block's positioning
    context - kept as its own rule in case something else joins it later. */
-.hdr-top{position:relative;z-index:1}
+.hdr-top{position:relative;z-index:1;display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap}
+/* Whose board is this? On a shared machine that question has to be answerable
+   without clicking anything, so the answer sits in the header permanently.
+   Header text sits on brand green, so both use --on-brand like everything else
+   up here rather than the page's --ink. */
+.hdr-user{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--on-brand);flex-shrink:0}
+.hdr-user b{display:block;font-size:13.5px;font-weight:700}
+.hdr-user span{opacity:.85}
+.hdr-out{font:inherit;font-size:12px;font-weight:600;color:var(--on-brand);cursor:pointer;
+  padding:5px 11px;border-radius:999px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35)}
+.hdr-out:hover{background:rgba(255,255,255,.26)}
 header h1{font-size:26px;letter-spacing:.3px}
 /* Header text sits on the brand green. Hierarchy comes from size/weight, NOT
    opacity — fading --on-brand drops it under 4.5:1 against --forest. */
@@ -491,6 +501,495 @@ body.view-reports .board-only,body.view-history .board-only{display:none}
 </style>
 </head>
 <body>
+
+<!-- ======================================================================
+     AUTHENTICATION GATE
+     ======================================================================
+     Everything in this block runs BEFORE the main app script further down,
+     which is the whole point: the board script early-returns unless PDAuth
+     says a session is valid, so a signed-out tab never reads a board out of
+     storage, never starts a timer and never renders. Hiding the app behind an
+     overlay would leave the previous user's data sitting in the DOM.
+
+     The Worker is the authority. Nothing here decides who you are - it only
+     collects credentials, hands them to the Worker, and keeps the signed
+     token the Worker gives back. The token carries the board id, and the
+     Worker reads that id from the token's signature rather than from anything
+     this file sends, so editing localStorage or a URL here cannot reach
+     another account's data.
+     ================================================================== -->
+<style>
+#authGate{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;
+  padding:20px;background:var(--ivory);overflow-y:auto}
+#authGate[hidden]{display:none}
+.ag-card{width:100%;max-width:420px;background:var(--paper);border:1px solid var(--line);
+  border-radius:14px;padding:26px 24px;box-shadow:0 10px 40px rgba(15,23,42,.10)}
+.ag-brand{font-family:var(--serif);font-size:23px;color:var(--forest-ink);margin:0 0 2px}
+.ag-sub{font-size:12.5px;color:var(--muted);margin:0 0 18px}
+.ag-h{font-size:15px;font-weight:700;color:var(--ink);margin:0 0 4px}
+.ag-p{font-size:12.5px;color:var(--muted);margin:0 0 16px;line-height:1.5}
+.ag-f{margin-bottom:12px}
+.ag-f label{display:block;font-size:12px;font-weight:600;color:var(--ink);margin-bottom:4px}
+.ag-f input,.ag-f select{width:100%;box-sizing:border-box;padding:9px 11px;font:inherit;font-size:14px;
+  color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px}
+.ag-f input:focus,.ag-f select:focus{outline:2px solid var(--forest);outline-offset:-1px;border-color:var(--forest)}
+.ag-hint{font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.45}
+.ag-row{display:flex;gap:10px}
+.ag-row>.ag-f{flex:1}
+.ag-btn{width:100%;padding:11px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;
+  border-radius:8px;border:1px solid var(--forest);background:var(--forest);color:var(--on-brand)}
+.ag-btn:hover{background:var(--forest-dk);border-color:var(--forest-dk)}
+.ag-btn[disabled]{opacity:.6;cursor:progress}
+.ag-btn.ghost{background:transparent;color:var(--forest-ink);border-color:var(--line)}
+.ag-btn.ghost:hover{background:var(--ivory)}
+.ag-btns{display:flex;flex-direction:column;gap:9px;margin-top:6px}
+.ag-link{background:none;border:0;padding:0;font:inherit;font-size:12.5px;color:var(--forest-ink);
+  cursor:pointer;text-decoration:underline}
+.ag-foot{margin-top:16px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:12.5px}
+.ag-msg{display:none;margin-bottom:14px;padding:10px 12px;border-radius:8px;font-size:12.5px;line-height:1.5}
+.ag-msg.on{display:block}
+.ag-msg.err{background:var(--terra-lt);color:var(--terra-ink);border:1px solid var(--terra)}
+.ag-msg.ok{background:var(--olive-lt);color:var(--forest-dk);border:1px solid var(--olive)}
+.ag-q{font-weight:600;color:var(--ink);font-size:13.5px;margin:0 0 14px;padding:10px 12px;
+  background:var(--ivory);border-radius:8px;border:1px solid var(--line)}
+/* Signed-in identity in the header, so "whose board is this?" is answerable
+   at a glance on a shared machine. */
+.ag-who{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.ag-who b{color:var(--ink);font-weight:600}
+</style>
+
+<div id="authGate">
+  <div class="ag-card">
+    <h1 class="ag-brand">How's our Dave looking?</h1>
+    <p class="ag-sub">Productivity Dashboard (ProDash)</p>
+    <div class="ag-msg" id="agMsg"></div>
+
+    <!-- First run on a device: which Worker is this app talking to. Stored per
+         device, never inside the board data, exactly like the old sync URL. -->
+    <div class="ag-view" id="agSetup" hidden>
+      <p class="ag-h">Connect to your ProDash server</p>
+      <p class="ag-p">One-off on this device. Paste the address of your ProDash Worker &mdash; the same one from the setup workflow.</p>
+      <div class="ag-f">
+        <label for="agUrl">Server address</label>
+        <input id="agUrl" type="url" placeholder="https://prodash-sync.yourname.workers.dev" autocomplete="off">
+      </div>
+      <div class="ag-btns"><button class="ag-btn" id="agUrlSave">Continue</button></div>
+    </div>
+
+    <div class="ag-view" id="agChoose" hidden>
+      <p class="ag-h">Sign in to your dashboard</p>
+      <p class="ag-p">Your board, your tasks and your history are tied to your account, so they follow you to any device you sign in on.</p>
+      <div class="ag-btns">
+        <button class="ag-btn" id="agGoLogin">Log in</button>
+        <button class="ag-btn ghost" id="agGoSignup">Sign up</button>
+      </div>
+      <div class="ag-foot"><button class="ag-link" id="agChangeUrl">Change server</button></div>
+    </div>
+
+    <div class="ag-view" id="agLogin" hidden>
+      <p class="ag-h">Log in</p>
+      <form id="agLoginForm" autocomplete="on">
+        <div class="ag-f">
+          <label for="agLoginUser">Username</label>
+          <input id="agLoginUser" name="username" autocomplete="username" autocapitalize="none" spellcheck="false">
+        </div>
+        <div class="ag-f">
+          <label for="agLoginPass">Password</label>
+          <input id="agLoginPass" name="password" type="password" autocomplete="current-password">
+        </div>
+        <div class="ag-btns"><button class="ag-btn" type="submit">Log in</button></div>
+      </form>
+      <div class="ag-foot">
+        <button class="ag-link" id="agGoForgot">Forgot password?</button>
+        <button class="ag-link" id="agBack1">Back</button>
+      </div>
+    </div>
+
+    <div class="ag-view" id="agSignup" hidden>
+      <p class="ag-h">Create your account</p>
+      <form id="agSignupForm" autocomplete="on">
+        <div class="ag-row">
+          <div class="ag-f">
+            <label for="agFirst">First name</label>
+            <input id="agFirst" name="given-name" autocomplete="given-name">
+          </div>
+          <div class="ag-f">
+            <label for="agLast">Last name</label>
+            <input id="agLast" name="family-name" autocomplete="family-name">
+          </div>
+        </div>
+        <div class="ag-f">
+          <label for="agUser">Username</label>
+          <input id="agUser" name="username" autocomplete="username" autocapitalize="none" spellcheck="false">
+          <div class="ag-hint">3&ndash;32 characters. Letters, numbers, dots, underscores and hyphens. Not case sensitive.</div>
+        </div>
+        <div class="ag-f">
+          <label for="agEmail">Email address</label>
+          <input id="agEmail" name="email" type="email" autocomplete="email" autocapitalize="none" spellcheck="false">
+          <div class="ag-hint">Used to verify it's really you if you ever forget your password.</div>
+        </div>
+        <div class="ag-f">
+          <label for="agPass">Password</label>
+          <input id="agPass" name="new-password" type="password" autocomplete="new-password">
+          <div class="ag-hint">At least 10 characters, with an uppercase letter, a lowercase letter and a number.</div>
+        </div>
+        <div class="ag-f">
+          <label for="agPass2">Confirm password</label>
+          <input id="agPass2" type="password" autocomplete="new-password">
+        </div>
+        <div class="ag-f">
+          <label for="agQ">Secret question</label>
+          <select id="agQ">
+            <option value="">Choose a question&hellip;</option>
+            <option>What was the name of your first pet?</option>
+            <option>What street did you live on as a child?</option>
+            <option>What was the make of your first car?</option>
+            <option>What is your mother's maiden name?</option>
+            <option>What was the name of your first school?</option>
+            <option>What city were you born in?</option>
+          </select>
+        </div>
+        <div class="ag-f">
+          <label for="agA">Answer</label>
+          <input id="agA" autocapitalize="none">
+          <div class="ag-hint">Capitals and extra spaces are ignored when you answer it later.</div>
+        </div>
+        <div class="ag-btns"><button class="ag-btn" type="submit">Create account</button></div>
+      </form>
+      <div class="ag-foot"><button class="ag-link" id="agBack2">Back</button></div>
+    </div>
+
+    <!-- Recovery, step 1: username AND the registered email must both match
+         before the secret question is shown. Requiring the email is what stops
+         this being a free lookup of which usernames exist and what guards
+         them. -->
+    <div class="ag-view" id="agForgot1" hidden>
+      <p class="ag-h">Forgot password</p>
+      <p class="ag-p">Confirm the username and the email address registered to it.</p>
+      <form id="agForgot1Form">
+        <div class="ag-f">
+          <label for="agFUser">Username</label>
+          <input id="agFUser" autocapitalize="none" spellcheck="false">
+        </div>
+        <div class="ag-f">
+          <label for="agFEmail">Email address</label>
+          <input id="agFEmail" type="email" autocapitalize="none" spellcheck="false">
+        </div>
+        <div class="ag-btns"><button class="ag-btn" type="submit">Continue</button></div>
+      </form>
+      <div class="ag-foot"><button class="ag-link" id="agBack3">Back to log in</button></div>
+    </div>
+
+    <div class="ag-view" id="agForgot2" hidden>
+      <p class="ag-h">Answer your secret question</p>
+      <p class="ag-q" id="agFQ"></p>
+      <form id="agForgot2Form">
+        <div class="ag-f">
+          <label for="agFA">Your answer</label>
+          <input id="agFA" autocapitalize="none">
+        </div>
+        <div class="ag-btns"><button class="ag-btn" type="submit">Verify</button></div>
+      </form>
+      <div class="ag-foot"><button class="ag-link" id="agBack4">Back to log in</button></div>
+    </div>
+
+    <div class="ag-view" id="agForgot3" hidden>
+      <p class="ag-h">Choose a new password</p>
+      <p class="ag-p">You have 10 minutes to set it. Signing in again everywhere will be required afterwards.</p>
+      <form id="agForgot3Form">
+        <div class="ag-f">
+          <label for="agNew">New password</label>
+          <input id="agNew" type="password" autocomplete="new-password">
+          <div class="ag-hint">At least 10 characters, with an uppercase letter, a lowercase letter and a number.</div>
+        </div>
+        <div class="ag-f">
+          <label for="agNew2">Confirm new password</label>
+          <input id="agNew2" type="password" autocomplete="new-password">
+        </div>
+        <div class="ag-btns"><button class="ag-btn" type="submit">Set new password</button></div>
+      </form>
+      <div class="ag-foot"><button class="ag-link" id="agBack5">Back to log in</button></div>
+    </div>
+  </div>
+</div>
+
+<script>
+window.PDAuth = (function(){
+"use strict";
+/* Every localStorage access in this file is wrapped. An unguarded read throws
+   synchronously wherever storage is blocked (private browsing, strict cookie
+   settings, some in-app browsers), and a throw here would abort the whole gate
+   before it could render - leaving a blank page rather than a login form. The
+   board script below already learned this lesson the hard way. */
+function get(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function set(k,v){ try{ localStorage.setItem(k,v); return true; }catch(e){ return false; } }
+function del(k){ try{ localStorage.removeItem(k); }catch(e){} }
+
+var URL_KEY="prodash.serverUrl", SESSION_KEY="prodash.session";
+/* The old single-user sync stored a shared password here. It is now worthless
+   - the Worker no longer accepts it - and leaving a stale password lying in
+   storage is pure liability, so it is cleared on sight. */
+del("prodash.cloudPw");
+
+var serverUrl = (get(URL_KEY) || get("prodash.cloudUrl") || "").replace(/\/+$/,"");
+var session = null;
+try{ session = JSON.parse(get(SESSION_KEY) || "null"); }catch(e){ session = null; }
+
+/* A session is trusted locally until its own expiry passes. The signature can
+   only be checked by the Worker (it holds the key), so this is deliberately
+   optimistic: the board opens instantly from the stored session, and the
+   Worker is asked to confirm in the background. That is what makes ProDash
+   usable at 3am on a dead connection - a device you already signed in on keeps
+   working offline for the life of the token, and a forged token buys nothing,
+   because every read or write of actual board data still has to get past the
+   Worker's signature check. */
+function valid(){ return !!(session && session.token && session.exp && Date.now() < session.exp); }
+
+function save(tok, user){
+  var exp = 0;
+  try{
+    // The expiry is read out of the token's own payload rather than assumed,
+    // so the client and the Worker can never disagree about when it lapses.
+    var p = JSON.parse(atob(tok.split(".")[1].replace(/-/g,"+").replace(/_/g,"/")));
+    exp = p.exp || 0;
+  }catch(e){ exp = Date.now() + 7*24*3600*1000; }
+  session = { token: tok, exp: exp, user: user };
+  set(SESSION_KEY, JSON.stringify(session));
+}
+
+function clear(){
+  session = null;
+  del(SESSION_KEY);
+}
+
+/* Signing out must not leave the board on screen for the next person, and a
+   reload is the only way to be certain of that - the app script's state, its
+   timers and its rendered DOM all go with it. */
+function signOut(silent){
+  var tok = session && session.token;
+  clear();
+  if(tok && serverUrl){
+    // Fire-and-forget: the local session is already gone, and a failed call
+    // here (offline, say) must not trap the user in a signed-in-looking app.
+    try{
+      fetch(serverUrl+"/auth/logout",{method:"POST",headers:{"Authorization":"Bearer "+tok}});
+    }catch(e){}
+  }
+  if(!silent) location.reload();
+}
+
+function api(path, opts){
+  opts = opts || {};
+  var headers = {"Content-Type":"application/json"};
+  if(session && session.token) headers["Authorization"] = "Bearer " + session.token;
+  if(opts.headers) for(var k in opts.headers) headers[k] = opts.headers[k];
+  if(!serverUrl) return Promise.reject(new Error("No server address is set for this device."));
+  return fetch(serverUrl + path, {
+    method: opts.method || "GET",
+    headers: headers,
+    body: opts.body ? JSON.stringify(opts.body) : undefined
+  }).then(function(r){
+    return r.json().catch(function(){ return {}; }).then(function(data){
+      if(!r.ok){
+        var err = new Error(data.error || ("Request failed (" + r.status + ")"));
+        err.status = r.status; err.code = data.code;
+        throw err;
+      }
+      return data;
+    });
+  }, function(){
+    // A network-level failure, not an HTTP error. Worth distinguishing: the
+    // messages the user needs are completely different.
+    var err = new Error("Can't reach the ProDash server. Check your connection.");
+    err.offline = true;
+    throw err;
+  });
+}
+
+/* Per-account storage namespacing. Two people using the same browser must not
+   share a board cache, and signing out must not leave one visible to the
+   other. Keyed on the user id from the token, which the Worker issued. */
+function ns(base){
+  if(!valid()) return base;
+  var key = base + "::" + session.user.userId;
+  var flag = "prodash.migrated::" + base;
+  // One-time carry-over from the single-user era: the first account to sign in
+  // on this device adopts whatever was stored under the old unnamespaced key,
+  // mirroring the Worker's own legacy claim so the same board arrives from
+  // both directions instead of appearing to vanish.
+  if(get(key) === null && get(base) !== null && !get(flag)){
+    if(set(key, get(base))) set(flag, session.user.userId);
+  }
+  return key;
+}
+
+// ---- the gate UI -------------------------------------------------------
+var gate = document.getElementById("authGate");
+var msgEl = document.getElementById("agMsg");
+var VIEWS = ["agSetup","agChoose","agLogin","agSignup","agForgot1","agForgot2","agForgot3"];
+var recovery = { username:"", email:"", ticket:"" };
+
+function show(id){
+  VIEWS.forEach(function(v){ document.getElementById(v).hidden = (v !== id); });
+  msg("");
+  var first = document.querySelector("#" + id + " input, #" + id + " select");
+  if(first) setTimeout(function(){ try{ first.focus(); }catch(e){} }, 30);
+}
+function msg(text, kind){
+  msgEl.textContent = text || "";
+  msgEl.className = "ag-msg" + (text ? " on " + (kind || "err") : "");
+}
+function busy(form, on){
+  var b = form.querySelector("button[type=submit], .ag-btn");
+  if(b) b.disabled = !!on;
+}
+function val(id){ return document.getElementById(id).value; }
+
+function openGate(){
+  gate.hidden = false;
+  show(serverUrl ? "agChoose" : "agSetup");
+}
+
+/* One place decides what happens after any successful authentication, so
+   login, signup and a post-reset login cannot drift apart. The reload is not
+   laziness: the board script reads its storage key and builds its entire state
+   at parse time, so it has to start over to come up as the right person. */
+function enter(res){
+  save(res.token, res.user);
+  location.reload();
+}
+
+document.getElementById("agUrlSave").addEventListener("click", function(){
+  var u = val("agUrl").trim().replace(/\/+$/,"");
+  if(!/^https:\/\/.+\..+/.test(u)){ msg("Enter the full https:// address of your ProDash server."); return; }
+  serverUrl = u; set(URL_KEY, u);
+  show("agChoose");
+});
+document.getElementById("agChangeUrl").addEventListener("click", function(){
+  document.getElementById("agUrl").value = serverUrl;
+  show("agSetup");
+});
+document.getElementById("agGoLogin").addEventListener("click", function(){ show("agLogin"); });
+document.getElementById("agGoSignup").addEventListener("click", function(){ show("agSignup"); });
+document.getElementById("agGoForgot").addEventListener("click", function(){ show("agForgot1"); });
+["agBack1","agBack2"].forEach(function(id){
+  document.getElementById(id).addEventListener("click", function(){ show("agChoose"); });
+});
+["agBack3","agBack4","agBack5"].forEach(function(id){
+  document.getElementById(id).addEventListener("click", function(){ show("agLogin"); });
+});
+
+document.getElementById("agLoginForm").addEventListener("submit", function(e){
+  e.preventDefault();
+  var f = e.target; busy(f, true); msg("");
+  api("/auth/login", { method:"POST", body:{ username: val("agLoginUser"), password: val("agLoginPass") } })
+    .then(enter)
+    .catch(function(err){ busy(f, false); msg(err.message); });
+});
+
+document.getElementById("agSignupForm").addEventListener("submit", function(e){
+  e.preventDefault();
+  var f = e.target;
+  // Checked here purely so the user finds out before a round trip. The Worker
+  // re-checks all of it - these fields can be bypassed with one curl command,
+  // so they are convenience, never enforcement.
+  if(val("agPass") !== val("agPass2")){ msg("The two passwords don't match."); return; }
+  if(!val("agQ")){ msg("Choose a secret question."); return; }
+  busy(f, true); msg("");
+  api("/auth/signup", { method:"POST", body:{
+    firstName: val("agFirst"), lastName: val("agLast"), username: val("agUser"),
+    email: val("agEmail"), password: val("agPass"),
+    secretQuestion: val("agQ"), secretAnswer: val("agA")
+  }})
+    .then(enter)
+    .catch(function(err){
+      busy(f, false);
+      msg(err.message);
+      // Send the user straight at the field they have to change, rather than
+      // making them work out which of eight inputs the message refers to.
+      if(err.code === "username_taken"){ try{ document.getElementById("agUser").select(); }catch(e2){} }
+    });
+});
+
+document.getElementById("agForgot1Form").addEventListener("submit", function(e){
+  e.preventDefault();
+  var f = e.target; busy(f, true); msg("");
+  recovery.username = val("agFUser"); recovery.email = val("agFEmail");
+  api("/auth/forgot/start", { method:"POST", body:{ username: recovery.username, email: recovery.email } })
+    .then(function(res){
+      busy(f, false);
+      document.getElementById("agFQ").textContent = res.question;
+      show("agForgot2");
+    })
+    .catch(function(err){ busy(f, false); msg(err.message); });
+});
+
+document.getElementById("agForgot2Form").addEventListener("submit", function(e){
+  e.preventDefault();
+  var f = e.target; busy(f, true); msg("");
+  api("/auth/forgot/verify", { method:"POST", body:{
+    username: recovery.username, email: recovery.email, answer: val("agFA")
+  }})
+    .then(function(res){
+      busy(f, false); recovery.ticket = res.ticket;
+      show("agForgot3");
+    })
+    .catch(function(err){ busy(f, false); msg(err.message); });
+});
+
+document.getElementById("agForgot3Form").addEventListener("submit", function(e){
+  e.preventDefault();
+  var f = e.target;
+  if(val("agNew") !== val("agNew2")){ msg("The two passwords don't match."); return; }
+  busy(f, true); msg("");
+  api("/auth/forgot/reset", { method:"POST", body:{ ticket: recovery.ticket, password: val("agNew") } })
+    .then(function(){
+      // Deliberately not an automatic sign-in. Typing the new password once,
+      // immediately, is what proves it was actually memorised rather than
+      // typed twice into two boxes and forgotten.
+      recovery = { username:"", email:"", ticket:"" };
+      show("agLogin");
+      msg("Password updated. Log in with your new password.", "ok");
+    })
+    .catch(function(err){ busy(f, false); msg(err.message); });
+});
+
+// ---- boot decision -----------------------------------------------------
+var ready = valid();
+if(ready){
+  gate.hidden = true;
+  /* Confirm with the Worker in the background. The board is already usable by
+     now, so this costs the user nothing when it succeeds. When it fails with
+     an auth error the session is genuinely dead (revoked, expired server-side,
+     or the password was reset elsewhere) and the app must not stay open. A
+     network failure is explicitly NOT treated as a rejection - that is the
+     offline case, and it is the one this whole design exists to keep working. */
+  api("/auth/me").catch(function(err){
+    if(err.offline) return;
+    if(err.status === 401 || err.status === 403){
+      clear();
+      location.reload();
+    }
+  });
+}else{
+  clear();
+  openGate();
+}
+
+return {
+  ready: function(){ return ready; },
+  ns: ns,
+  serverUrl: function(){ return serverUrl; },
+  token: function(){ return session ? session.token : ""; },
+  user: function(){ return session ? session.user : null; },
+  headers: function(){
+    return { "Authorization": "Bearer " + (session ? session.token : ""), "Content-Type": "application/json" };
+  },
+  signOut: signOut
+};
+})();
+</script>
+
 <div class="wrap">
 
   <header>
@@ -504,6 +1003,13 @@ body.view-reports .board-only,body.view-history .board-only{display:none}
           <div class="stat"><b id="sTask">0</b><span>Open</span></div>
           <div class="stat"><b id="sStreak">0</b><span>Streak</span></div>
         </div>
+      </div>
+      <div class="hdr-user">
+        <div>
+          <b id="whoName"></b>
+          <span id="whoUser"></span>
+        </div>
+        <button class="hdr-out" id="signOutBtn">Sign out</button>
       </div>
     </div>
     <div id="nudges" class="board-only"></div>
@@ -538,7 +1044,7 @@ body.view-reports .board-only,body.view-history .board-only{display:none}
            the sync path that actually reaches a phone. The two are
            independent and can both be on at once - whichever writes last
            wins via the same updatedAt/adopt() logic either way. -->
-      <button class="pill sync" id="cloudBtn"><i></i><span id="cloudTxt">Cloud: not set up</span></button>
+      <button class="pill sync" id="cloudBtn"><i></i><span id="cloudTxt">Cloud: tap to sync</span></button>
       <div class="synced-note" id="cloudNote"></div>
     </div>
   </div>
@@ -647,7 +1153,16 @@ body.view-reports .board-only,body.view-history .board-only{display:none}
 <script>
 (function(){
 "use strict";
-var KEY="dayflow.v2";
+/* The authentication gate above owns the screen until a session exists. Bailing
+   out here - rather than rendering and hiding - is what makes sign-out real:
+   no board is read out of storage, no interval starts, nothing reaches the DOM.
+   A signed-out tab holds none of the previous user's data in memory. */
+if(!window.PDAuth || !PDAuth.ready()) return;
+
+/* Per-account storage. Two people on one browser get genuinely separate caches;
+   PDAuth.ns() also carries the single-user era's board over to the first
+   account that signs in here. */
+var KEY=PDAuth.ns("dayflow.v2");
 var ROLL=7*60;          // logical day starts 07:00
 
 // Blue = the three client jobs. Green = his own company. Yellow = learning.
@@ -861,15 +1376,13 @@ function adopt(d){
    synced JSON itself - they must never round-trip through export, import,
    or the Worker's own storage). Reuses adopt() exactly as the OneDrive path
    does, so "whichever copy is newer wins" is one rule, not two. */
-var CLOUD_URL_KEY="prodash.cloudUrl", CLOUD_PW_KEY="prodash.cloudPw";
-// Guarded like every other localStorage read in this file (see load()) -
-// an unguarded read here throws synchronously at parse time in any context
-// where storage is blocked (private browsing, strict cookie settings, this
-// preview tool's sandbox), which would abort the ENTIRE boot script before
-// renderAll() ever runs. Found by testing, not by inspection - worth the
-// reminder that every top-level statement in this file runs unprotected.
-var cloudUrl="", cloudPw="";
-try{ cloudUrl=localStorage.getItem(CLOUD_URL_KEY)||""; cloudPw=localStorage.getItem(CLOUD_PW_KEY)||""; }catch(e){}
+// The shared sync password is gone. The credential is now the session token
+// the Worker issued at login, which also identifies WHICH board to serve - so
+// there is nothing left for this file to remember, and nothing it could change
+// to reach a board other than its own. Both values come from PDAuth rather
+// than from storage read here, which is also why the old unguarded-read hazard
+// documented below no longer applies at this line.
+var cloudUrl=PDAuth.serverUrl();
 var cloudBusy=false, cloudPushTimer=null, cloudState="off";
 
 function setCloud(state,note){
@@ -879,36 +1392,35 @@ function setCloud(state,note){
   b.className="pill sync"+(state==="synced"?" ok":(state==="error"?" warn":""));
   t.textContent = state==="synced" ? "Cloud synced"
                 : state==="error"  ? "Cloud sync error"
-                : cloudUrl         ? "Cloud: tap to sync"
-                :                    "Cloud: not set up";
+                :                    "Cloud: tap to sync";
   n.textContent = note||"";
 }
-function cloudHeaders(){ return {"Authorization":"Bearer "+cloudPw,"Content-Type":"application/json"}; }
+// Read fresh on every call rather than captured once: the token can be
+// replaced (or cleared) while the tab is open, and a stale copy would keep
+// firing requests as a session that no longer exists.
+function cloudHeaders(){ return PDAuth.headers(); }
 
-function connectCloud(){
-  var url=prompt("Cloudflare Worker URL (from your dashboard, e.g.\nhttps://prodash-sync.yourname.workers.dev):",cloudUrl||"https://");
-  if(url===null)return;
-  url=url.trim().replace(/\/+$/,"");
-  if(!url)return;
-  var pw=prompt("Sync password (the same one set as SYNC_PASSWORD on the Worker):","");
-  if(pw===null)return;
-  pw=pw.trim();  // a stray leading/trailing space here silently mismatches the Worker's copy
-  cloudUrl=url; cloudPw=pw;
-  try{ localStorage.setItem(CLOUD_URL_KEY,cloudUrl); localStorage.setItem(CLOUD_PW_KEY,cloudPw); }catch(e){}
-  setCloud("local","Connecting…");
-  cloudPull();
-}
-function disconnectCloud(){
-  if(!confirm("Disconnect cloud sync on this device? Data already saved to the Worker is untouched - this only stops this device talking to it."))return;
-  cloudUrl="";cloudPw="";
-  try{ localStorage.removeItem(CLOUD_URL_KEY); localStorage.removeItem(CLOUD_PW_KEY); }catch(e){}
-  setCloud("off");
+/* Cloud sync is no longer something to connect or disconnect - it is simply
+   what being logged in means. Signing out is the disconnect, and it is handled
+   by the gate. What remains is the failure path: if the Worker rejects the
+   token, this device is holding a session that is genuinely dead (revoked from
+   another device, expired server-side, or invalidated by a password reset) and
+   the only correct response is to stop pretending and return to the gate.
+   Anything other than 401/403 is a transport problem, not an auth problem, and
+   must NOT sign the user out - dropping someone at a login screen because
+   their train went into a tunnel is exactly the failure this design avoids. */
+function cloudAuthFailed(status){
+  if(status!==401 && status!==403) return false;
+  setCloud("error","Signed out — please log in again.");
+  PDAuth.signOut(true);
+  location.reload();
+  return true;
 }
 function cloudPull(){
-  if(!cloudUrl||!cloudPw||cloudBusy)return Promise.resolve();
+  if(!cloudUrl||cloudBusy)return Promise.resolve();
   cloudBusy=true;
   return fetch(cloudUrl+"/data",{headers:cloudHeaders()})
-    .then(function(r){ if(!r.ok)throw new Error("HTTP "+r.status); return r.json(); })
+    .then(function(r){ if(!r.ok){var e=new Error("HTTP "+r.status);e.status=r.status;throw e;} return r.json(); })
     .then(function(remote){
       cloudBusy=false;
       var adopted = remote && typeof remote==="object" && adopt(remote);
@@ -919,7 +1431,7 @@ function cloudPull(){
       setCloud("synced",(adopted?"Pulled newer data · ":"Up to date · ")+new Date().toLocaleTimeString());
       if(curHView)renderHistory();
     })
-    .catch(function(e){ cloudBusy=false; setCloud("error",e.message); });
+    .catch(function(e){ cloudBusy=false; if(cloudAuthFailed(e.status))return; setCloud("error",e.message); });
 }
 /* Pulls-then-pushes rather than blindly overwriting the Worker's stored
    copy. Without the pull, two devices pushing close together can have one's
@@ -932,11 +1444,11 @@ function cloudPull(){
    ever push, or a network hiccup) fall through and push current S anyway
    rather than blocking a save indefinitely on a read that isn't essential. */
 function cloudPush(){
-  if(!cloudUrl||!cloudPw)return;
+  if(!cloudUrl)return;
   clearTimeout(cloudPushTimer);
   cloudPushTimer=setTimeout(function(){
     fetch(cloudUrl+"/data",{headers:cloudHeaders()})
-      .then(function(r){ if(!r.ok)throw new Error("HTTP "+r.status); return r.json(); })
+      .then(function(r){ if(!r.ok){var e=new Error("HTTP "+r.status);e.status=r.status;throw e;} return r.json(); })
       .then(function(remote){ if(remote&&typeof remote==="object")adopt(remote); })
       .catch(function(){ /* no remote yet, or unreachable - push what we have */ })
       .then(function(){
@@ -944,12 +1456,12 @@ function cloudPush(){
         // going out in the PUT body, including anything adopt() just folded in.
         var upTo=newestRevTs();
         return fetch(cloudUrl+"/data",{method:"PUT",headers:cloudHeaders(),body:JSON.stringify(S)})
-          .then(function(r){ if(!r.ok)throw new Error("HTTP "+r.status);
+          .then(function(r){ if(!r.ok){var e=new Error("HTTP "+r.status);e.status=r.status;throw e;}
             markPushed(upTo);
             setCloud("synced","Saved · "+new Date().toLocaleTimeString());
             if(curHView)renderHistory(); });
       })
-      .catch(function(e){ setCloud("error",e.message); });
+      .catch(function(e){ if(cloudAuthFailed(e.status))return; setCloud("error",e.message); });
   },800);
 }
 /* ================= Board History: revision engine =========================
@@ -965,7 +1477,10 @@ function cloudPush(){
 
    The board slice is deliberately narrow: BOARD_KEYS excludes hist/devices,
    so a snapshot can never contain the history that contains it.           */
-var APP_VERSION="1.1";
+// 2.0, not 1.2: the board is no longer one document on one Worker. Every
+// device now reports which app version wrote a revision, and a 1.x entry in
+// the audit trail means "from before accounts existed".
+var APP_VERSION="2.0";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -976,6 +1491,7 @@ var APP_VERSION="1.1";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-08-15T21:40:00+08:00",text:"ProDash now asks you to log in. Everyone gets their own separate board that follows them to any device, instead of one shared board behind one shared password. Includes sign-up, forgot-password with a secret question, and a 15-minute lock after three wrong passwords."},
   {ts:"2026-08-15T20:24:11+08:00",text:"Added this tab — a plain-English update log for the app itself, separate from the board's own change history."},
   {ts:"2026-08-15T20:17:46+08:00",text:"Removed the old Shutdown ritual card. Timeline items like Sleep and Wake + prep can now be deleted. Every appointment sends a reminder, not just must-attend ones."},
   {ts:"2026-08-15T19:24:45+08:00",text:"Cloud sync now refreshes automatically when you open the app, and reconnecting no longer makes you re-enter your password."},
@@ -994,7 +1510,11 @@ var APP_VERSION_HISTORY=[
   {ts:"2026-08-12T20:24:54+08:00",text:"First build of Productivity Dashboard v8, a standalone dashboard that works offline."},
   {ts:"2026-08-12T19:31:33+08:00",text:"Project set up: instructions, folders, and version control put in place."}
 ];
-var DEV_KEY="prodash.deviceId", DEV_NAME_KEY="prodash.deviceName", PUSHED_KEY="prodash.pushedUpTo";
+/* The two device keys stay unnamespaced on purpose: they describe this machine,
+   not the person at it, so a shared laptop should keep reporting itself as one
+   device in the audit trail no matter who signs in. "How far has this device
+   pushed" is per-account, though - it tracks a specific board's revisions. */
+var DEV_KEY="prodash.deviceId", DEV_NAME_KEY="prodash.deviceName", PUSHED_KEY=PDAuth.ns("prodash.pushedUpTo");
 var HIST_CAP=400, CKPT_EVERY=25, BATCH_MS=2500;
 var BOARD_KEYS=["tasks","log","days","events","lanes","rituals","focus","theme","hiddenBlocks"];
 var KEYED=["tasks","events","lanes","rituals"], MAPS=["log","days"], SCALARS=["focus","theme"];
@@ -1984,28 +2504,30 @@ document.getElementById("syncBtn").addEventListener("click",function(){
 window.addEventListener("focus",function(){if(fileHandle)readFile();});
 document.addEventListener("visibilitychange",function(){if(!document.hidden&&fileHandle)readFile();});
 
-document.getElementById("cloudBtn").addEventListener("click",function(){
-  // Only offer to disconnect once it's actually working. If it's off, or
-  // stuck in error (wrong password, etc.), clicking should let you re-enter
-  // credentials, not force a disconnect confirmation first - that was the
-  // original bug: an error state and a working state used the same click
-  // behaviour, so there was no way to just fix a typo'd password.
-  //
-  // "local" is a THIRD state, distinct from both: credentials are already
-  // stored (from a previous session), but nothing has confirmed them yet
-  // this load - e.g. right after a refresh, before the boot-time pull below
-  // resolves. That used to fall into the same bucket as "off"/"error" and
-  // trigger the full connectCloud() prompt - which re-asks for the password
-  // with a BLANK field every time, never pre-filled. So "tap to sync" on an
-  // already-configured device actually meant "retype your password or it
-  // fails silently" - real friction, and a place to introduce a typo for no
-  // reason. Try the credentials we already have first; only fall through to
-  // the full prompt if there's genuinely nothing stored, or they've actually
-  // failed (a real error, which flips cloudState to "error" on its own).
-  if(cloudState==="synced") disconnectCloud();
-  else if(cloudState==="local"&&cloudUrl&&cloudPw) cloudPull();
-  else connectCloud();
-});
+/* ---------- signed-in identity ---------- */
+// textContent, never innerHTML: these strings came from a registration form,
+// so treating them as markup would let a chosen first name run script in every
+// session that displays it.
+(function(){
+  var u=PDAuth.user()||{};
+  document.getElementById("whoName").textContent=((u.firstName||"")+" "+(u.lastName||"")).trim()||u.username||"";
+  document.getElementById("whoUser").textContent="@"+(u.username||"")+(u.role==="admin"?" · admin":"");
+  document.getElementById("signOutBtn").addEventListener("click",function(){
+    // Unsynced work is the one thing sign-out can genuinely destroy, so say so
+    // by number rather than asking a vague "are you sure?".
+    var pend=pendingRevs().length;
+    var warn=pend?("You have "+pend+" change"+(pend>1?"s":"")+" that haven't reached the cloud yet. Sign out anyway?")
+                 :"Sign out of ProDash on this device?";
+    if(!confirm(warn))return;
+    PDAuth.signOut();
+  });
+})();
+
+// The three-way click behaviour this button used to need is gone with the
+// shared password. There are no credentials left to re-enter or disconnect -
+// the session is the credential and the gate owns it - so every state collapses
+// to the one action that was ever actually wanted: sync now.
+document.getElementById("cloudBtn").addEventListener("click",function(){ cloudPull(); });
 // same triggers as the OneDrive path above: on regaining focus, on the tab
 // becoming visible again, so a change made on the phone shows up on the PC
 // (and back) without waiting for the periodic interval further down.
@@ -2020,14 +2542,14 @@ document.addEventListener("visibilitychange",function(){if(!document.hidden&&clo
 // same deleted state on their next sync regardless of order.
 window.addEventListener("focus",function(){expireHistory();});
 document.addEventListener("visibilitychange",function(){if(!document.hidden)expireHistory();});
-setCloud(cloudUrl?"local":"off");
+setCloud("local");
 // A returning device (credentials already stored from a previous session)
 // used to sit on "tap to sync" until a focus/visibility event happened to
 // fire - a plain page load or refresh never pulled on its own, so "why
 // isn't the other device's change showing up" after simply reopening the
 // tab was the expected, if confusing, default. Pull once immediately, the
 // same way the OneDrive path's restore() already reconnects on boot.
-if(cloudUrl&&cloudPw)cloudPull();
+if(cloudUrl)cloudPull();
 
 /* ============================================================
    Reports — a read-only view over S.tasks, grouped by lane.
@@ -2186,18 +2708,16 @@ function renderHistory(){
       '<div><b>'+(h.length-mine.length)+'</b>from other devices</div>'+
       '<div><b>'+pend.length+'</b>waiting to sync</div>'+
       '<div><b>'+groups.length+'</b>conflicts</div></div>';
-    if(!cloudUrl){
-      out+='<div class="empty-note">Cloud sync isn\'t set up on this device, so nothing here has left this browser. '+
-           'Use the <b>Cloud: not set up</b> pill on the Board tab to connect it.</div>';
-    }else{
-      out+='<div class="rep-controls"><button class="hist-btn" id="histPush">'+
-           (pend.length?"Sync "+pend.length+" local change"+(pend.length>1?"s":"")+" to cloud":"Everything is synced — check again")+
-           '</button></div>';
-      out+=pend.length
-        ? '<div class="rep-lane"><div class="rep-lane-h"><h3>Made here, not yet in the cloud</h3></div>'+
-          pend.slice().reverse().map(function(r){return revRow(r,conf[r.id],false);}).join("")+'</div>'
-        : '<div class="empty-note">Every change made on this device has reached the cloud.</div>';
-    }
+    // The "cloud isn't set up" branch that used to live here is gone: being
+    // signed in IS being connected, so there is no longer a state where the
+    // board exists but has nowhere to sync to.
+    out+='<div class="rep-controls"><button class="hist-btn" id="histPush">'+
+         (pend.length?"Sync "+pend.length+" local change"+(pend.length>1?"s":"")+" to cloud":"Everything is synced — check again")+
+         '</button></div>';
+    out+=pend.length
+      ? '<div class="rep-lane"><div class="rep-lane-h"><h3>Made here, not yet in the cloud</h3></div>'+
+        pend.slice().reverse().map(function(r){return revRow(r,conf[r.id],false);}).join("")+'</div>'
+      : '<div class="empty-note">Every change made on this device has reached the cloud.</div>';
     if(groups.length){
       out+='<div class="rep-lane"><div class="rep-lane-h"><h3>Conflicts</h3>'+
         '<span class="rep-counts">two devices edited without seeing each other</span></div>'+

@@ -1,5 +1,13 @@
 # Workflow: Setting up cloud sync
 
+> **Partly superseded — see [`auth-setup.md`](auth-setup.md).**
+> Steps 1–3 (KV namespace, creating the Worker, binding `PRODASH_KV`) are still
+> correct and still required. **Step 4 is not**: the Worker no longer reads
+> `SYNC_PASSWORD`, and there is no longer one shared password opening one board.
+> Accounts now live in a Google Sheet and each person logs in to their own
+> board. Kept here because the Cloudflare walkthrough and the deployment gotcha
+> below are still the ones you need.
+
 **Why:** the OneDrive sync ProDash already has only works in Chrome/Edge on a
 desktop — no phone browser supports the API it uses. This sets up a second,
 independent sync path that does work on a phone: a small Cloudflare Worker
