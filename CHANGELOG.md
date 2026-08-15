@@ -2,6 +2,29 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-08-15 — Cloud sync: pull on boot, stop re-asking for a stored password
+
+Found while actually connecting three real devices (phone, a test browser,
+and the local file) to the same Worker for the first time this session.
+
+**A plain page load/refresh never pulled fresh cloud data on its own** — only
+focus, tab-visibility-change, or the 2-minute poll did. A returning device
+with credentials already stored just sat on "tap to sync" until one of those
+fired, so "why isn't the other device's change showing up" after simply
+reopening the tab was the expected, if confusing, default. Now pulls once
+automatically on boot when a URL/password are already saved — the same
+"reconnect on load" step the OneDrive path already had via `restore()`.
+
+**Worse, clicking "tap to sync" didn't just try again — it re-asked for
+*both* the URL and the password, with the password field blank every time,
+never pre-filled.** Any state other than "synced" fell through to the same
+full `connectCloud()` prompt, including a device that was correctly
+configured moments earlier and just hadn't confirmed it yet this session.
+That's a real place to introduce a typo for no reason. The click handler now
+tries the already-stored credentials first via a plain `cloudPull()`; only
+"off" (nothing ever set up) or a genuine "error" state still prompts for
+input.
+
 ## 2026-08-15 — Closed three sync-merge gaps in Board History, added 7-day retention
 
 Board History's `adopt()` fix (below) only closed one door — three more of

@@ -1939,7 +1939,21 @@ document.getElementById("cloudBtn").addEventListener("click",function(){
   // credentials, not force a disconnect confirmation first - that was the
   // original bug: an error state and a working state used the same click
   // behaviour, so there was no way to just fix a typo'd password.
-  if(cloudState==="synced") disconnectCloud(); else connectCloud();
+  //
+  // "local" is a THIRD state, distinct from both: credentials are already
+  // stored (from a previous session), but nothing has confirmed them yet
+  // this load - e.g. right after a refresh, before the boot-time pull below
+  // resolves. That used to fall into the same bucket as "off"/"error" and
+  // trigger the full connectCloud() prompt - which re-asks for the password
+  // with a BLANK field every time, never pre-filled. So "tap to sync" on an
+  // already-configured device actually meant "retype your password or it
+  // fails silently" - real friction, and a place to introduce a typo for no
+  // reason. Try the credentials we already have first; only fall through to
+  // the full prompt if there's genuinely nothing stored, or they've actually
+  // failed (a real error, which flips cloudState to "error" on its own).
+  if(cloudState==="synced") disconnectCloud();
+  else if(cloudState==="local"&&cloudUrl&&cloudPw) cloudPull();
+  else connectCloud();
 });
 // same triggers as the OneDrive path above: on regaining focus, on the tab
 // becoming visible again, so a change made on the phone shows up on the PC
@@ -1956,6 +1970,13 @@ document.addEventListener("visibilitychange",function(){if(!document.hidden&&clo
 window.addEventListener("focus",function(){expireHistory();});
 document.addEventListener("visibilitychange",function(){if(!document.hidden)expireHistory();});
 setCloud(cloudUrl?"local":"off");
+// A returning device (credentials already stored from a previous session)
+// used to sit on "tap to sync" until a focus/visibility event happened to
+// fire - a plain page load or refresh never pulled on its own, so "why
+// isn't the other device's change showing up" after simply reopening the
+// tab was the expected, if confusing, default. Pull once immediately, the
+// same way the OneDrive path's restore() already reconnects on boot.
+if(cloudUrl&&cloudPw)cloudPull();
 
 /* ============================================================
    Reports — a read-only view over S.tasks, grouped by lane.
