@@ -131,6 +131,28 @@ and everyone has to use Forgot password. Set it once and leave it.
 > means the code and all five required variables are live. A 500 naming a
 > missing variable tells you exactly which one didn't take.
 
+### The check that actually tests Google
+
+`/health` never contacts Google, so it cannot tell you whether step 2.5 worked —
+it will happily say `{"ok":true}` while the sheet is unshared, and you would not
+find out until the first signup failed. This call does test it, reads only, and
+creates nothing. Run it in PowerShell:
+
+```bash
+$u="https://YOUR-WORKER-URL"; try { Invoke-WebRequest "$u/auth/forgot/start" -Method POST -ContentType "application/json" -Body '{"username":"connectivity-test","email":"test@example.com"}' -UseBasicParsing } catch { $s=$_.Exception.Response; "STATUS $([int]$s.StatusCode)"; (New-Object IO.StreamReader($s.GetResponseStream())).ReadToEnd() }
+```
+
+Read the result like this:
+
+- **404 `No account matches that username and email address.`** — success. The
+  Worker authenticated to Google, read the `Users` tab, and found no such user,
+  which is correct. Everything from step 1 to step 4 is working.
+- **502 `Could not reach the account database.`** — Google refused. Almost
+  always step 2.5 (sheet not shared with the service account), otherwise a bad
+  `GOOGLE_SA_KEY` paste or the Sheets API not enabled. The Worker's live logs
+  show the real Google error.
+- **500 naming a variable** — that variable didn't deploy.
+
 ## 5. Point ProDash at it
 
 **Get the URL by copying it, never by reconstructing it.** A `workers.dev`
