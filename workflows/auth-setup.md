@@ -133,10 +133,26 @@ and everyone has to use Forgot password. Set it once and leave it.
 
 ## 5. Point ProDash at it
 
+**Get the URL by copying it, never by reconstructing it.** A `workers.dev`
+address is `<worker-name>.<account-subdomain>.workers.dev` — exactly two labels
+before `workers.dev`, and the account subdomain is rarely your name. Typing a
+guessed one gives `DNS_PROBE_FINISHED_NXDOMAIN`, which looks alarming but only
+means the hostname doesn't exist; nothing reached Cloudflare and none of your
+variables are implicated.
+
+Find it in either of these places:
+
+- **Cloudflare dashboard → Compute (Workers) → `prodash-sync` → Settings →
+  Domains & Routes.** Shows the real hostname *and* whether the `workers.dev`
+  route is enabled. A disabled route also gives NXDOMAIN — a Worker can be
+  deployed and healthy with no public hostname at all.
+- **If cloud sync ever worked on this device**, the old URL is still in the
+  browser. F12 → Console → `localStorage.getItem("prodash.cloudUrl")`. ProDash
+  reads that key as a fallback anyway, so it may fill itself in.
+
 Open ProDash. Because there is no session yet, you get the login screen, and on
-a fresh device it asks for the **server address** first — paste your Worker URL
-(`https://prodash-sync.yourname.workers.dev`). That is stored on that device
-only. Then **Sign up**.
+a fresh device it asks for the **server address** first — paste the Worker URL
+you just copied. That is stored on that device only. Then **Sign up**.
 
 Do the same on your phone: same URL, then **Log in** with the account you just
 made. Same board, both devices.
@@ -202,6 +218,14 @@ spaces. Wrong answers count toward the same three-strike lockout.
 
 ## If something looks wrong
 
+- **`DNS_PROBE_FINISHED_NXDOMAIN` / "site can't be reached"** — the hostname
+  doesn't exist, so nothing reached Cloudflare and this is not a code or
+  variable problem. Either the URL is wrong (see step 5) or the Worker's
+  `workers.dev` route is disabled.
+- **`/health` returns an empty body, or an HTML error page** — you reached
+  Cloudflare but not this Worker. Every response from `worker.js` is JSON, so
+  anything else means the name resolved to a different Worker, or the paste-in
+  never deployed.
 - **`/health` returns 500 naming a variable** — that variable didn't deploy.
   Promote the newest version (step 4's gotcha).
 - **"Could not reach the account database"** — the Worker reached Google and was
