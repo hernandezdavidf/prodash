@@ -118,6 +118,42 @@ A second tab, next to **Board**, in the header.
 - **Export to Excel** on the Current Day Report downloads a real `.xlsx` —
   Lane, Task, Status, Added, Completed — for whichever lane is selected.
 
+## Board History
+
+A third tab, after **Board** and **Reports**. Every change to the board is
+recorded automatically — you never have to do anything to keep it.
+
+- **Update history** — the full log, newest first: what changed, when, which
+  device did it, whether it reached the cloud, and its revision ID. Edits
+  made within a few seconds of each other collapse into one entry, so
+  ticking off your non-negotiables doesn't produce a dozen lines.
+- **Local ↔ Cloud** — the diagnostic view. Counts of what came from this
+  device vs. others, what's still waiting to sync, and any conflicts. The
+  **Sync local changes to cloud** button pushes and re-pulls on demand
+  instead of waiting for the automatic rhythm.
+- **Devices** — every device that has ever touched this data: type, OS,
+  browser, app version, when it was last active, and how far its copy
+  reaches. This is how you confirm the phone actually received what the
+  desktop wrote.
+- **Restore** — pick any revision to **Compare** against the board right now,
+  or **Restore** back to it. You're told how many changes will roll back
+  before anything happens.
+
+**Restoring never deletes history.** The rollback is itself recorded as a new
+entry, so you can undo a restore exactly the way you did the restore. Very
+old revisions show a greyed-out **Too old** button — history keeps the last
+400 changes, and past that point the app would have to guess at the board
+state, so it refuses instead.
+
+**A "Conflict" badge** means two devices edited without having seen each
+other's change — the board kept whichever arrived last, so the other side's
+edits may have been overwritten. Both are still listed and either can be
+restored. If you see these often, the two devices aren't syncing before you
+start editing: bring the app to the foreground and let it pull first.
+
+Console hooks for digging deeper: `dfDebug.hist()`, `dfDebug.devices()`,
+`dfDebug.conflicts()`, `dfDebug.stateAt("rev_…")`, `dfDebug.whoAmI()`.
+
 ## Colours
 
 Blue = the three client jobs (Day Client, Night Client A, Night Client B in three tints). Green = your

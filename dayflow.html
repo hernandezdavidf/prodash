@@ -374,7 +374,7 @@ textarea.note:focus{border-color:var(--olive);background:var(--paper)}
   color:var(--muted);font-weight:600;font-size:12.5px}
 .tab:hover{background:var(--ivory)}
 .tab.on{background:var(--forest);color:var(--on-brand);border-color:var(--forest)}
-body.view-reports .board-only{display:none}
+body.view-reports .board-only,body.view-history .board-only{display:none}
 /* #view-reports itself is shown/hidden by toggling its `hidden` attribute in
    setView() - a CSS rule here can't win against the UA [hidden]{display:none}
    without matching or exceeding its specificity, so don't add one. */
@@ -403,6 +403,63 @@ body.view-reports .board-only{display:none}
 .rep-row.done .rep-title{color:var(--muted);text-decoration:line-through}
 .rep-title{flex:1;word-break:break-word}
 .rep-date{font-size:10.5px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+
+/* ---- board history ---- */
+.sub-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:2px 0 14px}
+.sub-tab{border:1px solid var(--line);border-radius:999px;padding:5px 13px;font-size:12px;
+  font-weight:600;color:var(--muted);background:var(--paper)}
+.sub-tab:hover{color:var(--ink);border-color:var(--sage)}
+.sub-tab.on{background:var(--forest);color:var(--on-brand);border-color:var(--forest)}
+.hist-row{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px dashed var(--line);font-size:12.5px}
+.hist-row:last-child{border-bottom:none}
+.hist-when{width:112px;flex-shrink:0;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;line-height:1.45}
+.hist-when b{display:block;color:var(--ink);font-family:var(--serif);font-size:12.5px;font-weight:700}
+.hist-main{flex:1;min-width:0}
+.hist-what{word-break:break-word}
+.hist-what em{font-style:normal;color:var(--muted)}
+.hist-meta{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-top:5px}
+.hist-act{flex-shrink:0}
+/* Status chips. Colour is meaning, matching the board's rule that orange
+   always means "look here" - pending/conflict are the only warm ones. */
+.chip{font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;
+  border-radius:5px;padding:2px 6px;white-space:nowrap;border:1px solid transparent}
+.chip.ok{background:var(--olive-lt);color:var(--forest-ink)}
+.chip.pend{background:var(--terra-lt);color:var(--terra-ink)}
+.chip.bad{background:var(--terra);color:var(--on-warm)}
+.chip.neutral{background:var(--ivory);color:var(--muted);border-color:var(--line)}
+.chip.dev{background:var(--ivory);color:var(--ink);border-color:var(--line);text-transform:none;letter-spacing:0;font-weight:600}
+.rev-id{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:10px;color:var(--sage)}
+.hist-btn{border:1px solid var(--line);border-radius:7px;padding:4px 10px;font-size:11.5px;
+  font-weight:600;color:var(--forest-ink);background:var(--paper)}
+.hist-btn:hover{background:var(--ivory);border-color:var(--olive)}
+.hist-btn.warn{color:var(--terra-ink)}
+.hist-btn.warn:hover{background:var(--terra-lt);border-color:var(--terra)}
+.hist-btn[disabled]{color:var(--sage);border-color:var(--line);background:transparent;cursor:not-allowed}
+.hist-btn[disabled]:hover{background:transparent;border-color:var(--line)}
+.dev-card{border:1px solid var(--line);border-radius:10px;padding:11px 13px;margin-bottom:9px}
+.dev-card:last-child{margin-bottom:0}
+.dev-card.me{border-color:var(--olive);background:var(--olive-lt)}
+.dev-h{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+.dev-h h3{font-size:13px}
+.dev-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(160px,100%),1fr));gap:4px 16px;font-size:11.5px;color:var(--muted)}
+.dev-grid b{color:var(--ink);font-weight:600}
+.diff-box{background:var(--ivory);border:1px solid var(--line);border-radius:9px;padding:10px 12px;
+  margin-top:10px;font-size:12px;max-height:340px;overflow:auto}
+.diff-box ul{margin:5px 0 0;padding-left:17px}
+.diff-box li{margin-bottom:3px}
+.empty-note{color:var(--muted);font-size:12.5px;padding:10px 0}
+/* Phones: the three-column row (fixed 112px timestamp | text | buttons) has
+   nowhere near enough width, and squeezes the description down to one
+   character per line. Stack it instead, and let the timestamp read as a
+   single inline line rather than a stacked block. */
+@media(max-width:600px){
+  .hist-row{flex-direction:column;gap:6px}
+  .hist-when{width:auto;display:flex;gap:7px;align-items:baseline}
+  .hist-when b{display:inline}
+  .hist-act{display:flex;gap:7px}
+  .hist-act .hist-btn{flex:1}
+  .dev-grid{grid-template-columns:1fr}
+}
 
 /* ---- touch targets --------------------------------------------------------
    (pointer: coarse) targets touch specifically - a touchscreen laptop at a
@@ -456,6 +513,7 @@ body.view-reports .board-only{display:none}
   <nav class="tabbar">
     <button class="tab on" id="tabBoard">Board</button>
     <button class="tab" id="tabReports">Reports</button>
+    <button class="tab" id="tabHistory">Board History</button>
   </nav>
 
   <div class="nowbar board-only" id="nowbar">
@@ -569,6 +627,20 @@ body.view-reports .board-only{display:none}
     </div>
   </div>
 
+  <div id="view-history" hidden>
+    <div class="card">
+      <h2>Board History <span class="cnt" id="histCount">0 changes</span></h2>
+      <div class="sub">Every change to the board — when it happened, which device made it, and whether it reached the cloud.</div>
+      <div class="sub-tabs">
+        <button class="sub-tab on" data-hview="log">Update history</button>
+        <button class="sub-tab" data-hview="sync">Local ↔ Cloud</button>
+        <button class="sub-tab" data-hview="devices">Devices</button>
+        <button class="sub-tab" data-hview="restore">Restore</button>
+      </div>
+      <div id="histBody"></div>
+    </div>
+  </div>
+
   <div class="saved" id="saved"></div>
   <div class="foot">
     <button id="exportBtn">Export backup</button>
@@ -666,6 +738,11 @@ function norm(s){
     s.rituals=DEFAULT_RITUALS.map(function(r){return {id:r.id,l:r.l,tag:r.tag};});
   if(["auto","dark","light"].indexOf(s.theme)<0)s.theme="auto";
   if(typeof s.updatedAt!=="number")s.updatedAt=0;
+  // Board History. Both are MERGED across devices rather than last-write-wins
+  // (see adopt()) - an audit trail that loses the losing side's entries can't
+  // do the one job it exists for.
+  if(!Array.isArray(s.hist))s.hist=[];
+  if(!s.devices||typeof s.devices!=="object")s.devices={};
   return s;
 }
 function load(){
@@ -682,7 +759,13 @@ function save(){
   try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
   stamp(fileHandle?"saving…":"saved");
   scheduleWrite();
-  cloudPush();
+  // The cloud push now happens inside commitRevision() instead of here, so
+  // the pushed document already carries the history entry for this change -
+  // otherwise the cloud would get the data first and its audit entry a beat
+  // later, in two separate writes. noteChange() batches rapid edits (ticking
+  // several rituals in a row) into one entry; it also always ends in a push,
+  // including when nothing material changed.
+  noteChange();
 }
 
 /* ---------- OneDrive file sync (Chrome/Edge desktop) ----------
@@ -739,9 +822,27 @@ function writeFile(){
     setSync("error","Couldn't write. Click to reconnect.");
   });
 }
+/* Board data is still last-write-wins on the whole document, unchanged. The
+   history and device registry are NOT: they're unioned by revision id, in
+   both directions. Without this, every pull from a newer device would wipe
+   this device's own audit trail - and the losing side of a conflict is
+   exactly the evidence you need to notice the conflict happened at all.
+   Note the second merge below: even when the incoming copy is OLDER and its
+   board is discarded, its history entries are still absorbed. */
 function adopt(d){
   d=norm(d);
-  if(d.updatedAt>=S.updatedAt){S=d;try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}renderAll();return true;}
+  var mh=mergeHist(S.hist,d.hist), md=mergeDevices(S.devices,d.devices);
+  if(d.updatedAt>=S.updatedAt){
+    S=d; S.hist=mh; S.devices=md;
+    baseSnap=boardOnly(S);
+    try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
+    renderAll();return true;
+  }
+  if(mh.length!==(S.hist||[]).length){
+    S.hist=mh; S.devices=md;
+    try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
+    renderAll();
+  }
   return false;
 }
 
@@ -803,7 +904,12 @@ function cloudPull(){
     .then(function(remote){
       cloudBusy=false;
       var adopted = remote && typeof remote==="object" && adopt(remote);
+      // This device has now seen everything the cloud held. Recording it in
+      // the shared registry is what lets EVERY device answer "did my phone
+      // ever receive that change?" without each one reporting separately.
+      touchDevice();
       setCloud("synced",(adopted?"Pulled newer data · ":"Up to date · ")+new Date().toLocaleTimeString());
+      if(curHView)renderHistory();
     })
     .catch(function(e){ cloudBusy=false; setCloud("error",e.message); });
 }
@@ -811,12 +917,279 @@ function cloudPush(){
   if(!cloudUrl||!cloudPw)return;
   clearTimeout(cloudPushTimer);
   cloudPushTimer=setTimeout(function(){
+    // Captured BEFORE the request, not in the .then: anything committed while
+    // this push is in flight was not part of this body and must stay pending.
+    var upTo=newestRevTs();
     fetch(cloudUrl+"/data",{method:"PUT",headers:cloudHeaders(),body:JSON.stringify(S)})
       .then(function(r){ if(!r.ok)throw new Error("HTTP "+r.status);
-        setCloud("synced","Saved · "+new Date().toLocaleTimeString()); })
+        markPushed(upTo);
+        setCloud("synced","Saved · "+new Date().toLocaleTimeString());
+        if(curHView)renderHistory(); })
       .catch(function(e){ setCloud("error",e.message); });
   },800);
 }
+/* ================= Board History: revision engine =========================
+   Records every board change as a Change Record, merged across devices.
+
+   Storage model (chosen deliberately over full snapshots): each revision
+   stores only its OPS - the individual items that were added, updated or
+   deleted - and every CKPT_EVERY revisions one entry also carries a full
+   board snapshot. The state at any revision = nearest snapshot at or before
+   it, with the ops after it replayed forward. That keeps the document small
+   enough to keep pushing the whole thing to the Worker on mobile data, which
+   a snapshot-per-change model would not.
+
+   The board slice is deliberately narrow: BOARD_KEYS excludes hist/devices,
+   so a snapshot can never contain the history that contains it.           */
+var APP_VERSION="1.1";
+var DEV_KEY="prodash.deviceId", DEV_NAME_KEY="prodash.deviceName", PUSHED_KEY="prodash.pushedUpTo";
+var HIST_CAP=400, CKPT_EVERY=25, BATCH_MS=2500;
+var BOARD_KEYS=["tasks","log","days","events","lanes","rituals","focus","theme"];
+var KEYED=["tasks","events","lanes","rituals"], MAPS=["log","days"], SCALARS=["focus","theme"];
+
+function clone(o){return JSON.parse(JSON.stringify(o));}
+function boardOnly(s){var o={};BOARD_KEYS.forEach(function(k){if(s[k]!==undefined)o[k]=clone(s[k]);});return o;}
+function rid(p){return p+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+
+/* ---- device / client metadata ---- */
+var sessionId=rid("ses_");
+var myDeviceId="";
+try{ myDeviceId=localStorage.getItem(DEV_KEY)||""; }catch(e){}
+if(!myDeviceId){ myDeviceId=rid("dev_"); try{localStorage.setItem(DEV_KEY,myDeviceId);}catch(e){} }
+var pushedUpTo=0;
+try{ pushedUpTo=+(localStorage.getItem(PUSHED_KEY)||0)||0; }catch(e){}
+
+function deviceProfile(){
+  var ua=(navigator.userAgent||""), nm="";
+  try{ nm=localStorage.getItem(DEV_NAME_KEY)||""; }catch(e){}
+  var os = /Windows/.test(ua)?"Windows" : /Android/.test(ua)?"Android"
+         : /iPhone|iPad|iPod/.test(ua)?"iOS" : /Mac OS X|Macintosh/.test(ua)?"macOS"
+         : /CrOS/.test(ua)?"ChromeOS" : /Linux/.test(ua)?"Linux" : "Unknown";
+  // iPadOS 13+ reports itself as a Mac; the touch-point count is the only
+  // reliable tell, and it's what decides tablet vs desktop here.
+  var touch = (navigator.maxTouchPoints||0)>1;
+  var type = /iPad|Tablet/.test(ua) || (/Macintosh/.test(ua)&&touch) ? "tablet"
+           : /Mobi|Android|iPhone|iPod/.test(ua) ? "mobile" : "desktop";
+  var br = /Edg\//.test(ua)?"Edge" : /OPR\//.test(ua)?"Opera"
+         : /Chrome\//.test(ua)?"Chrome" : /Firefox\//.test(ua)?"Firefox"
+         : /Safari\//.test(ua)?"Safari" : "Browser";
+  return {id:myDeviceId, name:nm||(br+" on "+os), type:type, os:os, browser:br, app:APP_VERSION};
+}
+function newestRevTs(){var h=S.hist;return h&&h.length?(h[h.length-1].ts||0):0;}
+function touchDevice(){
+  var p=deviceProfile(), prev=S.devices[myDeviceId]||{};
+  S.devices[myDeviceId]={id:p.id,name:p.name,type:p.type,os:p.os,browser:p.browser,app:p.app,
+    firstSeen:prev.firstSeen||Date.now(), lastSeen:Date.now(), seenUpTo:newestRevTs()};
+}
+function markPushed(ts){
+  if(ts<=pushedUpTo)return;
+  pushedUpTo=ts; try{localStorage.setItem(PUSHED_KEY,String(ts));}catch(e){}
+}
+
+/* ---- merge (union by id, never replace) ---- */
+function mergeHist(a,b){
+  var seen={},out=[];
+  (a||[]).concat(b||[]).forEach(function(r){
+    if(!r||!r.id||seen[r.id])return; seen[r.id]=1; out.push(r);
+  });
+  out.sort(function(x,y){return (x.ts||0)-(y.ts||0) || (x.id<y.id?-1:x.id>y.id?1:0);});
+  return out;
+}
+function mergeDevices(a,b){
+  var out={};
+  [a||{},b||{}].forEach(function(src){
+    Object.keys(src).forEach(function(k){
+      var have=out[k],inc=src[k];
+      if(!inc||typeof inc!=="object")return;
+      if(!have||(inc.lastSeen||0)>(have.lastSeen||0))out[k]=inc;
+    });
+  });
+  return out;
+}
+
+/* ---- diff / apply ---- */
+function byId(arr){var m={};(arr||[]).forEach(function(x){if(x&&x.id)m[x.id]=x;});return m;}
+function diffOps(a,b){
+  var ops=[];
+  KEYED.forEach(function(k){
+    var A=byId(a[k]),B=byId(b[k]),touched=false;
+    Object.keys(B).forEach(function(id){
+      if(!A[id]){ops.push({k:k,o:"add",id:id,v:B[id]});touched=true;}
+      else if(JSON.stringify(A[id])!==JSON.stringify(B[id])){ops.push({k:k,o:"upd",id:id,v:B[id]});touched=true;}
+    });
+    Object.keys(A).forEach(function(id){
+      if(!B[id]){ops.push({k:k,o:"del",id:id,v:A[id]});touched=true;}
+    });
+    // Lanes can be dragged into a new order with nothing else changing, so
+    // sequence is its own kind of change and needs its own op.
+    var ao=(a[k]||[]).map(function(x){return x.id;}).join(","),
+        bo=(b[k]||[]).map(function(x){return x.id;}).join(",");
+    if(ao!==bo)ops.push({k:k,o:"ord",v:(b[k]||[]).map(function(x){return x.id;}),quiet:touched});
+  });
+  MAPS.forEach(function(k){
+    var A=a[k]||{},B=b[k]||{};
+    Object.keys(B).forEach(function(d){
+      if(JSON.stringify(A[d])!==JSON.stringify(B[d]))ops.push({k:k,o:"set",id:d,v:B[d]});
+    });
+    Object.keys(A).forEach(function(d){ if(!(d in B))ops.push({k:k,o:"drop",id:d}); });
+  });
+  SCALARS.forEach(function(k){
+    if(a[k]!==b[k])ops.push({k:k,o:"val",v:b[k],from:a[k]});
+  });
+  return ops;
+}
+function applyOps(state,ops){
+  (ops||[]).forEach(function(op){
+    if(KEYED.indexOf(op.k)>=0){
+      if(!Array.isArray(state[op.k]))state[op.k]=[];
+      var arr=state[op.k],i=-1;
+      arr.forEach(function(x,n){if(x&&x.id===op.id)i=n;});
+      if(op.o==="add"||op.o==="upd"){ if(i<0)arr.push(clone(op.v)); else arr[i]=clone(op.v); }
+      else if(op.o==="del"){ if(i>=0)arr.splice(i,1); }
+      else if(op.o==="ord"){
+        var m=byId(arr),out=[];
+        (op.v||[]).forEach(function(id){if(m[id]){out.push(m[id]);delete m[id];}});
+        // Anything the recorded order didn't mention keeps its relative place
+        // at the end rather than vanishing - an op list from a newer app
+        // version must never silently drop lanes.
+        arr.forEach(function(x){if(x&&m[x.id])out.push(x);});
+        state[op.k]=out;
+      }
+    } else if(MAPS.indexOf(op.k)>=0){
+      if(!state[op.k]||typeof state[op.k]!=="object")state[op.k]={};
+      if(op.o==="set")state[op.k][op.id]=clone(op.v); else delete state[op.k][op.id];
+    } else if(SCALARS.indexOf(op.k)>=0){
+      state[op.k]=op.v;
+    }
+  });
+  return state;
+}
+
+/* Board state as it stood immediately after revId. Returns null when the
+   history no longer reaches back that far (trimmed past its last snapshot) -
+   the caller must treat null as "cannot restore" and say so, never guess. */
+function stateAt(revId){
+  var h=S.hist,idx=-1;
+  h.forEach(function(r,i){if(r.id===revId)idx=i;});
+  if(idx<0)return null;
+  var j=-1;
+  for(var i=idx;i>=0;i--){ if(h[i].snap){j=i;break;} }
+  if(j<0)return null;
+  var st=clone(h[j].snap);
+  for(var k=j+1;k<=idx;k++)applyOps(st,h[k].ops);
+  return st;
+}
+function canRestore(revId){return !!stateAt(revId);}
+
+/* ---- describing a change in words ---- */
+function laneName(id){
+  var n=null;(S.lanes||[]).forEach(function(l){if(l.id===id)n=l.name;});
+  return n||id;
+}
+function opText(op){
+  var verb={add:"Added",upd:"Updated",del:"Deleted"}[op.o];
+  if(op.k==="tasks"&&verb){
+    var t=op.v||{},w=t.lane?" in "+esc(laneName(t.lane)):"";
+    if(op.o==="upd")return (t.done?"Completed":"Reopened")+" task “"+esc(t.text||"")+"”"+w;
+    return verb+" task “"+esc(t.text||"")+"”"+w;
+  }
+  if(op.k==="lanes"){
+    if(op.o==="ord")return "Reordered lanes";
+    return verb+" lane “"+esc((op.v||{}).name||"")+"”";
+  }
+  if(op.k==="rituals"&&verb)return verb+" non-negotiable “"+esc((op.v||{}).l||"")+"”";
+  if(op.k==="events"&&verb)return verb+" appointment “"+esc((op.v||{}).n||"")+"”";
+  if(op.k==="log")return "Ticked non-negotiables for "+esc(op.id);
+  if(op.k==="days")return "Updated shift notes for "+esc(op.id);
+  if(op.k==="focus")return "Focus mode "+(op.v?"on":"off");
+  if(op.k==="theme")return "Theme → "+esc(String(op.v));
+  if(op.o==="ord")return "Reordered "+op.k;
+  return (verb||"Changed")+" "+op.k;
+}
+function revSummary(r){
+  var ops=(r.ops||[]).filter(function(o){return !o.quiet;});
+  if(!ops.length)return "<em>No board data changed</em>";
+  var lines=ops.slice(0,4).map(opText);
+  if(ops.length>4)lines.push("<em>+"+(ops.length-4)+" more</em>");
+  return lines.join("<br>");
+}
+
+/* ---- conflict detection ----
+   Every revision records the id of the newest revision its device knew about
+   (`base`). Two revisions sharing one base are siblings: they were made
+   concurrently, without either device seeing the other, which is exactly the
+   case where last-write-wins silently discards one side's board edits. */
+function conflictGroups(){
+  var byBase={},out=[];
+  (S.hist||[]).forEach(function(r){
+    if(!r.base)return;
+    (byBase[r.base]=byBase[r.base]||[]).push(r);
+  });
+  Object.keys(byBase).forEach(function(b){
+    var g=byBase[b],devs={};
+    g.forEach(function(r){devs[r.dev]=1;});
+    if(g.length>1&&Object.keys(devs).length>1)out.push(g);
+  });
+  return out;
+}
+function pendingRevs(){
+  return (S.hist||[]).filter(function(r){return r.dev===myDeviceId&&(r.ts||0)>pushedUpTo;});
+}
+function receivedBy(r){
+  var out=[];
+  Object.keys(S.devices||{}).forEach(function(id){
+    if(id===r.dev)return;
+    if((S.devices[id].seenUpTo||0)>=(r.ts||0))out.push(S.devices[id]);
+  });
+  return out;
+}
+
+/* ---- recording ---- */
+var baseSnap=boardOnly(S), histTimer=null, restoring=false, pendingRestore=null;
+function noteChange(){
+  if(restoring)return;
+  clearTimeout(histTimer);
+  histTimer=setTimeout(commitRevision,BATCH_MS);
+}
+function commitRevision(){
+  clearTimeout(histTimer);histTimer=null;
+  if(restoring)return;
+  var ops=diffOps(baseSnap,S);
+  if(!ops.length){ cloudPush(); return; }
+  var h=S.hist,prev=h.length?h[h.length-1].id:null;
+  var rev={id:rid("rev_"),ts:Date.now(),dev:myDeviceId,ses:sessionId,src:"local",base:prev,ops:ops};
+  if(pendingRestore){rev.restoredFrom=pendingRestore;pendingRestore=null;}
+  var since=0;
+  for(var i=h.length-1;i>=0;i--){ if(h[i].snap)break; since++; }
+  if(!h.length||since>=CKPT_EVERY)rev.snap=boardOnly(S);
+  h.push(rev);
+  trimHist();
+  touchDevice();
+  baseSnap=boardOnly(S);
+  try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
+  scheduleWrite();
+  cloudPush();
+  if(curHView)renderHistory();
+}
+/* Trimming must never leave the oldest surviving entry unreachable - if it
+   has no snapshot of its own it gets one computed before the cut, otherwise
+   restore would quietly start returning wrong board states. If that state
+   can't be computed, we keep the extra entries instead. */
+function trimHist(){
+  var h=S.hist;
+  if(h.length<=HIST_CAP)return;
+  var cut=h.length-HIST_CAP,keep=h[cut];
+  if(!keep.snap){
+    var st=stateAt(keep.id);
+    if(!st)return;
+    keep.snap=st;
+  }
+  h.splice(0,cut);
+}
+function flushHistory(){ if(histTimer)commitRevision(); }
+window.addEventListener("beforeunload",flushHistory);
+document.addEventListener("visibilitychange",function(){ if(document.hidden)flushHistory(); });
+
 function readFile(){
   if(!fileHandle||reading)return Promise.resolve();
   reading=true;
@@ -1583,17 +1956,189 @@ function renderReportsView(){
 }
 function parseKeyDate(k){var p=k.split("-");return new Date(+p[0],+p[1]-1,+p[2]);}
 
+/* ---------- Board History views ---------- */
+var curHView=null;
+function fmtWhen(ts){
+  var d=new Date(ts);
+  return "<b>"+d.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit",second:"2-digit"})+"</b>"+
+         d.toLocaleDateString([],{month:"short",day:"numeric",year:"numeric"});
+}
+function devLabel(id){
+  var d=(S.devices||{})[id];
+  if(!d)return "Unknown device";
+  return d.name+(id===myDeviceId?" (this device)":"");
+}
+function syncChip(r){
+  if(!cloudUrl)return '<span class="chip neutral">Local only</span>';
+  if(r.dev===myDeviceId)
+    return (r.ts||0)>pushedUpTo
+      ? '<span class="chip pend">Not yet in cloud</span>'
+      : '<span class="chip ok">In cloud</span>';
+  return '<span class="chip ok">Received from cloud</span>';
+}
+function revRow(r,conflicted,withActions){
+  var got=receivedBy(r);
+  return '<div class="hist-row">'+
+    '<div class="hist-when">'+fmtWhen(r.ts)+'</div>'+
+    '<div class="hist-main"><div class="hist-what">'+revSummary(r)+
+      (r.restoredFrom?'<br><em>Restored the board to revision '+esc(r.restoredFrom)+'</em>':'')+'</div>'+
+      '<div class="hist-meta">'+
+        '<span class="chip dev">'+esc(devLabel(r.dev))+'</span>'+
+        syncChip(r)+
+        (conflicted?'<span class="chip bad">Conflict</span>':'')+
+        (got.length?'<span class="chip neutral">Also on '+got.length+' other device'+(got.length>1?'s':'')+'</span>':'')+
+        '<span class="rev-id">'+esc(r.id)+'</span>'+
+      '</div></div>'+
+    (withActions?'<div class="hist-act">'+
+      (canRestore(r.id)
+        ? '<button class="hist-btn" data-cmp="'+esc(r.id)+'">Compare</button> '+
+          '<button class="hist-btn warn" data-rst="'+esc(r.id)+'">Restore</button>'
+        : '<button class="hist-btn" disabled title="History no longer reaches back this far">Too old</button>')+
+      '</div>':'')+
+    '</div>';
+}
+function renderHistory(){
+  var h=(S.hist||[]),body=document.getElementById("histBody");
+  if(!body)return;
+  document.getElementById("histCount").textContent=h.length+(h.length===1?" change":" changes");
+  var conf={},groups=conflictGroups();
+  groups.forEach(function(g){g.forEach(function(r){conf[r.id]=1;});});
+  var rev=h.slice().reverse();
+
+  if(curHView==="log"){
+    body.innerHTML = rev.length
+      ? rev.map(function(r){return revRow(r,conf[r.id],false);}).join("")
+      : '<div class="empty-note">No changes recorded yet. Edit anything on the board and it shows up here.</div>';
+
+  }else if(curHView==="sync"){
+    var pend=pendingRevs(),mine=h.filter(function(r){return r.dev===myDeviceId;});
+    var out='<div class="rep-totals">'+
+      '<div><b>'+mine.length+'</b>from this device</div>'+
+      '<div><b>'+(h.length-mine.length)+'</b>from other devices</div>'+
+      '<div><b>'+pend.length+'</b>waiting to sync</div>'+
+      '<div><b>'+groups.length+'</b>conflicts</div></div>';
+    if(!cloudUrl){
+      out+='<div class="empty-note">Cloud sync isn\'t set up on this device, so nothing here has left this browser. '+
+           'Use the <b>Cloud: not set up</b> pill on the Board tab to connect it.</div>';
+    }else{
+      out+='<div class="rep-controls"><button class="hist-btn" id="histPush">'+
+           (pend.length?"Sync "+pend.length+" local change"+(pend.length>1?"s":"")+" to cloud":"Everything is synced — check again")+
+           '</button></div>';
+      out+=pend.length
+        ? '<div class="rep-lane"><div class="rep-lane-h"><h3>Made here, not yet in the cloud</h3></div>'+
+          pend.slice().reverse().map(function(r){return revRow(r,conf[r.id],false);}).join("")+'</div>'
+        : '<div class="empty-note">Every change made on this device has reached the cloud.</div>';
+    }
+    if(groups.length){
+      out+='<div class="rep-lane"><div class="rep-lane-h"><h3>Conflicts</h3>'+
+        '<span class="rep-counts">two devices edited without seeing each other</span></div>'+
+        groups.map(function(g){
+          return '<div class="diff-box"><b>'+g.length+' changes made concurrently</b> — '+
+            'the board kept whichever arrived last, so the other side\'s edits may have been overwritten. '+
+            'Both are still listed below and can be restored.'+
+            g.map(function(r){return revRow(r,false,true);}).join("")+'</div>';
+        }).join("");
+      out+='</div>';
+    }
+    body.innerHTML=out;
+    var pb=document.getElementById("histPush");
+    if(pb)pb.addEventListener("click",function(){
+      flushHistory();
+      pb.textContent="Syncing…";
+      cloudPush();
+      cloudPull().then(function(){renderHistory();});
+    });
+
+  }else if(curHView==="devices"){
+    var ids=Object.keys(S.devices||{});
+    if(!ids.length){ body.innerHTML='<div class="empty-note">No devices recorded yet.</div>'; return; }
+    ids.sort(function(a,b){return (S.devices[b].lastSeen||0)-(S.devices[a].lastSeen||0);});
+    body.innerHTML=ids.map(function(id){
+      var d=S.devices[id],n=h.filter(function(r){return r.dev===id;}).length;
+      return '<div class="dev-card'+(id===myDeviceId?" me":"")+'">'+
+        '<div class="dev-h"><h3>'+esc(d.name||"Unknown")+'</h3>'+
+          (id===myDeviceId?'<span class="chip ok">This device</span>':'')+
+          '<span class="chip neutral">'+esc(d.type||"?")+'</span></div>'+
+        '<div class="dev-grid">'+
+          '<div>Platform <b>'+esc(d.os||"?")+" · "+esc(d.browser||"?")+'</b></div>'+
+          '<div>App version <b>'+esc(d.app||"?")+'</b></div>'+
+          '<div>Changes made <b>'+n+'</b></div>'+
+          '<div>First seen <b>'+(d.firstSeen?new Date(d.firstSeen).toLocaleDateString():"?")+'</b></div>'+
+          '<div>Last active <b>'+(d.lastSeen?new Date(d.lastSeen).toLocaleString():"?")+'</b></div>'+
+          '<div>Has data up to <b>'+(d.seenUpTo?new Date(d.seenUpTo).toLocaleString():"—")+'</b></div>'+
+          '<div>Device ID <b class="rev-id">'+esc(id)+'</b></div>'+
+        '</div></div>';
+    }).join("");
+
+  }else{ // restore
+    body.innerHTML = rev.length
+      ? '<div class="sub">Pick a point in time to inspect or roll back to. Restoring never erases history — it adds a new entry recording the rollback.</div>'+
+        rev.map(function(r){return revRow(r,conf[r.id],true);}).join("")+
+        '<div id="histDiff"></div>'
+      : '<div class="empty-note">Nothing to restore yet.</div>';
+    body.querySelectorAll("[data-cmp]").forEach(function(b){
+      b.addEventListener("click",function(){showCompare(b.dataset.cmp);});
+    });
+    body.querySelectorAll("[data-rst]").forEach(function(b){
+      b.addEventListener("click",function(){doRestore(b.dataset.rst);});
+    });
+  }
+}
+function showCompare(revId){
+  var st=stateAt(revId),box=document.getElementById("histDiff");
+  if(!st||!box)return;
+  var ops=diffOps(st,boardOnly(S)).filter(function(o){return !o.quiet;});
+  box.innerHTML='<div class="diff-box"><b>Revision '+esc(revId)+' vs the board right now</b>'+
+    (ops.length
+      ? '<ul>'+ops.map(function(o){return "<li>"+opText(o)+"</li>";}).join("")+'</ul>'
+      : '<div class="empty-note">Identical — nothing has changed since then.</div>')+
+    '</div>';
+  box.scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+function doRestore(revId){
+  var st=stateAt(revId);
+  if(!st){alert("That revision can't be rebuilt — the history no longer reaches back far enough.");return;}
+  var ops=diffOps(boardOnly(S),st).filter(function(o){return !o.quiet;});
+  if(!ops.length){alert("The board already matches that revision. Nothing to restore.");return;}
+  if(!confirm("Restore the board to "+new Date(((S.hist||[]).filter(function(r){return r.id===revId;})[0]||{}).ts).toLocaleString()+"?\n\n"+
+    ops.length+" change"+(ops.length>1?"s":"")+" will be rolled back.\n\n"+
+    "Your history is kept — this adds a new entry recording the restore, so you can undo it the same way."))return;
+  restoring=true;
+  BOARD_KEYS.forEach(function(k){ if(st[k]!==undefined)S[k]=clone(st[k]); });
+  restoring=false;
+  pendingRestore=revId;
+  S.updatedAt=Date.now();
+  try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
+  commitRevision();
+  renderAll();
+  renderHistory();
+  stamp("restored");
+}
+
 document.getElementById("tabBoard").addEventListener("click",function(){setView("board");});
 document.getElementById("tabReports").addEventListener("click",function(){setView("reports");});
+document.getElementById("tabHistory").addEventListener("click",function(){setView("history");});
+document.querySelectorAll(".sub-tab").forEach(function(b){
+  b.addEventListener("click",function(){
+    document.querySelectorAll(".sub-tab").forEach(function(x){x.classList.toggle("on",x===b);});
+    curHView=b.dataset.hview;
+    renderHistory();
+  });
+});
 function setView(v){
   document.body.classList.toggle("view-reports",v==="reports");
+  document.body.classList.toggle("view-history",v==="history");
   // the CSS class alone can't win: the static `hidden` attribute in the markup
   // forces display:none via the UA stylesheet no matter what a class-based
   // rule says, so the attribute itself has to be flipped here.
   document.getElementById("view-reports").hidden=(v!=="reports");
+  document.getElementById("view-history").hidden=(v!=="history");
   document.getElementById("tabBoard").classList.toggle("on",v==="board");
   document.getElementById("tabReports").classList.toggle("on",v==="reports");
+  document.getElementById("tabHistory").classList.toggle("on",v==="history");
   if(v==="reports")renderReportsView();
+  if(v==="history"){ curHView=curHView||"log"; flushHistory(); renderHistory(); }
+  else curHView=null;
 }
 ["repFrom","repTo","repLane"].forEach(function(id){
   document.getElementById(id).addEventListener("change",renderReportsView);});
@@ -1712,6 +2257,11 @@ document.getElementById("cdrExport").addEventListener("click",function(){
 // console hooks:  dfDebug.dayBlocks("2026-08-15")  ·  dfDebug.state()
 window.dfDebug={dayBlocks:dayBlocks,today:today,norm:norm,state:function(){return S;},
   xlsxBlob:xlsxBlob,buildZip:buildZip,crc32:crc32,
+  // Board History hooks: dfDebug.hist() · dfDebug.stateAt("rev_…") · dfDebug.devices()
+  hist:function(){return S.hist;}, devices:function(){return S.devices;},
+  stateAt:stateAt, diffOps:diffOps, conflicts:conflictGroups, adopt:adopt,
+  whoAmI:function(){return {device:myDeviceId,session:sessionId,pushedUpTo:pushedUpTo};},
+  flushHistory:flushHistory,
   /** Round-trips a built .xlsx back through a hand-written ZIP reader and
       confirms every part's CRC32 matches and every XML part parses cleanly.
       This is the real test - if this passes, Excel opening it isn't luck. */
@@ -1747,6 +2297,12 @@ window.dfDebug={dayBlocks:dayBlocks,today:today,norm:norm,state:function(){retur
   }};
 
 applyTheme();   // before first paint, so a dark session doesn't flash white
+// Register this device before anything else can record a change against it,
+// so a revision can never point at a device the registry doesn't know. Not
+// routed through save(): boot is not a board change and must not create a
+// history entry of its own.
+touchDevice();
+try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
 renderAll();
 restore();
 // The very first renderTimeline() above runs synchronously during initial

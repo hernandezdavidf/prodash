@@ -2,6 +2,56 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-08-15 — Board History: audit trail, sync diagnostics, and restore
+
+A third main tab, next to Board and Reports, with four sub-views: **Update
+history**, **Local ↔ Cloud**, **Devices**, and **Restore**. Built to answer
+one question end to end: what changed → when → which device made it →
+whether it reached the cloud → which devices received it → did anything
+conflict.
+
+**The sync fix underneath it.** `adopt()` replaced the whole state object
+whenever the incoming copy was newer — fine for board data (last-write-wins
+is still the rule there, unchanged) but fatal for an audit trail, since every
+pull from a newer device would have wiped this device's own history. History
+and the device registry are now **unioned by revision id in both
+directions**, including when the incoming copy is *older* and its board is
+discarded: the losing side of a conflict is precisely the evidence needed to
+notice the conflict happened.
+
+**Storage model.** Each revision stores only its ops — the individual items
+added, updated or deleted — and every 25th entry also carries a full board
+snapshot. State at any revision = nearest snapshot, ops replayed forward.
+Chosen over a snapshot-per-change model so the whole document can keep being
+pushed to the Worker on mobile data. History caps at 400 entries; trimming
+first guarantees the oldest survivor has a snapshot, and refuses to trim at
+all if that state can't be computed, rather than leaving restore quietly
+returning wrong board states.
+
+**Change records** carry a unique revision id, exact timestamp, device id,
+session id, source, and the id of the newest revision their device knew
+about (`base`). That last field is what makes conflict detection exact: two
+revisions sharing a base were made concurrently, without either device
+seeing the other — the case where last-write-wins silently drops one side.
+
+**Device metadata** is a structured record per device — id, type
+(desktop/mobile/tablet), OS, browser, app version, first seen, last active,
+and how far its data reaches. iPadOS is detected via touch-point count,
+since it reports itself as a Mac. Each device stamps how far it has seen on
+every pull, which is what lets any device answer "did my phone ever receive
+that change?" without each one reporting separately.
+
+**Restore** rebuilds the board at any revision, after a confirmation naming
+how many changes roll back. It never deletes history — the rollback itself
+becomes a new entry tagged with the revision it came from, so a restore can
+be undone the same way. Revisions too old to rebuild show a disabled "Too
+old" button rather than a restore that would silently produce a wrong board.
+
+Rapid edits batch into one entry (2.5s window), so ticking several
+non-negotiables in a row doesn't flood the log. The cloud push moved from
+`save()` into the batch commit, so the pushed document already carries its
+own audit entry instead of arriving a beat ahead of it.
+
 ## 2026-08-13 — Header redesign: stats moved under the date, nudges moved into the header
 
 Board UI pass ahead of the GitHub Pages push. Two changes, both from user
