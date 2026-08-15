@@ -2,6 +2,38 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-08-15 — Removed Shutdown ritual; deletable timeline placeholders; all appointments notify
+
+**Shutdown ritual removed** — the "next shift's top 3 / what moved this
+shift" card, no longer used. Removed the card, its CSS, `meta()`, and its
+wiring. Left `S.days` and its sync/history support (`MAPS`, `opText`'s
+"days" branch) alone rather than ripping them out — they're harmless once
+nothing writes to them, and touching sync internals for a UI-only removal
+wasn't worth the risk. `Reset this shift`'s confirm text and behavior no
+longer references notes, since there's nothing left to clear there.
+
+**Shift timeline: routine blocks are now deletable.** Every fixed slot
+(Sleep, Wake + prep, School drop-off, etc.) gets a `×` like appointments
+already had — click it, confirm, and it's removed from every day it would
+appear, not just today. Needed each `BLOCKS` entry to get a stable `id` for
+the first time (previously unreferenced), tracked in a new `S.hiddenBlocks`
+array that `dayBlocks()` filters against. Wired into the sync/diff/history
+machinery as a new small category (`ARRAYS`) alongside the existing
+`KEYED`/`MAPS`/`SCALARS` — a flat list of ids, compared by content rather
+than reference (a cloned snapshot never shares object identity with the
+live array even when nothing in it changed, which would have falsely
+flagged a "change" on every single revision otherwise). No restore UI yet,
+matching how lane/ritual removal already works — same "no undo, don't
+delete if unsure" tradeoff, not a new one.
+
+**Notifications now include every upcoming appointment**, not just
+must-attend ones — previously must-attend was the only kind that generated
+a heads-up. Regular appointments get a calm light-green accent (distinct
+from the default "you're behind on something" orange); must-attend escalates
+further into a rose accent reserved for genuine priority, reusing a hue
+from the custom-lane swatch palette that isn't otherwise fixed to any
+meaning in the UI.
+
 ## 2026-08-15 — Cloud sync: pull on boot, stop re-asking for a stored password
 
 Found while actually connecting three real devices (phone, a test browser,

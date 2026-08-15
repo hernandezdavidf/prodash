@@ -46,10 +46,6 @@ counts against the right shift. Everything in the app follows this.
    do it, delegate it, or delete it.
 5. Turn on **Focus mode** to dim every lane except the one that's live.
 
-**Before sleep (~6:30am)**
-6. Fill the Shutdown ritual: next shift's top 3, and what moved this shift.
-   It closes the loop so the work doesn't follow you to bed.
-
 **Weekly** — check the weekly targets (exercise ×3, learning ×2) and the
 Last 7 shifts bars.
 
@@ -61,13 +57,23 @@ Under the Shift timeline: type what it is, set date and start/end, pick which
 part of your life it belongs to, tick **must attend** if you have to be there.
 
 - It appears in the timeline in the right chronological slot, tinted orange.
-- A must-attend appointment raises a nudge **2 hours before**, and again while
-  it's live, so it can't quietly arrive mid-shift.
+- **Every** appointment raises a notification **2 hours before**, and again while
+  it's live — not just must-attend ones. Regular appointments show up in a
+  light green; must-attend ones get their own more distinct color (rose) so
+  they stand out from ones you can run a few minutes late on.
 - The Now bar shows an appointment in preference to the routine block it sits
   inside.
 - Remove one with the **×** on its row.
 
 Weekends only show Sleep, Wake + prep and Dinner — the client shifts are Mon–Fri.
+
+## Removing a routine block
+
+Every fixed block on the Shift timeline (Sleep, Wake + prep, School drop-off,
+etc. — not appointments, which have their own **×**) now has a **×** on its
+row too. Click it and confirm to remove that slot from your daily schedule —
+this removes it every day it would otherwise appear, not just today. There's
+no undo built in yet, so if you're not sure, leave it rather than delete it.
 
 ## Adding your own lane
 

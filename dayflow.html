@@ -330,12 +330,6 @@ header h1{font-size:26px;letter-spacing:.3px}
 .wd.today .wd-l{color:var(--forest-ink);font-weight:700}
 .wd-p{font-size:9.5px;color:var(--muted)}
 
-.top3{display:flex;gap:8px;align-items:center;margin-bottom:7px}
-.top3 span{width:17px;height:17px;min-width:17px;border-radius:50%;background:var(--forest);color:var(--on-brand);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center}
-.top3 input{flex:1;border:none;border-bottom:1px solid var(--line);padding:4px 2px;background:none;outline:none}
-.top3 input:focus{border-color:var(--olive)}
-textarea.note{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px;background:var(--ivory);resize:vertical;min-height:58px;outline:none;line-height:1.5}
-textarea.note:focus{border-color:var(--olive);background:var(--paper)}
 
 .foot{display:flex;gap:10px;justify-content:center;margin-top:16px;flex-wrap:wrap}
 .foot button{font-size:11.5px;color:var(--muted);border-bottom:1px solid transparent}
@@ -363,6 +357,15 @@ textarea.note:focus{border-color:var(--olive);background:var(--paper)}
 @keyframes nudgeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 .nudge b{color:inherit}
 .nudge.cool{border-left-color:var(--night-ink)}
+/* Appointments get their own tier, distinct from the default "you're behind
+   on something" orange - they're neutral facts, not a warning, so a calmer
+   accent fits. Must-attend escalates past that into --ln-x1 (unused
+   elsewhere in fixed UI, only offered as a custom-lane swatch choice, so
+   repurposing it here for "priority" doesn't collide with any lane's
+   established meaning) - deliberately its own hue rather than just a bolder
+   orange, so it reads as a distinct tier at a glance, not a shade of the same one. */
+.nudge.apt{border-left-color:var(--olive)}
+.nudge.apt-must{border-left-color:var(--ln-x1)}
 .nudge .x{position:absolute;top:4px;right:4px;color:var(--on-brand);opacity:.75;font-size:15px;line-height:1;
   padding:4px 7px;border-radius:7px}
 .nudge .x:hover{opacity:1;background:rgba(240,253,244,.16)}
@@ -589,16 +592,6 @@ body.view-reports .board-only,body.view-history .board-only{display:none}
         <div class="week" id="week"></div>
       </div>
 
-      <div class="card">
-        <h2>Shutdown ritual</h2>
-        <div class="sub">6:30am, before you sleep. Closes the loop so it doesn't follow you to bed.</div>
-        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--sage);font-weight:700;margin-bottom:7px">Next shift's top 3</div>
-        <div class="top3"><span>1</span><input id="t3a" placeholder="Most important thing next shift"></div>
-        <div class="top3"><span>2</span><input id="t3b" placeholder="Second"></div>
-        <div class="top3"><span>3</span><input id="t3c" placeholder="Third"></div>
-        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--sage);font-weight:700;margin:13px 0 7px">What moved this shift?</div>
-        <textarea class="note" id="wins" placeholder="Wins, blockers, anything to remember..."></textarea>
-      </div>
     </div>
   </div>
 
@@ -681,21 +674,25 @@ var LANE_PALETTE=["var(--ln-x1)","var(--ln-x2)","var(--ln-x3)","var(--ln-x4)","v
 // One-off appointments live in S.events and use these same field names, so
 // dayBlocks() can merge the two and every renderer treats them alike.
 var WD=[1,2,3,4,5];
+// Each entry needs a stable id (never used for anything before now) so a
+// hidden placeholder can be tracked in S.hiddenBlocks by reference rather
+// than by array position, which would silently shift if this list is ever
+// reordered or edited.
 var BLOCKS=[
- {s:"07:00",e:"12:15",n:"Sleep",              d:"Protected. Single point of failure.", lane:null, sleep:1},
- {s:"12:15",e:"12:45",n:"Wake + prep",        d:"Light, food, sun if you can",         lane:null},
- {s:"12:45",e:"13:00",n:"School drop-off",    d:"Classes 1pm–4pm",                lane:null, days:WD},
- {s:"13:00",e:"14:00",n:"My Company",         d:"Protected. Before clients start.",    lane:"biz", days:WD},
- {s:"14:00",e:"15:30",n:"Day Client",           d:"Hardest items — you're freshest now", lane:"dayclient", days:WD},
- {s:"15:30",e:"16:15",n:"School fetch",         d:"Flex out of Day Client",              lane:null, days:WD},
- {s:"16:15",e:"19:00",n:"Day Client",           d:"Main block",                          lane:"dayclient", days:WD},
- {s:"19:00",e:"19:30",n:"Dinner",               d:"Real break",                          lane:null},
- {s:"19:30",e:"22:30",n:"Day Client",           d:"Clear the list, update to-complete",  lane:"dayclient", days:WD},
- {s:"22:30",e:"23:00",n:"Day Client wrap + Night Client B open", d:"Handover — one switch", lane:"nightclientb", days:WD},
- {s:"23:00",e:"02:30",n:"Night Client A + Night Client B",       d:"Dual shift — both live", lane:"nightclienta", lane2:"nightclientb", dual:1, days:WD},
- {s:"02:30",e:"06:00",n:"Night Client A + Night Client B · low ebb", d:"Mechanical work only. Don't decide anything big.", lane:"nightclienta", lane2:"nightclientb", dual:1, nadir:1, days:WD},
- {s:"06:00",e:"06:30",n:"Night Client B to-do writeup", d:"Tomorrow's list, while it's fresh",   lane:"nightclientb", days:WD},
- {s:"06:30",e:"07:00",n:"Night Client A EOD + shutdown", d:"Send it, log the shift, then sleep",  lane:"nightclienta", days:WD}
+ {id:"sleep",     s:"07:00",e:"12:15",n:"Sleep",              d:"Protected. Single point of failure.", lane:null, sleep:1},
+ {id:"wake",      s:"12:15",e:"12:45",n:"Wake + prep",        d:"Light, food, sun if you can",         lane:null},
+ {id:"dropoff",   s:"12:45",e:"13:00",n:"School drop-off",    d:"Classes 1pm–4pm",                lane:null, days:WD},
+ {id:"biz",       s:"13:00",e:"14:00",n:"My Company",         d:"Protected. Before clients start.",    lane:"biz", days:WD},
+ {id:"dayclient1",s:"14:00",e:"15:30",n:"Day Client",           d:"Hardest items — you're freshest now", lane:"dayclient", days:WD},
+ {id:"fetch",     s:"15:30",e:"16:15",n:"School fetch",         d:"Flex out of Day Client",              lane:null, days:WD},
+ {id:"dayclient2",s:"16:15",e:"19:00",n:"Day Client",           d:"Main block",                          lane:"dayclient", days:WD},
+ {id:"dinner",    s:"19:00",e:"19:30",n:"Dinner",               d:"Real break",                          lane:null},
+ {id:"dayclient3",s:"19:30",e:"22:30",n:"Day Client",           d:"Clear the list, update to-complete",  lane:"dayclient", days:WD},
+ {id:"handover",  s:"22:30",e:"23:00",n:"Day Client wrap + Night Client B open", d:"Handover — one switch", lane:"nightclientb", days:WD},
+ {id:"dual1",     s:"23:00",e:"02:30",n:"Night Client A + Night Client B",       d:"Dual shift — both live", lane:"nightclienta", lane2:"nightclientb", dual:1, days:WD},
+ {id:"dual2",     s:"02:30",e:"06:00",n:"Night Client A + Night Client B · low ebb", d:"Mechanical work only. Don't decide anything big.", lane:"nightclienta", lane2:"nightclientb", dual:1, nadir:1, days:WD},
+ {id:"nbwriteup", s:"06:00",e:"06:30",n:"Night Client B to-do writeup", d:"Tomorrow's list, while it's fresh",   lane:"nightclientb", days:WD},
+ {id:"naeod",     s:"06:30",e:"07:00",n:"Night Client A EOD + shutdown", d:"Send it, log the shift, then sleep",  lane:"nightclienta", days:WD}
 ];
 
 // Seed only - the live, editable list is S.rituals (see norm()). Same pattern
@@ -743,6 +740,9 @@ function norm(s){
   // do the one job it exists for.
   if(!Array.isArray(s.hist))s.hist=[];
   if(!s.devices||typeof s.devices!=="object")s.devices={};
+  // ids of BLOCKS entries (the fixed routine schedule, not appointments)
+  // this user has removed from their timeline. See dayBlocks().
+  if(!Array.isArray(s.hiddenBlocks))s.hiddenBlocks=[];
   return s;
 }
 function load(){
@@ -967,8 +967,14 @@ function cloudPush(){
 var APP_VERSION="1.1";
 var DEV_KEY="prodash.deviceId", DEV_NAME_KEY="prodash.deviceName", PUSHED_KEY="prodash.pushedUpTo";
 var HIST_CAP=400, CKPT_EVERY=25, BATCH_MS=2500;
-var BOARD_KEYS=["tasks","log","days","events","lanes","rituals","focus","theme"];
+var BOARD_KEYS=["tasks","log","days","events","lanes","rituals","focus","theme","hiddenBlocks"];
 var KEYED=["tasks","events","lanes","rituals"], MAPS=["log","days"], SCALARS=["focus","theme"];
+// Plain arrays of primitive ids (not objects with their own .id, so KEYED's
+// per-item union doesn't apply) compared by CONTENT, not reference - a
+// cloned snapshot never shares object identity with the live array even
+// when nothing in it changed, so a reference check here would falsely
+// flag "changed" on every single revision.
+var ARRAYS=["hiddenBlocks"];
 
 function clone(o){return JSON.parse(JSON.stringify(o));}
 function boardOnly(s){var o={};BOARD_KEYS.forEach(function(k){if(s[k]!==undefined)o[k]=clone(s[k]);});return o;}
@@ -1068,6 +1074,10 @@ function diffOps(a,b){
   SCALARS.forEach(function(k){
     if(a[k]!==b[k])ops.push({k:k,o:"val",v:b[k],from:a[k]});
   });
+  ARRAYS.forEach(function(k){
+    var av=JSON.stringify((a[k]||[]).slice().sort()),bv=JSON.stringify((b[k]||[]).slice().sort());
+    if(av!==bv)ops.push({k:k,o:"val",v:(b[k]||[]).slice(),from:(a[k]||[]).slice()});
+  });
   return ops;
 }
 function applyOps(state,ops){
@@ -1090,8 +1100,8 @@ function applyOps(state,ops){
     } else if(MAPS.indexOf(op.k)>=0){
       if(!state[op.k]||typeof state[op.k]!=="object")state[op.k]={};
       if(op.o==="set")state[op.k][op.id]=clone(op.v); else delete state[op.k][op.id];
-    } else if(SCALARS.indexOf(op.k)>=0){
-      state[op.k]=op.v;
+    } else if(SCALARS.indexOf(op.k)>=0||ARRAYS.indexOf(op.k)>=0){
+      state[op.k]=op.o==="val"?clone(op.v):op.v;
     }
   });
   return state;
@@ -1118,6 +1128,10 @@ function laneName(id){
   var n=null;(S.lanes||[]).forEach(function(l){if(l.id===id)n=l.name;});
   return n||id;
 }
+function blockName(id){
+  var b=null;BLOCKS.forEach(function(x){if(x.id===id)b=x;});
+  return b?b.n:id;
+}
 function opText(op){
   var verb={add:"Added",upd:"Updated",del:"Deleted"}[op.o];
   if(op.k==="tasks"&&verb){
@@ -1135,6 +1149,15 @@ function opText(op){
   if(op.k==="days")return "Updated shift notes for "+esc(op.id);
   if(op.k==="focus")return "Focus mode "+(op.v?"on":"off");
   if(op.k==="theme")return "Theme → "+esc(String(op.v));
+  if(op.k==="hiddenBlocks"){
+    var was=op.from||[],now=op.v||[];
+    var added=now.filter(function(id){return was.indexOf(id)<0;});
+    var restored=was.filter(function(id){return now.indexOf(id)<0;});
+    var parts=[];
+    if(added.length)parts.push("Removed “"+added.map(blockName).map(esc).join("”, “")+"” from the daily schedule");
+    if(restored.length)parts.push("Restored “"+restored.map(blockName).map(esc).join("”, “")+"” to the daily schedule");
+    return parts.join("<br>")||"Updated the daily schedule";
+  }
   if(op.o==="ord")return "Reordered "+op.k;
   return (verb||"Changed")+" "+op.k;
 }
@@ -1328,7 +1351,6 @@ function reconnect(){
   }).catch(function(){connect();});
 }
 function day(k){k=k||today();if(!S.log[k])S.log[k]={};return S.log[k];}
-function meta(k){k=k||today();if(!S.days[k])S.days[k]={t3:["","",""],wins:""};return S.days[k];}
 
 // ---------- shift-minute coordinates ----------
 function mins(hhmm){var p=hhmm.split(":");return (+p[0])*60+(+p[1]);}
@@ -1343,8 +1365,8 @@ function dowOf(k){var p=k.split("-");return new Date(+p[0],+p[1]-1,+p[2]).getDay
 // plus any one-off appointments booked for this date, in clock order.
 function dayBlocks(k){
   k=k||today();
-  var dow=dowOf(k);
-  var out=BLOCKS.filter(function(b){return !b.days||b.days.indexOf(dow)>=0;});
+  var dow=dowOf(k),hidden=S.hiddenBlocks||[];
+  var out=BLOCKS.filter(function(b){return (!b.days||b.days.indexOf(dow)>=0)&&hidden.indexOf(b.id)<0;});
   S.events.forEach(function(e){if(e.date===k)out.push(e);});
   return out.sort(function(a,b){return sm(a.s)-sm(b.s);});
 }
@@ -1444,16 +1466,19 @@ function renderNudges(){
     out.push(["","school-fetch","<b>School fetch unchecked</b> — it's past 4:15pm."]);
   if(n>sm("06:30")&&!l.nightclienta)
     out.push(["","nighta-eod","<b>Night Client A EOD report still open</b> and the shift ends at 7am."]);
-  // appointments he said he has to be at — the whole point of booking one
+  // Every upcoming appointment gets a heads-up, not just must-attend ones -
+  // but must-attend still gets its own more emphatic tier (apt-must) so it
+  // doesn't blend in with an appointment that's fine to run a few minutes late on.
   dayBlocks().forEach(function(b){
-    if(!b.ev||!b.must)return;
+    if(!b.ev)return;
+    var cls=b.must?"apt-must":"apt";
     var st=sm(b.s),mins=st-n;
     if(mins>0&&mins<=120)
-      out.push(["","appt-soon-"+b.id,"<b>"+esc(b.n)+" at "+fmt(b.s)+" — in "+
+      out.push([cls,"appt-soon-"+b.id,"<b>"+esc(b.n)+" at "+fmt(b.s)+" — in "+
         (mins>=60?Math.floor(mins/60)+"h "+(mins%60)+"m":mins+" min")+".</b> "+
-        "You marked this one must-attend. Start closing down what you're on now."]);
+        (b.must?"You marked this one must-attend. Start closing down what you're on now.":"")]);
     else if(n>=st&&n<smEnd(b.e))
-      out.push(["","appt-now-"+b.id,"<b>"+esc(b.n)+" is happening now</b> — until "+fmt(b.e)+"."]);
+      out.push([cls,"appt-now-"+b.id,"<b>"+esc(b.n)+" is happening now</b> — until "+fmt(b.e)+"."]);
   });
   var stale=S.tasks.filter(function(t){return !t.done&&ageOf(t)>=3;}).length;
   if(stale)out.push(["","stale-tasks","<b>"+stale+" task"+(stale>1?"s have":" has")+" been open 3+ shifts.</b> Do it, delegate it, or delete it."]);
@@ -1551,9 +1576,18 @@ function renderTimeline(forceCenter){
         (b.dual?' <span class="dual">dual</span>':'')+
         (b.ev?' <span class="apt">'+(b.must?"must attend":"appointment")+'</span>':'')+'</div>'+
       '<div class="blk-d">'+esc(b.d||"")+'</div></div>'+
-      (b.ev?'<button class="x" title="Remove this appointment">&times;</button>':'');
+      (b.ev?'<button class="x" title="Remove this appointment">&times;</button>'
+           :'<button class="x" title="Remove this from your daily schedule">&times;</button>');
     if(b.ev) el.querySelector(".x").addEventListener("click",function(){
       S.events=S.events.filter(function(x){return x.id!==b.id;});
+      save();renderAll();});
+    else el.querySelector(".x").addEventListener("click",function(){
+      // Unlike an appointment (a single dated occurrence), this is a
+      // recurring routine slot - removing it takes it off every day it
+      // would otherwise appear on, not just today. There's no restore UI
+      // yet, same as removing a lane or a non-negotiable - if unsure, leave it.
+      if(!confirm('Remove "'+b.n+'" from your daily schedule? This removes it every day it appears, not just today - there\'s no undo built in yet.'))return;
+      S.hiddenBlocks=(S.hiddenBlocks||[]).concat([b.id]);
       save();renderAll();});
     if(isNow){ nowEl=el; }
     c.appendChild(el);
@@ -1831,15 +1865,6 @@ function renderWeek(){
   }
 }
 
-function renderShutdown(){
-  var m=meta();
-  ["t3a","t3b","t3c"].forEach(function(id,i){
-    var el=document.getElementById(id);
-    if(document.activeElement!==el)el.value=m.t3[i]||"";});
-  var w=document.getElementById("wins");
-  if(document.activeElement!==w)w.value=m.wins||"";
-}
-
 // auto = follow the OS. Explicit choices stamp data-theme, which wins over the
 // prefers-color-scheme block in both directions.
 function applyTheme(){
@@ -1852,7 +1877,7 @@ function applyTheme(){
 
 function renderAll(){
   renderHeader();renderNow();renderNudges();renderRituals();
-  renderWeekly();renderTimeline();renderLanes();renderWeek();renderShutdown();
+  renderWeekly();renderTimeline();renderLanes();renderWeek();
   renderAptLaneOptions();
   if(document.body.classList.contains("view-reports"))renderReportsView();
   applyTheme();
@@ -1862,9 +1887,6 @@ function renderAll(){
 }
 
 // ---------- wiring ----------
-["t3a","t3b","t3c"].forEach(function(id,i){
-  document.getElementById(id).addEventListener("input",function(){meta().t3[i]=this.value;save();});});
-document.getElementById("wins").addEventListener("input",function(){meta().wins=this.value;save();});
 document.getElementById("focusBtn").addEventListener("click",function(){S.focus=!S.focus;save();renderAll();});
 document.getElementById("ritAddBtn").addEventListener("click",addRitual);
 ["ritName","ritTag"].forEach(function(id){
@@ -1902,8 +1924,8 @@ document.getElementById("themeBtn").addEventListener("click",function(){
   S.theme = S.theme==="auto" ? "dark" : (S.theme==="dark" ? "light" : "auto");
   save();applyTheme();});
 document.getElementById("resetBtn").addEventListener("click",function(){
-  if(!confirm("Clear this shift's checkmarks and notes? Tasks are kept."))return;
-  delete S.log[today()];delete S.days[today()];save();renderAll();});
+  if(!confirm("Clear this shift's checkmarks? Tasks are kept."))return;
+  delete S.log[today()];save();renderAll();});
 document.getElementById("exportBtn").addEventListener("click",function(){
   var b=new Blob([JSON.stringify(S,null,2)],{type:"application/json"});
   var a=document.createElement("a");a.href=URL.createObjectURL(b);
