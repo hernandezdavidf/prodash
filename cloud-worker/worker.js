@@ -119,20 +119,26 @@ export default {
     try {
       requireConfig(env);
 
+      // EVERY await below is load-bearing. `return handler(request, env)` inside
+      // a try block returns the promise without awaiting it, so the promise's
+      // rejection escapes this try/catch completely and Cloudflare answers with
+      // a bare 1101 "Worker threw exception" instead of the JSON error the
+      // client knows how to read. Only the synchronous requireConfig() throw
+      // above was being caught. Do not drop these awaits to "simplify".
       if (path === "/health") return json({ ok: true });
 
-      if (path === "/auth/signup" && request.method === "POST") return signup(request, env);
-      if (path === "/auth/login" && request.method === "POST") return login(request, env);
-      if (path === "/auth/logout" && request.method === "POST") return logout(request, env);
-      if (path === "/auth/me" && request.method === "GET") return me(request, env);
-      if (path === "/auth/forgot/start" && request.method === "POST") return forgotStart(request, env);
-      if (path === "/auth/forgot/verify" && request.method === "POST") return forgotVerify(request, env);
-      if (path === "/auth/forgot/reset" && request.method === "POST") return forgotReset(request, env);
+      if (path === "/auth/signup" && request.method === "POST") return await signup(request, env);
+      if (path === "/auth/login" && request.method === "POST") return await login(request, env);
+      if (path === "/auth/logout" && request.method === "POST") return await logout(request, env);
+      if (path === "/auth/me" && request.method === "GET") return await me(request, env);
+      if (path === "/auth/forgot/start" && request.method === "POST") return await forgotStart(request, env);
+      if (path === "/auth/forgot/verify" && request.method === "POST") return await forgotVerify(request, env);
+      if (path === "/auth/forgot/reset" && request.method === "POST") return await forgotReset(request, env);
 
-      if (path === "/data") return boardData(request, env);
+      if (path === "/data") return await boardData(request, env);
 
-      if (path === "/admin/bootstrap" && request.method === "POST") return adminBootstrap(request, env);
-      if (path.startsWith("/admin/")) return adminPlaceholder(request, env);
+      if (path === "/admin/bootstrap" && request.method === "POST") return await adminBootstrap(request, env);
+      if (path.startsWith("/admin/")) return await adminPlaceholder(request, env);
 
       return json({ error: "not found" }, 404);
     } catch (err) {
