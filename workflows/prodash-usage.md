@@ -141,9 +141,14 @@ recorded automatically — you never have to do anything to keep it.
 
 **Restoring never deletes history.** The rollback is itself recorded as a new
 entry, so you can undo a restore exactly the way you did the restore. Very
-old revisions show a greyed-out **Too old** button — history keeps the last
-400 changes, and past that point the app would have to guess at the board
-state, so it refuses instead.
+old revisions show a greyed-out **Too old** button — a revision stops being
+restorable after 7 days, or once it falls off the 400-entry cap, whichever
+comes first. Past that point the row stays in the log forever as a small
+summary ("Details expired — 3 changes, touching tasks, log") so you can
+still see *that* something happened, just not *what* — the underlying detail
+is genuinely deleted, not just hidden, and can't be recovered by any device.
+**Importing a backup** goes through the same merge as everything else — your
+history isn't reset by restoring an old export.
 
 **A "Conflict" badge** means two devices edited without having seen each
 other's change — the board kept whichever arrived last, so the other side's

@@ -750,13 +750,13 @@ function load(){
   return norm(s);
 }
 var S=load();
-function stamp(t){
+function stamp(t,ms){
   var el=document.getElementById("saved");el.textContent=t;
-  clearTimeout(stamp._t);stamp._t=setTimeout(function(){el.textContent="";},1600);
+  clearTimeout(stamp._t);stamp._t=setTimeout(function(){el.textContent="";},ms||1600);
 }
 function save(){
   S.updatedAt=Date.now();
-  try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
+  persistLocal();
   stamp(fileHandle?"saving…":"saved");
   scheduleWrite();
   // The cloud push now happens inside commitRevision() instead of here, so
@@ -832,15 +832,22 @@ function writeFile(){
 function adopt(d){
   d=norm(d);
   var mh=mergeHist(S.hist,d.hist), md=mergeDevices(S.devices,d.devices);
+  // A length check alone would miss the case where an entry mutates IN PLACE
+  // (a full entry on one side, its tombstone on the other, same id, same
+  // array length) - which is exactly the case that has to propagate for
+  // deletion to stay monotonic across devices. Compare content, not count.
+  var histChanged = JSON.stringify(mh)!==JSON.stringify(S.hist||[]);
   if(d.updatedAt>=S.updatedAt){
     S=d; S.hist=mh; S.devices=md;
+    expireHistory();
     baseSnap=boardOnly(S);
-    try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
+    persistLocal();
     renderAll();return true;
   }
-  if(mh.length!==(S.hist||[]).length){
+  if(histChanged){
     S.hist=mh; S.devices=md;
-    try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
+    expireHistory();
+    persistLocal();
     renderAll();
   }
   return false;
@@ -913,18 +920,34 @@ function cloudPull(){
     })
     .catch(function(e){ cloudBusy=false; setCloud("error",e.message); });
 }
+/* Pulls-then-pushes rather than blindly overwriting the Worker's stored
+   copy. Without the pull, two devices pushing close together can have one's
+   revisions server-side-overwritten by the other's PUT - usually self-heals
+   next time the losing device pulls and re-unions, but not if that device
+   never comes back online. adopt() is idempotent/commutative (union-by-id,
+   tombstone-wins, LWW on board only), so it's safe to call here even if a
+   cloudPull() happens to be running concurrently - no extra locking needed,
+   worst case is one redundant renderAll(). If the pre-push GET fails (first
+   ever push, or a network hiccup) fall through and push current S anyway
+   rather than blocking a save indefinitely on a read that isn't essential. */
 function cloudPush(){
   if(!cloudUrl||!cloudPw)return;
   clearTimeout(cloudPushTimer);
   cloudPushTimer=setTimeout(function(){
-    // Captured BEFORE the request, not in the .then: anything committed while
-    // this push is in flight was not part of this body and must stay pending.
-    var upTo=newestRevTs();
-    fetch(cloudUrl+"/data",{method:"PUT",headers:cloudHeaders(),body:JSON.stringify(S)})
-      .then(function(r){ if(!r.ok)throw new Error("HTTP "+r.status);
-        markPushed(upTo);
-        setCloud("synced","Saved · "+new Date().toLocaleTimeString());
-        if(curHView)renderHistory(); })
+    fetch(cloudUrl+"/data",{headers:cloudHeaders()})
+      .then(function(r){ if(!r.ok)throw new Error("HTTP "+r.status); return r.json(); })
+      .then(function(remote){ if(remote&&typeof remote==="object")adopt(remote); })
+      .catch(function(){ /* no remote yet, or unreachable - push what we have */ })
+      .then(function(){
+        // Captured AFTER the merge above, so it reflects what's actually
+        // going out in the PUT body, including anything adopt() just folded in.
+        var upTo=newestRevTs();
+        return fetch(cloudUrl+"/data",{method:"PUT",headers:cloudHeaders(),body:JSON.stringify(S)})
+          .then(function(r){ if(!r.ok)throw new Error("HTTP "+r.status);
+            markPushed(upTo);
+            setCloud("synced","Saved · "+new Date().toLocaleTimeString());
+            if(curHView)renderHistory(); });
+      })
       .catch(function(e){ setCloud("error",e.message); });
   },800);
 }
@@ -986,12 +1009,21 @@ function markPushed(ts){
   pushedUpTo=ts; try{localStorage.setItem(PUSHED_KEY,String(ts));}catch(e){}
 }
 
-/* ---- merge (union by id, never replace) ---- */
+/* ---- merge (union by id, never replace) ----
+   Tombstone always wins when both sides have the same id: once ANY device
+   has expired a revision's detail (see expireHistory()), it must stay
+   expired everywhere, forever - a device that hasn't opened in two weeks
+   still carrying the full entry must never resurrect it back into another
+   device's copy on merge. That makes deletion monotonic and the merge still
+   fully deterministic regardless of order, same guarantee as plain union. */
 function mergeHist(a,b){
-  var seen={},out=[];
+  var byId={};
   (a||[]).concat(b||[]).forEach(function(r){
-    if(!r||!r.id||seen[r.id])return; seen[r.id]=1; out.push(r);
+    if(!r||!r.id)return;
+    var have=byId[r.id];
+    if(!have||(r.tomb&&!have.tomb))byId[r.id]=r;
   });
+  var out=Object.keys(byId).map(function(k){return byId[k];});
   out.sort(function(x,y){return (x.ts||0)-(y.ts||0) || (x.id<y.id?-1:x.id>y.id?1:0);});
   return out;
 }
@@ -1107,6 +1139,11 @@ function opText(op){
   return (verb||"Changed")+" "+op.k;
 }
 function revSummary(r){
+  if(r.tomb){
+    var kinds=Object.keys(r.opKinds||{});
+    return "<em>Details expired (7-day retention) — "+(r.opCount||0)+
+      " change"+(r.opCount===1?"":"s")+(kinds.length?", touching "+kinds.map(esc).join(", "):"")+"</em>";
+  }
   var ops=(r.ops||[]).filter(function(o){return !o.quiet;});
   if(!ops.length)return "<em>No board data changed</em>";
   var lines=ops.slice(0,4).map(opText);
@@ -1145,7 +1182,27 @@ function receivedBy(r){
 }
 
 /* ---- recording ---- */
-var baseSnap=boardOnly(S), histTimer=null, restoring=false, pendingRestore=null;
+var baseSnap=boardOnly(S), histTimer=null, restoring=false, pendingRestore=null, pendingImportNote=null;
+/* Centralizes every localStorage.setItem(KEY,...) in the file. Before Board
+   History this was small enough that a bare try/catch swallowing quota
+   errors was low-risk; now that history can genuinely grow, a silent
+   failure here means the UI has already re-rendered as if the edit saved
+   while nothing on disk actually changed - the worst kind of bug, since
+   nothing LOOKS wrong until the tab closes. One recovery attempt (force-
+   expire history down to a small floor, retry) before surfacing a warning
+   the user can actually see. */
+function persistLocal(){
+  try{ localStorage.setItem(KEY,JSON.stringify(S)); return true; }
+  catch(e){
+    expireHistory(true);
+    try{ localStorage.setItem(KEY,JSON.stringify(S)); return true; }
+    catch(e2){
+      console.error("persistLocal: write failed even after emergency history expiry",e2);
+      stamp("⚠ Couldn't save — storage full. Export a backup now.",8000);
+      return false;
+    }
+  }
+}
 function noteChange(){
   if(restoring)return;
   clearTimeout(histTimer);
@@ -1155,36 +1212,63 @@ function commitRevision(){
   clearTimeout(histTimer);histTimer=null;
   if(restoring)return;
   var ops=diffOps(baseSnap,S);
-  if(!ops.length){ cloudPush(); return; }
+  if(!ops.length){ pendingRestore=null; pendingImportNote=null; cloudPush(); return; }
   var h=S.hist,prev=h.length?h[h.length-1].id:null;
   var rev={id:rid("rev_"),ts:Date.now(),dev:myDeviceId,ses:sessionId,src:"local",base:prev,ops:ops};
   if(pendingRestore){rev.restoredFrom=pendingRestore;pendingRestore=null;}
+  if(pendingImportNote){rev.importedFrom=pendingImportNote;pendingImportNote=null;}
   var since=0;
   for(var i=h.length-1;i>=0;i--){ if(h[i].snap)break; since++; }
   if(!h.length||since>=CKPT_EVERY)rev.snap=boardOnly(S);
   h.push(rev);
-  trimHist();
+  expireHistory();
   touchDevice();
   baseSnap=boardOnly(S);
-  try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
+  persistLocal();
   scheduleWrite();
   cloudPush();
   if(curHView)renderHistory();
 }
-/* Trimming must never leave the oldest surviving entry unreachable - if it
-   has no snapshot of its own it gets one computed before the cut, otherwise
-   restore would quietly start returning wrong board states. If that state
-   can't be computed, we keep the extra entries instead. */
-function trimHist(){
-  var h=S.hist;
-  if(h.length<=HIST_CAP)return;
-  var cut=h.length-HIST_CAP,keep=h[cut];
-  if(!keep.snap){
-    var st=stateAt(keep.id);
-    if(!st)return;
-    keep.snap=st;
+/* Expiry has two independent triggers - the 400-entry cap (a burst of edits
+   in one sitting) and the 7-day age window (the normal slow case) - whichever
+   is stricter for a given entry wins. HIST_CAP no longer bounds array length:
+   it bounds how many entries may keep FULL ops/snapshot data. Once an entry
+   is tombstoned it stays in S.hist permanently as a small marker - that's the
+   point, a lightweight log that survives even though the detail doesn't.
+   The oldest surviving FULL entry must keep (or be given) a snapshot before
+   anything before it is tombstoned, or every later entry loses the ability
+   to replay - same "guarantee reachability before cutting" rule the old
+   count-only trim used, just extended to a combined cutoff. If that state
+   can't be computed, nothing is expired this round rather than risking a
+   later restore silently returning a wrong board. emergency=true (called
+   from persistLocal() when a write fails) trims to a much smaller floor as
+   a last resort to free up space, ignoring the normal 400-entry comfort zone. */
+var RETENTION_MS=7*24*60*60*1000;
+function expireHistory(emergency){
+  var h=S.hist,full=[];
+  h.forEach(function(r,i){ if(!r.tomb)full.push(i); });
+  if(!full.length)return;
+  var cap=emergency?50:HIST_CAP;
+  var ageCutoff=Date.now()-RETENTION_MS;
+  var countCut=Math.max(0,full.length-cap);
+  var ageCut=0;
+  for(var k=0;k<full.length;k++){ if(h[full[k]].ts<ageCutoff)ageCut++; else break; }
+  var cutCount=Math.max(countCut,ageCut);
+  if(cutCount<=0)return;
+  if(cutCount<full.length){
+    var boundary=h[full[cutCount]];
+    if(!boundary.snap){
+      var st=stateAt(boundary.id);
+      if(!st)return;
+      boundary.snap=st;
+    }
   }
-  h.splice(0,cut);
+  for(var j=0;j<cutCount;j++){
+    var idx=full[j],r=h[idx],kinds={};
+    (r.ops||[]).forEach(function(o){kinds[o.k]=(kinds[o.k]||0)+1;});
+    h[idx]={id:r.id,ts:r.ts,dev:r.dev,ses:r.ses,src:r.src,base:r.base,
+      tomb:true,opKinds:kinds,opCount:(r.ops||[]).length,expiredAt:Date.now()};
+  }
 }
 function flushHistory(){ if(histTimer)commitRevision(); }
 window.addEventListener("beforeunload",flushHistory);
@@ -1829,7 +1913,10 @@ document.getElementById("fileIn").addEventListener("change",function(e){
   var f=e.target.files[0];if(!f)return;
   var r=new FileReader();
   r.onload=function(){try{var d=JSON.parse(r.result);
-    if(d&&d.tasks&&d.log){S=norm(d);save();renderAll();alert("Backup restored.");}
+    if(d&&d.tasks&&d.log){
+      applyImport(d, f.name+(d.updatedAt?" · saved "+new Date(d.updatedAt).toLocaleString():""));
+      alert("Backup restored.");
+    }
     else alert("That file doesn't look like a DayFlow backup.");}
     catch(err){alert("Couldn't read that file.");}};
   r.readAsText(f);e.target.value="";});
@@ -1859,6 +1946,15 @@ document.getElementById("cloudBtn").addEventListener("click",function(){
 // (and back) without waiting for the periodic interval further down.
 window.addEventListener("focus",function(){if(cloudUrl)cloudPull();});
 document.addEventListener("visibilitychange",function(){if(!document.hidden&&cloudUrl)cloudPull();});
+// Retention check runs here too, unconditional on cloud being set up - a
+// fully local, no-sync device still needs its own history aged out. This is
+// what "scheduled" means for a static page with no server-side timer of its
+// own: every device self-corrects the moment it's actually open, and since
+// deletion is monotonic (see mergeHist()'s tombstone-wins rule) it doesn't
+// matter which device expires an entry first - everyone converges to the
+// same deleted state on their next sync regardless of order.
+window.addEventListener("focus",function(){expireHistory();});
+document.addEventListener("visibilitychange",function(){if(!document.hidden)expireHistory();});
 setCloud(cloudUrl?"local":"off");
 
 /* ============================================================
@@ -1981,7 +2077,8 @@ function revRow(r,conflicted,withActions){
   return '<div class="hist-row">'+
     '<div class="hist-when">'+fmtWhen(r.ts)+'</div>'+
     '<div class="hist-main"><div class="hist-what">'+revSummary(r)+
-      (r.restoredFrom?'<br><em>Restored the board to revision '+esc(r.restoredFrom)+'</em>':'')+'</div>'+
+      (r.restoredFrom?'<br><em>Restored the board to revision '+esc(r.restoredFrom)+'</em>':'')+
+      (r.importedFrom?'<br><em>Board restored from backup file: '+esc(r.importedFrom)+'</em>':'')+'</div>'+
       '<div class="hist-meta">'+
         '<span class="chip dev">'+esc(devLabel(r.dev))+'</span>'+
         syncChip(r)+
@@ -2108,11 +2205,31 @@ function doRestore(revId){
   restoring=false;
   pendingRestore=revId;
   S.updatedAt=Date.now();
-  try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
+  persistLocal();
   commitRevision();
   renderAll();
   renderHistory();
   stamp("restored");
+}
+
+/* Board data is fully replaced by the imported file - that's the whole
+   point of "restore this backup," an explicit user action, not a "which
+   copy is newer" sync decision, so no last-write-wins check here. History
+   and devices are still MERGED, not replaced, using the exact same union
+   adopt() uses - the bug this closes is that importing a pre-Board-History
+   backup (or any older export) used to silently wipe this device's own
+   audit trail, same shape as the original adopt() landmine, different door. */
+function applyImport(d,label){
+  flushHistory();                // checkpoint any pending edits under the OLD board first
+  d=norm(d);
+  var mh=mergeHist(S.hist,d.hist), md=mergeDevices(S.devices,d.devices);
+  S=d; S.hist=mh; S.devices=md;
+  S.updatedAt=Date.now();        // this device's copy is now newest, regardless of the backup file's own timestamp
+  pendingImportNote=label;
+  persistLocal();
+  commitRevision();              // diffs old board vs imported board - the real change list, for free
+  renderAll();
+  renderHistory();
 }
 
 document.getElementById("tabBoard").addEventListener("click",function(){setView("board");});
@@ -2261,7 +2378,8 @@ window.dfDebug={dayBlocks:dayBlocks,today:today,norm:norm,state:function(){retur
   hist:function(){return S.hist;}, devices:function(){return S.devices;},
   stateAt:stateAt, diffOps:diffOps, conflicts:conflictGroups, adopt:adopt,
   whoAmI:function(){return {device:myDeviceId,session:sessionId,pushedUpTo:pushedUpTo};},
-  flushHistory:flushHistory,
+  flushHistory:flushHistory, applyImport:applyImport, expireHistory:expireHistory,
+  persistLocal:persistLocal, cloudPush:cloudPush, cloudPull:cloudPull, mergeHist:mergeHist,
   /** Round-trips a built .xlsx back through a hand-written ZIP reader and
       confirms every part's CRC32 matches and every XML part parses cleanly.
       This is the real test - if this passes, Excel opening it isn't luck. */
@@ -2302,7 +2420,8 @@ applyTheme();   // before first paint, so a dark session doesn't flash white
 // routed through save(): boot is not a board change and must not create a
 // history entry of its own.
 touchDevice();
-try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
+expireHistory();
+persistLocal();
 renderAll();
 restore();
 // The very first renderTimeline() above runs synchronously during initial

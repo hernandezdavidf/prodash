@@ -2,6 +2,47 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-08-15 — Closed three sync-merge gaps in Board History, added 7-day retention
+
+Board History's `adopt()` fix (below) only closed one door — three more of
+the same shape were found and closed the same way:
+
+**Import backup used to bypass the merge entirely.** `S=norm(d)` replaced
+the whole state on import, same landmine as the original `adopt()` bug,
+different trigger — restoring any backup (especially a pre-Board-History
+one) silently wiped this device's own history. New `applyImport()` keeps
+board replacement (that's the correct, deliberate behavior for an explicit
+restore) but merges `hist`/`devices` in via the same union `adopt()` uses,
+and records the import itself as a revision (`rev.importedFrom`) so it shows
+up in the log with context instead of as unexplained task diffs.
+
+**`cloudPush()` used to blindly overwrite the Worker's stored copy** — PUT
+with no prior GET, so two devices pushing close together could have one's
+revisions server-side-overwritten by the other (usually self-heals on the
+next pull, not if the losing device never reconnects). Now pulls first,
+runs the result through the same `adopt()` merge, then pushes the union —
+the Worker's copy can no longer lose an entry mid-race.
+
+**Six `localStorage.setItem` call sites silently swallowed write
+failures.** Centralized into `persistLocal()`: one recovery attempt (force-
+expire history, retry) before surfacing a visible, dismiss-free warning —
+previously a failed save looked identical to a successful one until the tab
+closed.
+
+**7-day rolling retention**, alongside the existing 400-entry cap
+(whichever's stricter for a given entry). Past that, a revision's ops/
+snapshot are deleted and replaced with a small permanent tombstone — id,
+timestamp, device, and a category count only (`{tasks:2,log:1}`), never
+field values — so the log still shows *that* something happened, never
+*what*. The one rule that keeps this safe across devices: `mergeHist()` now
+makes **tombstone always beat full data for the same id**, so deletion is
+monotonic — a device that hasn't opened in two weeks and still holds the
+full entry can never resurrect it back into another device's copy on merge.
+Checked on boot, focus, and visibility-change (there's no server-side
+scheduler for a static page — "scheduled" means "checked whenever a device
+is actually open," and every device converges to the same result regardless
+of which one expires an entry first).
+
 ## 2026-08-15 — Board History: audit trail, sync diagnostics, and restore
 
 A third main tab, next to Board and Reports, with four sub-views: **Update
