@@ -982,6 +982,12 @@ return {
   serverUrl: function(){ return serverUrl; },
   token: function(){ return session ? session.token : ""; },
   user: function(){ return session ? session.user : null; },
+  uid: function(){ return session && session.user ? session.user.userId : ""; },
+  /* Which account inherited this device's pre-accounts data. Used to decide who
+     the old un-namespaced OneDrive file handle belongs to - it is the same
+     person, and giving it to anyone else is precisely the leak that made a
+     second user's board fill up with the first user's tasks. */
+  legacyOwner: function(){ return get("prodash.migrated::dayflow.v2") || ""; },
   headers: function(){
     return { "Authorization": "Bearer " + (session ? session.token : ""), "Content-Type": "application/json" };
   },
@@ -1294,6 +1300,32 @@ function save(){
 var FS_OK = (typeof window!=="undefined" && typeof window.showSaveFilePicker==="function");
 var fileHandle=null, writeTimer=null, syncState="local", reading=false;
 var IDB="dayflow-sync", STORE="handles";
+
+/* The file handle is stored PER ACCOUNT. It used to live under a single key
+   called "file", which meant every account on a device shared one data file:
+   signing in as a second user reconnected the first user's OneDrive file,
+   adopt()ed their whole board into the new account, and - because the handle is
+   read-write - would then have written the second user's edits back into the
+   first user's file. localStorage was namespaced for exactly this reason and
+   IndexedDB was missed. Found by David signing up a second account and watching
+   it fill with the first one's tasks. */
+var FILE_KEY="file::"+PDAuth.uid();
+
+/* The pre-accounts handle belongs to whoever also inherited the pre-accounts
+   board, and to nobody else - that pairing is what keeps this from re-creating
+   the leak it fixes. Everyone else starts with no file connected and picks
+   their own, which is the correct default: two accounts should never share one
+   data file. */
+function claimLegacyHandle(){
+  if(!PDAuth.uid() || PDAuth.uid()!==PDAuth.legacyOwner()) return Promise.resolve();
+  return idbGet(FILE_KEY).then(function(mine){
+    if(mine) return;
+    return idbGet("file").then(function(old){
+      if(!old) return;
+      return idbSet(FILE_KEY,old).then(function(){ return idbDel("file"); });
+    });
+  }).catch(function(){});
+}
 
 function idb(){return new Promise(function(res,rej){
   try{var r=indexedDB.open(IDB,1);
@@ -1874,7 +1906,7 @@ function connect(){
     suggestedName:"dayflow-data.json",
     types:[{description:"DayFlow data",accept:{"application/json":[".json"]}}]
   }).then(function(h){
-    return idbSet("file",h).catch(function(){}).then(function(){
+    return idbSet(FILE_KEY,h).catch(function(){}).then(function(){
       return attach(h,"Save this inside your OneDrive folder so it follows you between PCs.");
     });
   }).catch(function(){/* user cancelled */});
@@ -1882,7 +1914,7 @@ function connect(){
 function restore(){
   if(!FS_OK){setSync("local","This browser stores data locally only. Use Export backup to move it.");return;}
   setSync("local","Not connected. Click to pick a file in your OneDrive folder.");
-  idbGet("file").then(function(h){
+  claimLegacyHandle().then(function(){ return idbGet(FILE_KEY); }).then(function(h){
     if(!h)return;
     h.queryPermission({mode:"readwrite"}).then(function(p){
       if(p==="granted")return attach(h);
@@ -2496,7 +2528,7 @@ document.getElementById("syncBtn").addEventListener("click",function(){
   if(syncState==="needs")reconnect();
   else if(syncState==="synced"){
     if(confirm("Disconnect this file? Data stays in this browser, but stops syncing."))
-      {fileHandle=null;idbDel("file").catch(function(){});setSync("local","Disconnected. Click to reconnect.");}
+      {fileHandle=null;idbDel(FILE_KEY).catch(function(){});setSync("local","Disconnected. Click to reconnect.");}
   }
   else connect();
 });
