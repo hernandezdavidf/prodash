@@ -629,6 +629,7 @@ body.view-reports .board-only,body.view-history .board-only{display:none}
         <button class="sub-tab" data-hview="sync">Local ↔ Cloud</button>
         <button class="sub-tab" data-hview="devices">Devices</button>
         <button class="sub-tab" data-hview="restore">Restore</button>
+        <button class="sub-tab" data-hview="appver">PRODASH Version History</button>
       </div>
       <div id="histBody"></div>
     </div>
@@ -965,6 +966,34 @@ function cloudPush(){
    The board slice is deliberately narrow: BOARD_KEYS excludes hist/devices,
    so a snapshot can never contain the history that contains it.           */
 var APP_VERSION="1.1";
+/* ================= PRODASH Version History ==================================
+   A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
+   - "what changed and when" without needing to open the repo. Newest first.
+   ts = when the change actually went live (the commit that shipped it), not
+   when it was written up. NOT derived from S (survives Reset/Restore/import
+   untouched) and NOT part of BOARD_KEYS, so it never syncs, conflicts, or
+   shows up in the audit trail - it's app history, not board history.
+   Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
+   added there for a real deploy, add one line here too - short, no jargon. */
+var APP_VERSION_HISTORY=[
+  {ts:"2026-08-15T20:24:11+08:00",text:"Added this tab — a plain-English update log for the app itself, separate from the board's own change history."},
+  {ts:"2026-08-15T20:17:46+08:00",text:"Removed the old Shutdown ritual card. Timeline items like Sleep and Wake + prep can now be deleted. Every appointment sends a reminder, not just must-attend ones."},
+  {ts:"2026-08-15T19:24:45+08:00",text:"Cloud sync now refreshes automatically when you open the app, and reconnecting no longer makes you re-enter your password."},
+  {ts:"2026-08-15T09:52:44+08:00",text:"Fixed cases where restoring a backup or syncing two devices at once could lose history. Old history now ages out on its own after 7 days."},
+  {ts:"2026-08-15T09:12:33+08:00",text:"Added Board History: a full record of every change, which device made it, whether it reached the cloud, and the ability to restore an earlier version."},
+  {ts:"2026-08-13T11:58:27+08:00",text:"Redesigned the header - stats moved under the date, and notifications moved into a cleaner strip under the header."},
+  {ts:"2026-08-13T11:19:40+08:00",text:"The Shift timeline can now be resized and automatically scrolls to keep the current block in view."},
+  {ts:"2026-08-13T10:57:18+08:00",text:"Cleaned up employer names shown in the app for privacy, and removed an old unused version of the dashboard."},
+  {ts:"2026-08-13T10:24:23+08:00",text:"Connected cloud sync to a live server, and cleaned up two accidental data leaks from the project's history."},
+  {ts:"2026-08-13T06:15:54+08:00",text:"Laid the groundwork for using ProDash as a mobile app: a phone-friendly layout, an installable icon, and cloud sync between devices."},
+  {ts:"2026-08-13T04:56:35+08:00",text:"Combined Non-negotiables and Weekly targets into one card, and made non-negotiables editable - add or remove your own."},
+  {ts:"2026-08-12T22:35:53+08:00",text:"Every board lane can now be renamed or deleted."},
+  {ts:"2026-08-12T21:50:06+08:00",text:"Lanes can now be added, reordered, and colored. Added a Reports tab with Excel export."},
+  {ts:"2026-08-12T21:19:25+08:00",text:"Removed sleep tracking, and moved the Shift timeline to the left column."},
+  {ts:"2026-08-12T21:02:26+08:00",text:"Switched back to DayFlow as the daily app, renamed to “How's our Dave looking? · ProDash”, with dark mode and real appointment times added."},
+  {ts:"2026-08-12T20:24:54+08:00",text:"First build of Productivity Dashboard v8, a standalone dashboard that works offline."},
+  {ts:"2026-08-12T19:31:33+08:00",text:"Project set up: instructions, folders, and version control put in place."}
+];
 var DEV_KEY="prodash.deviceId", DEV_NAME_KEY="prodash.deviceName", PUSHED_KEY="prodash.pushedUpTo";
 var HIST_CAP=400, CKPT_EVERY=25, BATCH_MS=2500;
 var BOARD_KEYS=["tasks","log","days","events","lanes","rituals","focus","theme","hiddenBlocks"];
@@ -2210,7 +2239,7 @@ function renderHistory(){
         '</div></div>';
     }).join("");
 
-  }else{ // restore
+  }else if(curHView==="restore"){
     body.innerHTML = rev.length
       ? '<div class="sub">Pick a point in time to inspect or roll back to. Restoring never erases history — it adds a new entry recording the rollback.</div>'+
         rev.map(function(r){return revRow(r,conf[r.id],true);}).join("")+
@@ -2222,6 +2251,14 @@ function renderHistory(){
     body.querySelectorAll("[data-rst]").forEach(function(b){
       b.addEventListener("click",function(){doRestore(b.dataset.rst);});
     });
+
+  }else{ // appver — plain-English app update log, read-only, not board data
+    body.innerHTML = '<div class="sub">What\'s changed in ProDash itself, in plain English — automatically added here whenever a real update ships. '+
+      'Current version <b>'+esc(APP_VERSION)+'</b>.</div>'+
+      APP_VERSION_HISTORY.map(function(v){
+        return '<div class="hist-row"><div class="hist-when">'+fmtWhen(v.ts)+'</div>'+
+          '<div class="hist-main"><div class="hist-what">'+esc(v.text)+'</div></div></div>';
+      }).join("");
   }
 }
 function showCompare(revId){

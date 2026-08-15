@@ -2,6 +2,37 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-08-15 — Board History: added a plain-English "PRODASH Version History" tab
+
+A fifth sub-tab under Board History (**PRODASH Version History**), separate
+from the existing four (Update history / Local ↔ Cloud / Devices / Restore).
+Those four are the *board's* audit trail — every task/lane/ritual edit,
+which device, sync status. This new one is the *app's* own changelog,
+surfaced in-app instead of requiring someone to open `CHANGELOG.md`: plain-
+English, one line per real update, with the date/time it actually shipped
+(the commit timestamp, not the write-up timestamp) and a short non-technical
+summary of what changed.
+
+**Read-only by design.** Backed by a new `APP_VERSION_HISTORY` array in
+`dayflow.html`, hand-written rather than parsed from `CHANGELOG.md` at
+runtime — the changelog is deliberately technical/verbose for maintainers,
+this needed to stay short and jargon-free for a daily user, and this file
+has no build step to transform one into the other. Deliberately kept
+outside `S`/`BOARD_KEYS`: it never syncs, never conflicts, and survives
+Reset/Restore/Import untouched, since it describes the app, not the board.
+
+**"Automatically updated" means part of the deploy process, not a live
+feed** — there's no backend and no build pipeline here (`file://` also
+still has to work, which rules out `fetch()`-ing `CHANGELOG.md` at runtime;
+Chrome blocks that under `file://` and it's a real usage mode for this app),
+so the array is hand-maintained. Going forward, whenever a `CHANGELOG.md`
+entry is added for a real deploy, a matching one-line entry gets added to
+`APP_VERSION_HISTORY` in the same change — documented as a code comment
+right above the array so this doesn't get forgotten later. Backfilled all
+16 prior entries using the actual commit timestamps that shipped them
+(`git log --date=iso -- CHANGELOG.md`), not today's date, so the tab is
+accurate from first use.
+
 ## 2026-08-15 — Removed Shutdown ritual; deletable timeline placeholders; all appointments notify
 
 **Shutdown ritual removed** — the "next shift's top 3 / what moved this

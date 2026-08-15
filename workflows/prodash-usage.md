@@ -165,6 +165,16 @@ start editing: bring the app to the foreground and let it pull first.
 Console hooks for digging deeper: `dfDebug.hist()`, `dfDebug.devices()`,
 `dfDebug.conflicts()`, `dfDebug.stateAt("rev_…")`, `dfDebug.whoAmI()`.
 
+### PRODASH Version History
+
+A fifth view under Board History, separate from the other four. Those track
+changes to *your board* (tasks, lanes, rituals); this one tracks changes to
+*the app itself* — a plain-English update log so you can see what changed
+in ProDash without reading the code or `CHANGELOG.md`. One line per real
+update: when it went live, and a short, non-technical summary of what
+changed, added, removed, or improved. Read-only — there's nothing to edit
+here, and it's unaffected by Reset, Restore, or Import.
+
 ## Colours
 
 Blue = the three client jobs (Day Client, Night Client A, Night Client B in three tints). Green = your
