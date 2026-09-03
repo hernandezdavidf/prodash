@@ -2,6 +2,72 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-04 — My Personal Calendar: recurrence, lesson-plan days, derived reminders
+
+A fourth tab holding personal scheduling: **Month**, **Week**, **Day**,
+**Year**, **Agenda** and **Recurring** views over one activity store.
+
+**No second scheduling store, deliberately.** Activities are rows in `S.events`
+— the array appointments have always used — so every existing appointment keeps
+working untouched, and calendar activities reach the Board's Shift Timeline and
+the nudge strip through `dayBlocks()`, the one function all three already read.
+The alternative (a `S.calendar` array beside `S.events`) would have needed
+two-way sync between two schedules that mean the same thing, which is the class
+of bug that never fully goes away. It also means sync, Board History and the
+revision engine picked the feature up for free: `events` was already a KEYED
+union-by-id key.
+
+**Recurrence stores a rule, never expanded copies:**
+`rr = {f, int, days[], until}` with `occursOn(e,k)` answering arithmetically
+per day. A daily habit stays one row instead of 365 a year, in a document that
+gets pushed to the Worker whole on mobile data — and editing the rule fixes
+every occurrence at once rather than leaving stale copies behind. Monthly and
+yearly clamp to the last valid day, so a commitment on the 31st doesn't vanish
+in February and 29 Feb doesn't skip three years in four. Weekly counts its
+interval from each date's own week start, because measuring from the raw anchor
+drifts for any weekday earlier in the week than the anchor itself.
+
+*"Ends after N times"* is converted to a concrete `until` date at save time.
+That keeps `occursOn` O(1) — a year view asks it ~4000 times per render, and
+counting occurrences from the anchor on each call would be visible.
+
+**Reminders are derived, never stored.** `renderNudges()` recomputes from the
+calendar on every render, which is the entire reason editing, rescheduling or
+deleting an activity keeps its reminders correct: there is nothing to update,
+because the reminder was never a separate object. Recurring activities notify
+per occurrence for the same reason. Per-activity lead time (`remind`) defaults
+to 120 minutes so every pre-existing appointment warns exactly as before.
+All-day items announce themselves up front since they have no start minute to
+count down to, and tomorrow's first commitment surfaces once the shift is
+winding down.
+
+**Per-occurrence, not per-series**, in both directions: ticking an activity done
+writes `done[dateKey]`, and deleting one day adds to `ex[]` rather than killing
+the series. The timeline's × button now asks which was meant — guessing wrong
+there destroys a year of a commitment to cancel one afternoon.
+
+**Day view is the lesson plan**: a per-date objective (new `S.plans` map, added
+to `BOARD_KEYS`/`MAPS`) above the day's activities in time order, each with its
+notes, category, recurrence and a done tick.
+
+**Dates are shift keys, not wall-clock dates** — `date` means what it has always
+meant to `dayBlocks()`. Since the shift rolls at 07:00 the two are identical
+from 7am onward; only a 00:00–06:59 activity belongs to the previous shift, and
+the editor says so when a start time crosses that line rather than filing a 3am
+session on the wrong day silently.
+
+**Colour means category here** (work/learning/health/family/admin/personal),
+deliberately a different axis from the Board's lane colours, which mean life
+area. A calendar answers "what kind of thing is this"; the board answers "whose
+time is this".
+
+Two layout fixes found by looking at it rather than reasoning about it: grid
+cells needed `min-width:0` (a grid item's `min-width:auto` let nowrap chips push
+the 7-column grid past its card, cutting off Friday and Saturday), and below
+560px month view drops to category-coloured density bars, since seven columns on
+a phone leaves ~50px per day — too narrow for any label to survive. Tapping a
+day opens the Day view, where the detail fits.
+
 ## 2026-08-15 — Accounts: log-in gate, Google Sheets user registry, per-user boards
 
 ProDash now authenticates before it opens. Each person gets an independent

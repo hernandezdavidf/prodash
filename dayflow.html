@@ -387,7 +387,7 @@ header h1{font-size:26px;letter-spacing:.3px}
   color:var(--muted);font-weight:600;font-size:12.5px}
 .tab:hover{background:var(--ivory)}
 .tab.on{background:var(--forest);color:var(--on-brand);border-color:var(--forest)}
-body.view-reports .board-only,body.view-history .board-only{display:none}
+body.view-reports .board-only,body.view-history .board-only,body.view-cal .board-only{display:none}
 /* #view-reports itself is shown/hidden by toggling its `hidden` attribute in
    setView() - a CSS rule here can't win against the UA [hidden]{display:none}
    without matching or exceeding its specificity, so don't add one. */
@@ -1027,6 +1027,7 @@ return {
 
   <nav class="tabbar">
     <button class="tab on" id="tabBoard">Board</button>
+    <button class="tab" id="tabCal">My Personal Calendar</button>
     <button class="tab" id="tabReports">Reports</button>
     <button class="tab" id="tabHistory">Board History</button>
   </nav>
@@ -1147,6 +1148,261 @@ return {
     </div>
   </div>
 
+  <style>
+  /* ---- Personal Calendar ---------------------------------------------
+     Colour here means CATEGORY, deliberately a different axis from the
+     Board's lane colours (which mean life area). A calendar answers "what
+     kind of thing is this", the board answers "whose time is this". */
+  .cal-bar{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center;margin:14px 0 6px}
+  .cal-nav{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .cal-add{background:var(--forest);color:var(--on-brand);border-color:var(--forest)}
+  .cal-add:hover{background:var(--forest-dk)}
+  .cal-title{font-family:var(--serif);font-size:20px;color:var(--forest-ink);margin:6px 0 12px}
+
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .cal-dow{background:var(--ivory);padding:7px 6px;font-size:11px;font-weight:700;text-align:center;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+  /* min-width:0 is load-bearing: a grid item defaults to min-width:auto, so the
+     nowrap chips inside refuse to shrink and push the whole 7-column grid wider
+     than its card. Without this the last two weekdays are simply cut off. */
+  .cal-cell{background:var(--paper);min-height:98px;padding:5px 6px;cursor:pointer;position:relative;min-width:0}
+  .cal-cell:hover{background:var(--ivory)}
+  .cal-cell.out{opacity:.42}
+  .cal-cell.today{box-shadow:inset 0 0 0 2px var(--terra)}
+  .cal-dnum{font-size:12px;font-weight:700;color:var(--ink);margin-bottom:3px}
+  .cal-cell.today .cal-dnum{color:var(--terra-ink)}
+  .cal-chip{display:flex;align-items:center;gap:4px;font-size:11px;line-height:1.35;margin-bottom:2px;
+    padding:2px 5px;border-radius:5px;background:var(--ivory);border-left:3px solid var(--sage);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cal-chip.done{opacity:.5;text-decoration:line-through}
+  .cal-chip b{font-weight:600}
+  .cal-more{font-size:10.5px;color:var(--muted);margin-top:1px}
+  .cal-plan{font-size:10.5px;color:var(--forest-ink);font-style:italic;margin-bottom:2px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  /* Week: one column per day, activities listed in time order. A time-grid
+     would need a fixed pixel scale that breaks on a phone, and this app is
+     used on a phone at 3am more than anywhere else. */
+  .cal-week{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+  .cal-wcol{background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:8px;min-height:150px;min-width:0}
+  .cal-wcol.today{border-color:var(--terra);box-shadow:0 0 0 1px var(--terra)}
+  .cal-wh{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:6px}
+  .cal-wh b{display:block;font-size:16px;color:var(--ink);text-transform:none}
+
+  /* Day: the lesson plan. */
+  .cal-obj{display:flex;gap:8px;align-items:center;margin-bottom:14px}
+  .cal-obj input{flex:1;padding:9px 11px;font:inherit;font-size:14px;border:1px solid var(--line);
+    border-radius:8px;background:var(--paper);color:var(--ink)}
+  .cal-row{display:flex;gap:12px;align-items:flex-start;padding:11px 12px;border:1px solid var(--line);
+    border-left-width:4px;border-radius:9px;margin-bottom:8px;background:var(--paper)}
+  .cal-row.done{opacity:.55}
+  .cal-row.done .cal-rn{text-decoration:line-through}
+  .cal-time{font-variant-numeric:tabular-nums;font-size:12px;font-weight:700;color:var(--muted);
+    min-width:104px;flex-shrink:0;padding-top:1px}
+  .cal-rn{font-size:14px;font-weight:600;color:var(--ink)}
+  .cal-rd{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.5;white-space:pre-wrap}
+  .cal-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  .cal-tag{font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:999px;background:var(--ivory);color:var(--muted)}
+  .cal-tag.rep{background:var(--olive-lt);color:var(--forest-dk)}
+  .cal-tag.must{background:var(--terra-lt);color:var(--terra-ink)}
+  .cal-actions{margin-left:auto;display:flex;gap:6px;flex-shrink:0}
+  .cal-tick{width:22px;height:22px;flex-shrink:0;cursor:pointer;margin-top:1px}
+
+  /* Year: twelve mini-months, sized so density is readable at a glance. */
+  .cal-year{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px}
+  .cal-mini{border:1px solid var(--line);border-radius:9px;padding:9px;background:var(--paper)}
+  .cal-mini h4{font-size:12.5px;margin:0 0 7px;color:var(--forest-ink);font-weight:700;cursor:pointer}
+  .cal-mgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+  .cal-md{font-size:9.5px;text-align:center;padding:3px 0;border-radius:3px;color:var(--muted);cursor:pointer;position:relative}
+  .cal-md.has{background:var(--olive-lt);color:var(--forest-dk);font-weight:700}
+  .cal-md.busy{background:var(--forest);color:var(--on-brand);font-weight:700}
+  .cal-md.today{outline:2px solid var(--terra)}
+  .cal-md.pad{visibility:hidden}
+  .cal-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin:10px 0 2px}
+  .cal-legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+
+  .cal-empty{font-size:12.5px;color:var(--muted);padding:16px;text-align:center;
+    border:1px dashed var(--line);border-radius:9px}
+  .cal-daygroup{font-size:12px;font-weight:700;color:var(--forest-ink);margin:16px 0 7px;
+    padding-bottom:5px;border-bottom:1px solid var(--line)}
+
+  /* Activity editor */
+  #actModal{position:fixed;inset:0;z-index:9998;display:flex;align-items:flex-start;justify-content:center;
+    padding:24px 16px;background:rgba(15,23,42,.5);overflow-y:auto}
+  #actModal[hidden]{display:none}
+  .am-card{width:100%;max-width:470px;background:var(--paper);border:1px solid var(--line);
+    border-radius:13px;padding:22px;box-shadow:0 14px 50px rgba(15,23,42,.28)}
+  .am-card h3{margin:0 0 14px;font-family:var(--serif);font-size:19px;color:var(--forest-ink)}
+  .am-row{display:flex;gap:10px}
+  .am-row>.ag-f{flex:1;min-width:0}
+  .am-check{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink);margin-bottom:12px;cursor:pointer}
+  .am-check input{width:17px;height:17px;cursor:pointer}
+  .am-days{display:flex;gap:4px;flex-wrap:wrap}
+  .am-days label{display:flex;align-items:center;justify-content:center;width:38px;height:32px;
+    border:1px solid var(--line);border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;color:var(--muted)}
+  .am-days input{display:none}
+  .am-days input:checked+span{color:var(--on-brand)}
+  .am-days label:has(input:checked){background:var(--forest);border-color:var(--forest);color:var(--on-brand)}
+  .am-card textarea{width:100%;box-sizing:border-box;padding:9px 11px;font:inherit;font-size:14px;
+    color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;resize:vertical}
+  .am-actions{display:flex;gap:9px;align-items:center;margin-top:18px}
+  .am-actions .ag-btn{width:auto;flex:1}
+  .am-del{margin-left:auto;color:var(--terra-ink);border-color:var(--terra)}
+  .am-del:hover{background:var(--terra-lt)}
+  .am-msg{display:none;margin-bottom:12px;padding:9px 11px;border-radius:8px;font-size:12.5px;
+    background:var(--terra-lt);color:var(--terra-ink);border:1px solid var(--terra)}
+  .am-msg.on{display:block}
+
+  @media(max-width:720px){
+    .cal-week{grid-template-columns:1fr}
+    .cal-cell{min-height:64px}
+    .cal-chip{font-size:10px}
+    .cal-time{min-width:84px}
+    .am-row{flex-direction:column;gap:0}
+  }
+  /* On a phone, seven columns leaves ~50px per day - too narrow for any label
+     to survive. Month view drops to density bars: you still see at a glance
+     which days are loaded and with what category, and tapping a day opens the
+     Day view where the detail actually fits. Week and Day views are unaffected,
+     and they are the ones you plan in on a phone anyway. */
+  @media(max-width:560px){
+    .cal-chip{height:5px;padding:0;margin-bottom:3px;border-left:none;border-radius:3px;
+      background:var(--cc,var(--sage));font-size:0;overflow:hidden}
+    .cal-chip b{display:none}
+    .cal-plan{font-size:0;height:5px;background:var(--olive-lt);border-radius:3px;margin-bottom:3px}
+    .cal-more{font-size:9px}
+    .cal-cell{min-height:52px;padding:4px 3px}
+    .cal-dnum{font-size:11px}
+    .cal-dow{font-size:9.5px;padding:5px 2px}
+  }
+  </style>
+
+  <!-- ===================== MY PERSONAL CALENDAR =====================
+       Activities live in S.events - the same array appointments have always
+       used - so everything here reaches the Shift Timeline and the nudge strip
+       through dayBlocks(), with no second store to keep in step. -->
+  <div id="view-cal" hidden>
+    <div class="card">
+      <h2>My Personal Calendar <span class="cnt" id="calCount">0 activities</span></h2>
+      <div class="sub">Your schedule, routines and long-term commitments. Anything with a start and end time also appears on the Board's Shift Timeline and in your daily reminders.</div>
+
+      <div class="cal-bar">
+        <div class="sub-tabs cal-views">
+          <button class="sub-tab on" data-cview="month">Month</button>
+          <button class="sub-tab" data-cview="week">Week</button>
+          <button class="sub-tab" data-cview="day">Day</button>
+          <button class="sub-tab" data-cview="year">Year</button>
+          <button class="sub-tab" data-cview="agenda">Agenda</button>
+          <button class="sub-tab" data-cview="recur">Recurring</button>
+        </div>
+        <div class="cal-nav">
+          <button class="hist-btn" id="calPrev" aria-label="Previous">&lsaquo;</button>
+          <button class="hist-btn" id="calToday">Today</button>
+          <button class="hist-btn" id="calNext" aria-label="Next">&rsaquo;</button>
+          <button class="hist-btn cal-add" id="calAdd">+ New activity</button>
+        </div>
+      </div>
+      <div class="cal-title" id="calTitle"></div>
+      <div id="calBody"></div>
+    </div>
+  </div>
+
+  <!-- Activity editor. One dialog creates and edits, so the two can never
+       drift apart in what they allow. -->
+  <div id="actModal" hidden>
+    <div class="am-card" role="dialog" aria-modal="true" aria-labelledby="amTitle">
+      <h3 id="amTitle">New activity</h3>
+      <div class="am-msg" id="amMsg"></div>
+
+      <div class="ag-f">
+        <label for="amName">Activity</label>
+        <input id="amName" maxlength="120" placeholder="What is it?">
+      </div>
+
+      <div class="am-row">
+        <div class="ag-f"><label for="amDate">Date</label><input id="amDate" type="date"></div>
+        <div class="ag-f"><label for="amCat">Category</label><select id="amCat"></select></div>
+      </div>
+
+      <label class="am-check"><input type="checkbox" id="amAllDay"> All day (no set time)</label>
+
+      <div class="am-row" id="amTimes">
+        <div class="ag-f"><label for="amStart">Start</label><input id="amStart" type="time"></div>
+        <div class="ag-f"><label for="amEnd">End</label><input id="amEnd" type="time"></div>
+      </div>
+
+      <div class="ag-f">
+        <label for="amRepeat">Repeat</label>
+        <select id="amRepeat">
+          <option value="">Does not repeat (one-time)</option>
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+          <option value="monthly">Monthly</option>
+          <option value="yearly">Yearly</option>
+        </select>
+      </div>
+
+      <div id="amRepeatOpts" hidden>
+        <div class="am-row">
+          <div class="ag-f">
+            <label for="amInt">Every</label>
+            <input id="amInt" type="number" min="1" max="99" value="1">
+            <div class="ag-hint" id="amIntUnit">day(s)</div>
+          </div>
+          <div class="ag-f">
+            <label for="amEnds">Ends</label>
+            <select id="amEnds">
+              <option value="never">Never</option>
+              <option value="on">On a date</option>
+              <option value="after">After N times</option>
+            </select>
+          </div>
+        </div>
+        <div class="ag-f" id="amDaysWrap" hidden>
+          <label>On these days</label>
+          <div class="am-days" id="amDays"></div>
+        </div>
+        <div class="ag-f" id="amUntilWrap" hidden>
+          <label for="amUntil">Until</label><input id="amUntil" type="date">
+        </div>
+        <div class="ag-f" id="amCountWrap" hidden>
+          <label for="amCount">Number of times</label>
+          <input id="amCount" type="number" min="1" max="500" value="10">
+        </div>
+      </div>
+
+      <div class="am-row">
+        <div class="ag-f">
+          <label for="amRemind">Remind me</label>
+          <select id="amRemind">
+            <option value="0">No reminder</option>
+            <option value="10">10 minutes before</option>
+            <option value="30">30 minutes before</option>
+            <option value="60">1 hour before</option>
+            <option value="120" selected>2 hours before</option>
+            <option value="240">4 hours before</option>
+          </select>
+        </div>
+        <div class="ag-f">
+          <label for="amLane">Link to lane</label>
+          <select id="amLane"></select>
+        </div>
+      </div>
+
+      <label class="am-check"><input type="checkbox" id="amMust"> Must attend (stronger reminder)</label>
+
+      <div class="ag-f">
+        <label for="amNotes">Notes / what to accomplish</label>
+        <textarea id="amNotes" rows="3" maxlength="1000" placeholder="The lesson-plan detail: what this session is for, what done looks like."></textarea>
+      </div>
+
+      <div class="am-actions">
+        <button class="ag-btn" id="amSave">Save activity</button>
+        <button class="ag-btn ghost" id="amCancel">Cancel</button>
+        <button class="hist-btn am-del" id="amDelete" hidden>Delete</button>
+      </div>
+    </div>
+  </div>
+
   <div class="saved" id="saved"></div>
   <div class="foot">
     <button id="exportBtn">Export backup</button>
@@ -1251,6 +1507,11 @@ function norm(s){
   if(!s.days)s.days={};
   if(typeof s.focus!=="boolean")s.focus=false;
   if(!Array.isArray(s.events))s.events=[];
+  /* The day's intent, in one line - the "objective" at the top of a lesson
+     plan. Kept in its own map rather than on an activity because a day can
+     have a purpose before anything is scheduled on it, and because the day
+     it describes outlives any single activity moved off it. */
+  if(!s.plans||typeof s.plans!=="object")s.plans={};
   if(!Array.isArray(s.lanes)||!s.lanes.length)
     s.lanes=DEFAULT_LANES.map(function(L){return {id:L.id,name:L.name,color:L.color,ritual:L.ritual};});
   if(!Array.isArray(s.rituals))
@@ -1512,7 +1773,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="2.0";
+var APP_VERSION="2.1";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -1523,6 +1784,7 @@ var APP_VERSION="2.0";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-04T22:10:00+08:00",text:"Added My Personal Calendar — month, week, day, year, agenda and recurring views for your own schedule. Activities can repeat daily, weekly, monthly or yearly, each day can carry an objective like a lesson plan, and anything with a start and end time automatically shows on the Board's Shift Timeline and in your daily reminders."},
   {ts:"2026-08-15T21:40:00+08:00",text:"ProDash now asks you to log in. Everyone gets their own separate board that follows them to any device, instead of one shared board behind one shared password. Includes sign-up, forgot-password with a secret question, and a 15-minute lock after three wrong passwords."},
   {ts:"2026-08-15T20:24:11+08:00",text:"Added this tab — a plain-English update log for the app itself, separate from the board's own change history."},
   {ts:"2026-08-15T20:17:46+08:00",text:"Removed the old Shutdown ritual card. Timeline items like Sleep and Wake + prep can now be deleted. Every appointment sends a reminder, not just must-attend ones."},
@@ -1548,8 +1810,8 @@ var APP_VERSION_HISTORY=[
    pushed" is per-account, though - it tracks a specific board's revisions. */
 var DEV_KEY="prodash.deviceId", DEV_NAME_KEY="prodash.deviceName", PUSHED_KEY=PDAuth.ns("prodash.pushedUpTo");
 var HIST_CAP=400, CKPT_EVERY=25, BATCH_MS=2500;
-var BOARD_KEYS=["tasks","log","days","events","lanes","rituals","focus","theme","hiddenBlocks"];
-var KEYED=["tasks","events","lanes","rituals"], MAPS=["log","days"], SCALARS=["focus","theme"];
+var BOARD_KEYS=["tasks","log","days","events","lanes","rituals","focus","theme","hiddenBlocks","plans"];
+var KEYED=["tasks","events","lanes","rituals"], MAPS=["log","days","plans"], SCALARS=["focus","theme"];
 // Plain arrays of primitive ids (not objects with their own .id, so KEYED's
 // per-item union doesn't apply) compared by CONTENT, not reference - a
 // cloned snapshot never shares object identity with the live array even
@@ -1942,13 +2204,137 @@ function fmt(hhmm){var p=hhmm.split(":"),h=+p[0],m=p[1],ap=h<12?"am":"pm",hh=h%1
 
 function dowOf(k){var p=k.split("-");return new Date(+p[0],+p[1]-1,+p[2]).getDay();}
 
+/* ================= Personal Calendar: the recurrence engine ================
+   An activity is an S.events row. A one-off has rr:null and shows on its own
+   date, exactly as appointments always have - which is why every appointment
+   that existed before this feature keeps working untouched.
+
+   A recurring activity stores a RULE, never a list of dates:
+       rr = {f:"daily"|"weekly"|"monthly"|"yearly", int:N, days:[0-6], until:"YYYY-MM-DD"|null}
+   and occursOn() answers "does this land on that day?" arithmetically. Storing
+   the rule rather than expanded copies is what keeps a daily habit from
+   becoming 365 rows a year in a document that gets pushed to the Worker whole
+   on mobile data - and it means editing the rule retroactively fixes every
+   occurrence instead of leaving stale copies behind.
+
+   "Ends after N times" is converted to a concrete `until` date when the rule
+   is saved (see ruleEndDate). That keeps this function O(1) per day - no
+   counting from the anchor on every cell of a year view - at the cost of
+   recomputing `until` whenever the rule is edited, which is the cheaper side.
+
+   Exceptions live in e.ex: date keys where a single occurrence was deleted.  */
+function dnum(k){var p=k.split("-");return Date.UTC(+p[0],+p[1]-1,+p[2])/86400000;}
+function dparts(k){var p=k.split("-");return {y:+p[0],m:+p[1]-1,d:+p[2]};}
+function daysInMonth(y,m){return new Date(y,m+1,0).getDate();}
+function addDays(k,n){return shift(k,n);}
+function monthKey(y,m){return y+"-"+String(m+1).padStart(2,"0");}
+
+function occursOn(e,k){
+  if(!e||!e.date)return false;
+  if(e.ex&&e.ex.indexOf(k)>=0)return false;       // this one occurrence was deleted
+  if(!e.rr)return e.date===k;
+  if(k<e.date)return false;                        // never before it starts
+  var r=e.rr,iv=Math.max(1,+r.int||1);
+  if(r.until&&k>r.until)return false;
+  var a=dparts(e.date),b=dparts(k);
+  if(r.f==="daily")   return ((dnum(k)-dnum(e.date))%iv)===0;
+  if(r.f==="weekly"){
+    var days=(r.days&&r.days.length)?r.days:[dowOf(e.date)];
+    if(days.indexOf(dowOf(k))<0)return false;
+    // Cycle counted from each date's own week start, so "every 2 weeks" stays
+    // aligned to the anchor's week no matter which weekday within it is asked
+    // about - measuring from the raw dates would drift for any day earlier in
+    // the week than the anchor.
+    var wa=dnum(e.date)-dowOf(e.date),wk=dnum(k)-dowOf(k);
+    return (((wk-wa)/7)%iv)===0;
+  }
+  if(r.f==="monthly"){
+    // The 31st clamps to the last day in shorter months rather than silently
+    // skipping them - a monthly commitment shouldn't vanish in February.
+    if(b.d!==Math.min(a.d,daysInMonth(b.y,b.m)))return false;
+    return ((((b.y-a.y)*12)+(b.m-a.m))%iv)===0;
+  }
+  if(r.f==="yearly"){
+    if(b.m!==a.m)return false;
+    if(b.d!==Math.min(a.d,daysInMonth(b.y,b.m)))return false;   // 29 Feb clamps
+    return ((b.y-a.y)%iv)===0;
+  }
+  return false;
+}
+
+/* Walk forward from the anchor to find the date of the Nth occurrence, used
+   only when the user chooses "ends after N times". Bounded so a malformed rule
+   can never spin: 4000 days is ~11 years, past any horizon this app plans on. */
+function ruleEndDate(anchor,rr,count){
+  if(!rr||!count||count<1)return null;
+  var probe={date:anchor,rr:{f:rr.f,int:rr.int,days:rr.days,until:null},ex:[]};
+  var seen=0,k=anchor;
+  for(var i=0;i<4000;i++){
+    if(occursOn(probe,k)){seen++;if(seen>=count)return k;}
+    k=addDays(k,1);
+  }
+  return null;
+}
+
+// Every activity landing on a date, in start-time order. All-day items sort
+// first because they frame the day rather than sit at a point in it.
+function activitiesOn(k){
+  return (S.events||[]).filter(function(e){return occursOn(e,k);})
+    .sort(function(a,b){
+      if(!!a.allDay!==!!b.allDay)return a.allDay?-1:1;
+      if(a.allDay&&b.allDay)return 0;
+      return sm(a.s||"00:00")-sm(b.s||"00:00");
+    });
+}
+function isDone(e,k){return !!(e.done&&e.done[k]);}
+function catOf(e){
+  for(var i=0;i<CATS.length;i++)if(CATS[i].id===(e.cat||"personal"))return CATS[i];
+  return CATS[CATS.length-1];
+}
+var CATS=[
+  {id:"work",     n:"Work",     c:"var(--ln-dayclient)"},
+  {id:"study",    n:"Learning", c:"var(--ln-grow)"},
+  {id:"health",   n:"Health",   c:"var(--olive)"},
+  {id:"family",   n:"Family",   c:"var(--ln-x3)"},
+  {id:"admin",    n:"Admin",    c:"var(--ln-other)"},
+  {id:"personal", n:"Personal", c:"var(--ln-x2)"}
+];
+// Plain-English rule summary, shown wherever an activity is listed so a
+// recurring item explains itself without opening the editor.
+function rruleText(e){
+  if(!e.rr)return "One-time";
+  var r=e.rr,iv=Math.max(1,+r.int||1),s;
+  var DW=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  if(r.f==="daily")   s=iv===1?"Every day":"Every "+iv+" days";
+  else if(r.f==="weekly"){
+    var days=(r.days&&r.days.length)?r.days.slice().sort():[dowOf(e.date)];
+    s=(iv===1?"Weekly":"Every "+iv+" weeks")+" on "+days.map(function(d){return DW[d];}).join(", ");
+  }
+  else if(r.f==="monthly") s=(iv===1?"Monthly":"Every "+iv+" months")+" on day "+dparts(e.date).d;
+  else if(r.f==="yearly")  s=iv===1?"Every year":"Every "+iv+" years";
+  else s="Repeats";
+  if(r.until)s+=" until "+r.until;
+  return s;
+}
+
 // The shift as actually lived: recurring blocks that apply to this weekday,
 // plus any one-off appointments booked for this date, in clock order.
 function dayBlocks(k){
   k=k||today();
   var dow=dowOf(k),hidden=S.hiddenBlocks||[];
   var out=BLOCKS.filter(function(b){return (!b.days||b.days.indexOf(dow)>=0)&&hidden.indexOf(b.id)<0;});
-  S.events.forEach(function(e){if(e.date===k)out.push(e);});
+  /* Calendar activities reach the Shift Timeline through here, which is why
+     there is no second scheduling store and nothing to keep in sync: the
+     timeline, the "now" bar and the nudges all read this one function, so a
+     recurring activity created in the Calendar tab simply appears in all three.
+     All-day items are deliberately excluded - the timeline is laid out by
+     start/end minute and something spanning the whole day has no position in
+     it. They surface in the Calendar and in nudges instead. */
+  S.events.forEach(function(e){
+    if(!occursOn(e,k))return;
+    if(e.allDay||!e.s||!e.e)return;
+    out.push(e);
+  });
   return out.sort(function(a,b){return sm(a.s)-sm(b.s);});
 }
 
@@ -2050,17 +2436,41 @@ function renderNudges(){
   // Every upcoming appointment gets a heads-up, not just must-attend ones -
   // but must-attend still gets its own more emphatic tier (apt-must) so it
   // doesn't blend in with an appointment that's fine to run a few minutes late on.
+  /* Reminders are DERIVED from the calendar every time this runs, never stored
+     alongside it. That is the whole reason editing, rescheduling or deleting an
+     activity keeps its reminders correct with no separate bookkeeping: there is
+     nothing to update, because the reminder was never a separate thing. A
+     recurring activity notifies on each occurrence for the same reason. */
+  var tk=today();
+  // All-day activities have no start minute to count down to, so they announce
+  // themselves once, up front, as the frame for the day.
+  (S.events||[]).forEach(function(e){
+    if(!e.allDay||!occursOn(e,tk)||isDone(e,tk))return;
+    out.push(["","allday-"+e.id,"<b>"+esc(e.n)+"</b> — all day today"+
+      (e.rr?" · "+esc(rruleText(e)):"")+(e.d?". "+esc(e.d):"")]);
+  });
   dayBlocks().forEach(function(b){
     if(!b.ev)return;
+    if(isDone(b,tk))return;                    // already ticked off today
     var cls=b.must?"apt-must":"apt";
     var st=sm(b.s),mins=st-n;
-    if(mins>0&&mins<=120)
-      out.push([cls,"appt-soon-"+b.id,"<b>"+esc(b.n)+" at "+fmt(b.s)+" — in "+
+    // Per-activity lead time, set in the Calendar editor. 120 minutes stays the
+    // default so every appointment that predates this feature warns exactly as
+    // it used to; 0 means the user asked for no advance warning at all.
+    var lead=(b.remind===undefined||b.remind===null)?120:+b.remind;
+    var rep=b.rr?' <span class="apt">↻</span>':'';
+    if(lead>0&&mins>0&&mins<=lead)
+      out.push([cls,"appt-soon-"+b.id,"<b>"+esc(b.n)+rep+" at "+fmt(b.s)+" — in "+
         (mins>=60?Math.floor(mins/60)+"h "+(mins%60)+"m":mins+" min")+".</b> "+
         (b.must?"You marked this one must-attend. Start closing down what you're on now.":"")]);
     else if(n>=st&&n<smEnd(b.e))
-      out.push([cls,"appt-now-"+b.id,"<b>"+esc(b.n)+" is happening now</b> — until "+fmt(b.e)+"."]);
+      out.push([cls,"appt-now-"+b.id,"<b>"+esc(b.n)+rep+" is happening now</b> — until "+fmt(b.e)+"."]);
   });
+  // Tomorrow's first commitment, once today's shift is winding down.
+  if(n>sm("04:00")){
+    var tm=activitiesOn(shift(tk,1)).filter(function(e){return !e.allDay&&e.s;})[0];
+    if(tm)out.push(["","tomorrow-first","<b>First up tomorrow: "+esc(tm.n)+" at "+fmt(tm.s)+".</b>"]);
+  }
   var stale=S.tasks.filter(function(t){return !t.done&&ageOf(t)>=3;}).length;
   if(stale)out.push(["","stale-tasks","<b>"+stale+" task"+(stale>1?"s have":" has")+" been open 3+ shifts.</b> Do it, delegate it, or delete it."]);
 
@@ -2160,7 +2570,17 @@ function renderTimeline(forceCenter){
       (b.ev?'<button class="x" title="Remove this appointment">&times;</button>'
            :'<button class="x" title="Remove this from your daily schedule">&times;</button>');
     if(b.ev) el.querySelector(".x").addEventListener("click",function(){
-      S.events=S.events.filter(function(x){return x.id!==b.id;});
+      // A recurring activity has two possible meanings for "remove", and
+      // guessing wrong destroys a whole series to cancel one day. Ask.
+      if(b.rr){
+        var k=today();
+        var one=confirm('"'+b.n+'" repeats ('+rruleText(b)+').\n\nOK = remove only today\'s occurrence.\nCancel = leave it alone (delete the whole series from the Calendar tab).');
+        if(!one)return;
+        var ev=S.events.filter(function(x){return x.id===b.id;})[0];
+        if(ev){ev.ex=(ev.ex||[]).concat([k]);}
+      }else{
+        S.events=S.events.filter(function(x){return x.id!==b.id;});
+      }
       save();renderAll();});
     else el.querySelector(".x").addEventListener("click",function(){
       // Unlike an appointment (a single dated occurrence), this is a
@@ -2865,6 +3285,7 @@ function applyImport(d,label){
 }
 
 document.getElementById("tabBoard").addEventListener("click",function(){setView("board");});
+document.getElementById("tabCal").addEventListener("click",function(){setView("cal");});
 document.getElementById("tabReports").addEventListener("click",function(){setView("reports");});
 document.getElementById("tabHistory").addEventListener("click",function(){setView("history");});
 document.querySelectorAll(".sub-tab").forEach(function(b){
@@ -2874,17 +3295,435 @@ document.querySelectorAll(".sub-tab").forEach(function(b){
     renderHistory();
   });
 });
+/* ==================== MY PERSONAL CALENDAR: views ==========================
+   Every view reads S.events through occursOn(); none of them keep their own
+   copy of anything. Editing an activity therefore updates the month, the week,
+   the day plan, the Shift Timeline and the reminders in one save, because they
+   are six renderings of one array rather than six stores.
+
+   A note on dates that matters here: an activity's `date` is a SHIFT key, not
+   a wall-clock date, because that is what the Board has always used and what
+   dayBlocks() expects. The shift rolls at 07:00, so for anything scheduled
+   from 7am onward the two are identical; only a 00:00-06:59 activity belongs
+   to the previous day's shift. The editor says so out loud rather than quietly
+   filing a 3am session on the wrong day.                                    */
+var calView="month", calCursor=today();
+var MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+var DOW=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+function weekStartOf(k){return addDays(k,-dowOf(k));}
+function nextOccurrence(e,from){
+  var k=from||today();
+  for(var i=0;i<400;i++){ if(occursOn(e,k))return k; k=addDays(k,1); }
+  return null;
+}
+function calTitleFor(){
+  var p=dparts(calCursor);
+  if(calView==="year")return String(p.y);
+  if(calView==="day")return new Date(p.y,p.m,p.d).toLocaleDateString(undefined,{weekday:"long",year:"numeric",month:"long",day:"numeric"});
+  if(calView==="week"){
+    var a=weekStartOf(calCursor),b=addDays(a,6),pa=dparts(a),pb=dparts(b);
+    return MONTHS[pa.m].slice(0,3)+" "+pa.d+" – "+MONTHS[pb.m].slice(0,3)+" "+pb.d+", "+pb.y;
+  }
+  if(calView==="agenda")return "Next 30 days";
+  if(calView==="recur")return "Recurring commitments";
+  return MONTHS[p.m]+" "+p.y;
+}
+
+function renderCalendar(){
+  var n=(S.events||[]).length;
+  document.getElementById("calCount").textContent=n+" activit"+(n===1?"y":"ies");
+  document.getElementById("calTitle").textContent=calTitleFor();
+  document.querySelectorAll("[data-cview]").forEach(function(b){
+    b.classList.toggle("on",b.dataset.cview===calView);});
+  var body=document.getElementById("calBody");
+  body.innerHTML =
+      calView==="month" ? calMonthHTML()
+    : calView==="week"  ? calWeekHTML()
+    : calView==="day"   ? calDayHTML()
+    : calView==="year"  ? calYearHTML()
+    : calView==="recur" ? calRecurHTML()
+    :                     calAgendaHTML();
+  wireCalBody();
+}
+
+function chipHTML(e,k){
+  var c=catOf(e);
+  return '<div class="cal-chip'+(isDone(e,k)?" done":"")+'" data-open="'+esc(e.id)+'" data-k="'+k+'" '+
+    // --cc carries the category colour independently of the border, so the
+    // phone layout can paint the whole bar with it once the label is gone.
+    'style="border-left-color:'+c.c+';--cc:'+c.c+'" title="'+esc(e.n)+(e.rr?" · "+esc(rruleText(e)):"")+'">'+
+    (e.allDay?"":'<b>'+fmt(e.s)+'</b> ')+esc(e.n)+(e.rr?" ↻":"")+'</div>';
+}
+
+function calMonthHTML(){
+  var p=dparts(calCursor),first=monthKey(p.y,p.m)+"-01";
+  var lead=dowOf(first),total=daysInMonth(p.y,p.m),tk=today();
+  var cells=[],start=addDays(first,-lead);
+  for(var i=0;i<42;i++)cells.push(addDays(start,i));
+  var out='<div class="cal-grid">'+DOW.map(function(d){return '<div class="cal-dow">'+d+'</div>';}).join("");
+  cells.forEach(function(k){
+    var kp=dparts(k),inMonth=(kp.m===p.m&&kp.y===p.y),list=activitiesOn(k);
+    var plan=(S.plans[k]&&S.plans[k].note)||"";
+    out+='<div class="cal-cell'+(inMonth?"":" out")+(k===tk?" today":"")+'" data-day="'+k+'">'+
+      '<div class="cal-dnum">'+kp.d+'</div>'+
+      (plan?'<div class="cal-plan" title="'+esc(plan)+'">◎ '+esc(plan)+'</div>':"")+
+      list.slice(0,3).map(function(e){return chipHTML(e,k);}).join("")+
+      (list.length>3?'<div class="cal-more">+'+(list.length-3)+' more</div>':"")+
+    '</div>';
+  });
+  return out+'</div>'+calLegend();
+}
+
+function calLegend(){
+  return '<div class="cal-legend">'+CATS.map(function(c){
+    return '<span><i style="background:'+c.c+'"></i>'+c.n+'</span>';}).join("")+
+    '<span>↻ repeats</span><span>◎ day objective</span></div>';
+}
+
+function calWeekHTML(){
+  var a=weekStartOf(calCursor),tk=today(),out='<div class="cal-week">';
+  for(var i=0;i<7;i++){
+    var k=addDays(a,i),kp=dparts(k),list=activitiesOn(k);
+    var plan=(S.plans[k]&&S.plans[k].note)||"";
+    out+='<div class="cal-wcol'+(k===tk?" today":"")+'" data-day="'+k+'">'+
+      '<div class="cal-wh">'+DOW[dowOf(k)]+'<b>'+kp.d+'</b></div>'+
+      (plan?'<div class="cal-plan">◎ '+esc(plan)+'</div>':"")+
+      (list.length?list.map(function(e){return chipHTML(e,k);}).join("")
+                  :'<div class="cal-more">Nothing scheduled</div>')+
+    '</div>';
+  }
+  return out+'</div>'+calLegend();
+}
+
+/* The lesson plan. One objective for the day, then the day's activities in
+   order with what each is for and whether it is done. */
+function calDayHTML(){
+  var k=calCursor,list=activitiesOn(k);
+  var plan=(S.plans[k]&&S.plans[k].note)||"";
+  var out='<div class="cal-obj"><input id="calPlanIn" maxlength="200" placeholder="Objective for this day — what does a good day here look like?" value="'+esc(plan)+'">'+
+          '<button class="hist-btn" id="calPlanSave">Save</button></div>';
+  if(!list.length)
+    return out+'<div class="cal-empty">Nothing scheduled. Use <b>+ New activity</b>, or click a day in Month view.</div>';
+  var doneN=list.filter(function(e){return isDone(e,k);}).length;
+  out+='<div class="rep-totals"><div><b>'+list.length+'</b>scheduled</div>'+
+       '<div><b>'+doneN+'</b>done</div>'+
+       '<div><b>'+(list.length-doneN)+'</b>remaining</div></div>';
+  list.forEach(function(e){
+    var c=catOf(e);
+    out+='<div class="cal-row'+(isDone(e,k)?" done":"")+'" style="border-left-color:'+c.c+'">'+
+      '<input type="checkbox" class="cal-tick" data-tick="'+esc(e.id)+'" data-k="'+k+'"'+(isDone(e,k)?" checked":"")+' aria-label="Mark done">'+
+      '<div class="cal-time">'+(e.allDay?"All day":fmt(e.s)+" – "+fmt(e.e))+'</div>'+
+      '<div style="flex:1;min-width:0">'+
+        '<div class="cal-rn">'+esc(e.n)+'</div>'+
+        (e.d?'<div class="cal-rd">'+esc(e.d)+'</div>':"")+
+        '<div class="cal-meta"><span class="cal-tag" style="color:'+c.c+'">'+c.n+'</span>'+
+          (e.rr?'<span class="cal-tag rep">↻ '+esc(rruleText(e))+'</span>':'<span class="cal-tag">One-time</span>')+
+          (e.must?'<span class="cal-tag must">Must attend</span>':"")+
+          (e.lane?'<span class="cal-tag">'+esc(laneName(e.lane))+'</span>':"")+
+        '</div>'+
+      '</div>'+
+      '<div class="cal-actions"><button class="hist-btn" data-open="'+esc(e.id)+'" data-k="'+k+'">Edit</button></div>'+
+    '</div>';
+  });
+  return out;
+}
+function laneName(id){
+  var L=(S.lanes||[]).filter(function(x){return x.id===id;})[0];
+  return L?L.name:id;
+}
+
+function calYearHTML(){
+  var y=dparts(calCursor).y,tk=today(),out='<div class="cal-year">';
+  for(var m=0;m<12;m++){
+    var total=daysInMonth(y,m),lead=dowOf(monthKey(y,m)+"-01");
+    out+='<div class="cal-mini"><h4 data-month="'+monthKey(y,m)+'-01">'+MONTHS[m]+'</h4><div class="cal-mgrid">';
+    for(var p=0;p<lead;p++)out+='<div class="cal-md pad">·</div>';
+    for(var d=1;d<=total;d++){
+      var k=monthKey(y,m)+"-"+String(d).padStart(2,"0"),c=activitiesOn(k).length;
+      out+='<div class="cal-md'+(c>=3?" busy":(c?" has":""))+(k===tk?" today":"")+'" data-day="'+k+'" '+
+           'title="'+k+" · "+c+' activit'+(c===1?"y":"ies")+'">'+d+'</div>';
+    }
+    out+='</div></div>';
+  }
+  out+='</div><div class="cal-legend"><span><i style="background:var(--olive-lt)"></i>1–2 activities</span>'+
+       '<span><i style="background:var(--forest)"></i>3+ activities</span>'+
+       '<span><i style="background:var(--terra)"></i>today</span></div>';
+  // A year view exists to show commitments, so name them rather than making
+  // the density squares carry all the meaning.
+  var rec=(S.events||[]).filter(function(e){return e.rr;});
+  if(rec.length){
+    out+='<div class="cal-daygroup">Recurring through '+y+'</div>';
+    rec.forEach(function(e){
+      var c=catOf(e);
+      out+='<div class="cal-row" style="border-left-color:'+c.c+'">'+
+        '<div class="cal-time">'+(e.allDay?"All day":fmt(e.s))+'</div>'+
+        '<div style="flex:1;min-width:0"><div class="cal-rn">'+esc(e.n)+'</div>'+
+        '<div class="cal-meta"><span class="cal-tag rep">↻ '+esc(rruleText(e))+'</span>'+
+        '<span class="cal-tag" style="color:'+c.c+'">'+c.n+'</span></div></div>'+
+        '<div class="cal-actions"><button class="hist-btn" data-open="'+esc(e.id)+'" data-k="'+(nextOccurrence(e,today())||e.date)+'">Edit</button></div>'+
+      '</div>';
+    });
+  }
+  return out;
+}
+
+function calAgendaHTML(){
+  var out="",any=false,k=today();
+  for(var i=0;i<30;i++){
+    var list=activitiesOn(k);
+    if(list.length){
+      any=true;
+      var kp=dparts(k);
+      out+='<div class="cal-daygroup">'+(i===0?"Today · ":i===1?"Tomorrow · ":"")+
+        DOW[dowOf(k)]+", "+MONTHS[kp.m]+" "+kp.d+'</div>';
+      out+=list.map(function(e){
+        var c=catOf(e);
+        return '<div class="cal-row'+(isDone(e,k)?" done":"")+'" style="border-left-color:'+c.c+'">'+
+          '<div class="cal-time">'+(e.allDay?"All day":fmt(e.s)+" – "+fmt(e.e))+'</div>'+
+          '<div style="flex:1;min-width:0"><div class="cal-rn">'+esc(e.n)+'</div>'+
+          (e.d?'<div class="cal-rd">'+esc(e.d)+'</div>':"")+
+          '<div class="cal-meta"><span class="cal-tag" style="color:'+c.c+'">'+c.n+'</span>'+
+          (e.rr?'<span class="cal-tag rep">↻</span>':"")+
+          (e.must?'<span class="cal-tag must">Must attend</span>':"")+'</div></div>'+
+          '<div class="cal-actions"><button class="hist-btn" data-open="'+esc(e.id)+'" data-k="'+k+'">Edit</button></div>'+
+        '</div>';
+      }).join("");
+    }
+    k=addDays(k,1);
+  }
+  return any?out:'<div class="cal-empty">Nothing scheduled in the next 30 days.</div>';
+}
+
+function calRecurHTML(){
+  var rec=(S.events||[]).filter(function(e){return e.rr;});
+  if(!rec.length)return '<div class="cal-empty">No recurring activities yet. Create one and set <b>Repeat</b> to daily, weekly, monthly or yearly.</div>';
+  var byCat={};
+  rec.forEach(function(e){var c=catOf(e).id;(byCat[c]=byCat[c]||[]).push(e);});
+  var out="";
+  CATS.forEach(function(c){
+    if(!byCat[c.id])return;
+    out+='<div class="cal-daygroup">'+c.n+'</div>';
+    byCat[c.id].forEach(function(e){
+      var nx=nextOccurrence(e,today());
+      out+='<div class="cal-row" style="border-left-color:'+c.c+'">'+
+        '<div class="cal-time">'+(e.allDay?"All day":fmt(e.s)+" – "+fmt(e.e))+'</div>'+
+        '<div style="flex:1;min-width:0"><div class="cal-rn">'+esc(e.n)+'</div>'+
+        (e.d?'<div class="cal-rd">'+esc(e.d)+'</div>':"")+
+        '<div class="cal-meta"><span class="cal-tag rep">↻ '+esc(rruleText(e))+'</span>'+
+        '<span class="cal-tag">Next: '+(nx||"—")+'</span>'+
+        ((e.ex&&e.ex.length)?'<span class="cal-tag">'+e.ex.length+' skipped</span>':"")+'</div></div>'+
+        '<div class="cal-actions"><button class="hist-btn" data-open="'+esc(e.id)+'" data-k="'+(nx||e.date)+'">Edit</button></div>'+
+      '</div>';
+    });
+  });
+  return out;
+}
+
+function wireCalBody(){
+  var body=document.getElementById("calBody");
+  body.querySelectorAll("[data-open]").forEach(function(el){
+    el.addEventListener("click",function(ev){
+      ev.stopPropagation();                       // don't also trigger the day cell
+      openActivity(el.dataset.open,el.dataset.k);
+    });
+  });
+  body.querySelectorAll("[data-tick]").forEach(function(el){
+    el.addEventListener("click",function(ev){
+      ev.stopPropagation();
+      var e=(S.events||[]).filter(function(x){return x.id===el.dataset.tick;})[0];
+      if(!e)return;
+      // Completion is per DATE, not per activity - ticking today's occurrence
+      // of a daily habit must not mark the whole series done forever.
+      e.done=e.done||{};
+      if(el.checked)e.done[el.dataset.k]=true; else delete e.done[el.dataset.k];
+      save();renderAll();renderCalendar();
+    });
+  });
+  // Clicking a day opens that day, from every view - the calendar is for
+  // reviewing at a glance and then drilling in, so a click means "show me this
+  // day", not "create something". Creating is what + New activity is for, and
+  // it uses whichever day is in view, so the two-step still lands on the right
+  // date. (Opening the editor straight from a cell was the first cut, and it
+  // made an accidental click feel like a mistake to undo rather than a place
+  // to look.)
+  body.querySelectorAll("[data-day]").forEach(function(el){
+    el.addEventListener("click",function(){
+      calCursor=el.dataset.day; calView="day"; renderCalendar();
+    });
+  });
+  body.querySelectorAll("[data-month]").forEach(function(el){
+    el.addEventListener("click",function(ev){
+      ev.stopPropagation();
+      calCursor=el.dataset.month;calView="month";renderCalendar();
+    });
+  });
+  var pin=document.getElementById("calPlanSave");
+  if(pin)pin.addEventListener("click",function(){
+    var v=document.getElementById("calPlanIn").value.trim(),k=calCursor;
+    if(v)S.plans[k]={note:v}; else delete S.plans[k];
+    save();renderCalendar();stamp("Day objective saved");
+  });
+}
+
+/* ---------------- activity editor ---------------- */
+var amEditing=null, amDate=null;
+
+function amEl(id){return document.getElementById(id);}
+function amMsg(t){var m=amEl("amMsg");m.textContent=t||"";m.className="am-msg"+(t?" on":"");}
+
+function amSyncRepeatUI(){
+  var f=amEl("amRepeat").value;
+  amEl("amRepeatOpts").hidden=!f;
+  amEl("amDaysWrap").hidden=(f!=="weekly");
+  amEl("amIntUnit").textContent={daily:"day(s)",weekly:"week(s)",monthly:"month(s)",yearly:"year(s)"}[f]||"";
+  var ends=amEl("amEnds").value;
+  amEl("amUntilWrap").hidden=(ends!=="on");
+  amEl("amCountWrap").hidden=(ends!=="after");
+}
+function amSyncAllDay(){ amEl("amTimes").hidden=amEl("amAllDay").checked; }
+
+function openActivity(id,dateKey){
+  amEditing=id||null; amDate=dateKey||today(); amMsg("");
+  var e=id?(S.events||[]).filter(function(x){return x.id===id;})[0]:null;
+
+  amEl("amTitle").textContent=e?"Edit activity":"New activity";
+  amEl("amDelete").hidden=!e;
+  amEl("amName").value=e?e.n:"";
+  amEl("amDate").value=e?e.date:amDate;
+  amEl("amAllDay").checked=e?!!e.allDay:false;
+  amEl("amStart").value=e&&e.s?e.s:"09:00";
+  amEl("amEnd").value=e&&e.e?e.e:"10:00";
+  amEl("amNotes").value=e?(e.d||""):"";
+  amEl("amMust").checked=e?!!e.must:false;
+  amEl("amRemind").value=e&&e.remind!==undefined&&e.remind!==null?String(e.remind):"120";
+
+  amEl("amCat").innerHTML=CATS.map(function(c){
+    return '<option value="'+c.id+'"'+((e&&e.cat===c.id)||(!e&&c.id==="personal")?" selected":"")+'>'+c.n+'</option>';}).join("");
+  amEl("amLane").innerHTML='<option value="">None</option>'+(S.lanes||[]).map(function(L){
+    return '<option value="'+esc(L.id)+'"'+(e&&e.lane===L.id?" selected":"")+'>'+esc(L.name)+'</option>';}).join("");
+
+  amEl("amDays").innerHTML=DOW.map(function(d,i){
+    var on=e&&e.rr&&e.rr.days&&e.rr.days.indexOf(i)>=0;
+    return '<label><input type="checkbox" value="'+i+'"'+(on?" checked":"")+'><span>'+d+'</span></label>';}).join("");
+
+  var r=e&&e.rr;
+  amEl("amRepeat").value=r?r.f:"";
+  amEl("amInt").value=r?(r.int||1):1;
+  amEl("amEnds").value=r&&r.until?"on":"never";
+  amEl("amUntil").value=r&&r.until?r.until:"";
+  amEl("amCount").value=10;
+  amSyncRepeatUI(); amSyncAllDay();
+  amEl("actModal").hidden=false;
+  setTimeout(function(){try{amEl("amName").focus();}catch(x){}},30);
+}
+function closeActivity(){ amEl("actModal").hidden=true; amEditing=null; }
+
+function amSave(){
+  var name=amEl("amName").value.trim();
+  if(!name){amMsg("Give the activity a name.");return;}
+  var date=amEl("amDate").value; if(!date){amMsg("Pick a date.");return;}
+  var allDay=amEl("amAllDay").checked, s=amEl("amStart").value, en=amEl("amEnd").value;
+  if(!allDay){
+    if(!s||!en){amMsg("An activity needs a start and an end time, or mark it all-day.");return;}
+    if(s===en){amMsg("Start and end are the same time.");return;}
+  }
+  var f=amEl("amRepeat").value, rr=null;
+  if(f){
+    var days=[].slice.call(amEl("amDays").querySelectorAll("input:checked")).map(function(i){return +i.value;});
+    if(f==="weekly"&&!days.length)days=[dowOf(date)];
+    rr={f:f,int:Math.max(1,+amEl("amInt").value||1),days:f==="weekly"?days:[],until:null};
+    var ends=amEl("amEnds").value;
+    if(ends==="on"){
+      rr.until=amEl("amUntil").value||null;
+      if(rr.until&&rr.until<date){amMsg("The end date is before the start date.");return;}
+    }else if(ends==="after"){
+      // Converted to a concrete date now so occursOn() stays O(1) later.
+      rr.until=ruleEndDate(date,rr,Math.max(1,+amEl("amCount").value||1));
+    }
+  }
+  var e=amEditing?(S.events||[]).filter(function(x){return x.id===amEditing;})[0]:null;
+  if(!e){ e={id:"evt_"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),ev:true,done:{},ex:[]}; S.events.push(e); }
+  e.n=name; e.date=date; e.allDay=allDay;
+  e.s=allDay?"":s; e.e=allDay?"":en;
+  e.d=amEl("amNotes").value.trim();
+  e.cat=amEl("amCat").value;
+  e.lane=amEl("amLane").value||null;
+  e.must=amEl("amMust").checked;
+  e.remind=+amEl("amRemind").value;
+  e.rr=rr; e.ev=true;
+  if(!e.done)e.done={}; if(!e.ex)e.ex=[];
+  save(); closeActivity(); renderAll(); renderCalendar();
+  stamp(amEditing?"Activity updated":"Activity added");
+}
+
+function amDelete(){
+  var e=(S.events||[]).filter(function(x){return x.id===amEditing;})[0];
+  if(!e)return closeActivity();
+  if(e.rr){
+    var one=confirm('"'+e.n+'" repeats ('+rruleText(e)+').\n\nOK = skip only '+amDate+'.\nCancel = delete the ENTIRE series.');
+    if(one){ e.ex=(e.ex||[]).concat([amDate]); }
+    else{
+      if(!confirm("Delete every occurrence of \""+e.n+"\"? This can't be undone."))return;
+      S.events=S.events.filter(function(x){return x.id!==e.id;});
+    }
+  }else{
+    if(!confirm("Delete \""+e.n+"\"?"))return;
+    S.events=S.events.filter(function(x){return x.id!==e.id;});
+  }
+  save(); closeActivity(); renderAll(); renderCalendar(); stamp("Activity removed");
+}
+
+document.querySelectorAll("[data-cview]").forEach(function(b){
+  b.addEventListener("click",function(){calView=b.dataset.cview;renderCalendar();});
+});
+document.getElementById("calToday").addEventListener("click",function(){calCursor=today();renderCalendar();});
+document.getElementById("calAdd").addEventListener("click",function(){openActivity(null,calCursor);});
+document.getElementById("calPrev").addEventListener("click",function(){calStep(-1);});
+document.getElementById("calNext").addEventListener("click",function(){calStep(1);});
+function calStep(dir){
+  var p=dparts(calCursor);
+  if(calView==="day")        calCursor=addDays(calCursor,dir);
+  else if(calView==="week")  calCursor=addDays(calCursor,7*dir);
+  else if(calView==="year")  calCursor=monthKey(p.y+dir,p.m)+"-01";
+  else{
+    var m=p.m+dir,y=p.y+Math.floor(m/12); m=((m%12)+12)%12;
+    calCursor=monthKey(y,m)+"-"+String(Math.min(p.d,daysInMonth(y,m))).padStart(2,"0");
+  }
+  renderCalendar();
+}
+amEl("amRepeat").addEventListener("change",amSyncRepeatUI);
+amEl("amEnds").addEventListener("change",amSyncRepeatUI);
+amEl("amAllDay").addEventListener("change",amSyncAllDay);
+amEl("amSave").addEventListener("click",amSave);
+amEl("amCancel").addEventListener("click",closeActivity);
+amEl("amDelete").addEventListener("click",amDelete);
+amEl("actModal").addEventListener("click",function(ev){if(ev.target===this)closeActivity();});
+document.addEventListener("keydown",function(ev){
+  if(ev.key==="Escape"&&!amEl("actModal").hidden)closeActivity();});
+// Times before the 07:00 shift roll belong to the previous shift on the Board.
+// Say so at the moment it becomes relevant instead of filing it silently.
+amEl("amStart").addEventListener("change",function(){
+  var v=amEl("amStart").value;
+  if(v&&v<"07:00")amMsg("Heads up: your day rolls at 7am, so this sits in the previous day's shift on the Board.");
+  else amMsg("");
+});
+
 function setView(v){
   document.body.classList.toggle("view-reports",v==="reports");
   document.body.classList.toggle("view-history",v==="history");
+  document.body.classList.toggle("view-cal",v==="cal");
   // the CSS class alone can't win: the static `hidden` attribute in the markup
   // forces display:none via the UA stylesheet no matter what a class-based
   // rule says, so the attribute itself has to be flipped here.
   document.getElementById("view-reports").hidden=(v!=="reports");
   document.getElementById("view-history").hidden=(v!=="history");
+  document.getElementById("view-cal").hidden=(v!=="cal");
   document.getElementById("tabBoard").classList.toggle("on",v==="board");
+  document.getElementById("tabCal").classList.toggle("on",v==="cal");
   document.getElementById("tabReports").classList.toggle("on",v==="reports");
   document.getElementById("tabHistory").classList.toggle("on",v==="history");
+  if(v==="cal")renderCalendar();
   if(v==="reports")renderReportsView();
   if(v==="history"){ curHView=curHView||"log"; flushHistory(); renderHistory(); }
   else curHView=null;
