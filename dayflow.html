@@ -216,9 +216,24 @@ header h1{font-size:26px;letter-spacing:.3px}
 .rit-add input.rit-tagin{flex:0 0 112px}
 .rit-add button{background:var(--forest);color:var(--on-brand);border-radius:7px;padding:6px 11px;font-weight:700}
 
+/* The shift-window chip is a button now, but must still read as the quiet
+   count-chip it replaced - editable, not shouty. */
+.roll-edit{font:inherit;cursor:pointer;border:1px dashed transparent;transition:border-color .15s}
+.roll-edit:hover{border-color:var(--forest)}
+.roll-edit input{font:inherit;font-size:inherit;color:inherit;background:var(--paper);
+  border:1px solid var(--forest);border-radius:6px;padding:1px 4px;width:105px}
+/* Goal row extras. Pips reuse .wk-p from the old Weekly targets block, which
+   is why that rule survives the removal of the card it was written for. */
+.rit-goal{display:flex;align-items:center;gap:7px;flex-shrink:0}
+.rit-gn{font-size:11px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.rit-gn.hit{color:var(--olive)}
+.rit-goalbtn{background:none;border:0;cursor:pointer;font-size:13px;color:var(--muted);
+  padding:2px 4px;line-height:1;opacity:.55}
+.rit-goalbtn:hover{opacity:1;color:var(--forest-ink)}
+.rit-target{width:58px;flex-shrink:0;text-align:center}
+
 /* Weekly targets, merged into the same card as Non-negotiables - same divider
    idiom already used for apt-add (a sub-form appended after a list). */
-.weekly-sub{margin-top:16px;padding-top:13px;border-top:1px dashed var(--line)}
 .subhead{font-size:13px;margin-bottom:2px}
 
 .wk{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px dashed var(--line)}
@@ -321,7 +336,6 @@ header h1{font-size:26px;letter-spacing:.3px}
 .tsk:last-of-type{border-bottom:none}
 .tsk-l{flex:1;font-size:12.5px;word-break:break-word}
 .tsk.done .tsk-l{color:var(--muted);text-decoration:line-through}
-.tsk .age{font-size:9.5px;color:var(--terra-ink);font-weight:700;white-space:nowrap;padding-top:2px}
 .tsk .x{color:var(--sage);font-size:15px;line-height:1;padding:0 2px}
 .tsk:hover .x{color:var(--terra)}
 .addrow{display:flex;gap:6px;margin-top:9px}
@@ -1059,8 +1073,8 @@ return {
   <div class="cols board-only">
     <div>
       <div class="card timelinecard">
-        <h2>Shift timeline <span class="cnt">7:00am → 7:00am</span></h2>
-        <div class="sub">Your day rolls over at 7am, not midnight — so 3am work logs to the right shift.</div>
+        <h2>Shift timeline <button class="cnt roll-edit" id="rollBtn" title="Click to change when your day starts">7:00am → 7:00am</button></h2>
+        <div class="sub" id="rollSub"></div>
         <div id="timeline"></div>
         <div class="apt-add">
           <input id="aptN" placeholder="Appointment — what and where">
@@ -1079,20 +1093,16 @@ return {
       </div>
 
       <div class="card">
-        <h2>Non-negotiables <span class="cnt" id="ritCnt"></span></h2>
-        <div class="sub">Seven, not nine. A list you can't finish teaches you to ignore it.</div>
+        <h2>Non-negotiables &amp; Goals <span class="cnt" id="ritCnt"></span></h2>
+        <div class="sub">Tick it daily, or give it a weekly target and track the pace. Seven, not nine — a list you can't finish teaches you to ignore it.</div>
         <div id="rituals"></div>
         <div class="rit-add" id="ritAdd">
-          <input id="ritName" class="rit-name" placeholder="Add a non-negotiable...">
+          <input id="ritName" class="rit-name" placeholder="Add a non-negotiable or goal...">
           <input id="ritTag" class="rit-tagin" placeholder="Tag (optional)">
+          <input id="ritTarget" class="rit-target" type="number" min="0" max="7" placeholder="×/wk" title="Weekly target — leave blank for a daily non-negotiable">
           <button id="ritAddBtn">+</button>
         </div>
 
-        <div class="weekly-sub">
-          <h3 class="subhead">Weekly targets</h3>
-          <div class="sub">These don't fit daily on this schedule. Weekly, they do.</div>
-          <div id="weekly"></div>
-        </div>
       </div>
     </div>
 
@@ -1425,7 +1435,17 @@ if(!window.PDAuth || !PDAuth.ready()) return;
    PDAuth.ns() also carries the single-user era's board over to the first
    account that signs in here. */
 var KEY=PDAuth.ns("dayflow.v2");
-var ROLL=7*60;          // logical day starts 07:00
+/* When the logical day starts, in minutes past midnight. Read through rollM()
+   rather than held in a constant, because it is now editable and every date
+   calculation in the file depends on it - a cached copy would go stale the
+   moment it changed, and the failure would look like tasks silently landing on
+   the wrong day rather than like a settings bug. 420 = 07:00, the long-standing
+   default, used whenever S has no value yet. */
+function rollM(){
+  var r=(typeof S!=="undefined"&&S&&typeof S.roll==="number")?S.roll:420;
+  return (r>=0&&r<1440)?r:420;
+}
+function rollHHMM(){var m=rollM();return String(Math.floor(m/60)).padStart(2,"0")+":"+String(m%60).padStart(2,"0");}
 
 // Blue = the three client jobs. Green = his own company. Yellow = learning.
 // Slate = low priority, drained of colour on purpose. Orange is reserved for
@@ -1486,16 +1506,16 @@ var DEFAULT_RITUALS=[
  {id:"nightclienta", l:"Night Client A EOD report sent",    tag:"Night Client A"}
 ];
 
-var WEEKLY=[
- {id:"ex",   l:"Exercise",            target:3},
- {id:"learn",l:"Learn something new", target:2}
-];
+// The separate WEEKLY list is gone. A weekly target is now a property any
+// non-negotiable can carry (r.target), so one card answers both "did I do it
+// today" and "am I on pace this week" instead of splitting the same habits
+// across two lists that never agreed on which one owned a given item.
 
 // ---------- logical day (rolls at 07:00) ----------
 function key(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
 function today(){
   var d=new Date();
-  if(d.getHours()*60+d.getMinutes() < ROLL) d.setDate(d.getDate()-1);
+  if(d.getHours()*60+d.getMinutes() < rollM()) d.setDate(d.getDate()-1);
   return key(d);
 }
 function shift(k,n){var p=k.split("-");var d=new Date(+p[0],+p[1]-1,+p[2]);d.setDate(d.getDate()+n);return key(d);}
@@ -1517,6 +1537,11 @@ function norm(s){
   if(!Array.isArray(s.rituals))
     s.rituals=DEFAULT_RITUALS.map(function(r){return {id:r.id,l:r.l,tag:r.tag};});
   if(["auto","dark","light"].indexOf(s.theme)<0)s.theme="auto";
+  // When the logical day starts, in minutes past midnight. Synced like any
+  // other board scalar, so changing it on the PC moves the phone's day too -
+  // two devices disagreeing about when "today" begins would put the same
+  // 3am edit on two different dates.
+  if(typeof s.roll!=="number"||s.roll<0||s.roll>=1440)s.roll=420;
   if(typeof s.updatedAt!=="number")s.updatedAt=0;
   // Board History. Both are MERGED across devices rather than last-write-wins
   // (see adopt()) - an audit trail that loses the losing side's entries can't
@@ -1773,7 +1798,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="2.1";
+var APP_VERSION="2.2";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -1784,6 +1809,7 @@ var APP_VERSION="2.1";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-04T23:30:00+08:00",text:"The shift start time is now editable - click the 7:00am chip on the Shift timeline to change when your day rolls over, and the note underneath updates itself. Weekly targets merged into Non-negotiables, which is now Non-negotiables & Goals: give any item a weekly target and it tracks your pace instead of a streak. Removed the day-count badge from tasks."},
   {ts:"2026-09-04T22:10:00+08:00",text:"Added My Personal Calendar — month, week, day, year, agenda and recurring views for your own schedule. Activities can repeat daily, weekly, monthly or yearly, each day can carry an objective like a lesson plan, and anything with a start and end time automatically shows on the Board's Shift Timeline and in your daily reminders."},
   {ts:"2026-08-15T21:40:00+08:00",text:"ProDash now asks you to log in. Everyone gets their own separate board that follows them to any device, instead of one shared board behind one shared password. Includes sign-up, forgot-password with a secret question, and a 15-minute lock after three wrong passwords."},
   {ts:"2026-08-15T20:24:11+08:00",text:"Added this tab — a plain-English update log for the app itself, separate from the board's own change history."},
@@ -1810,8 +1836,8 @@ var APP_VERSION_HISTORY=[
    pushed" is per-account, though - it tracks a specific board's revisions. */
 var DEV_KEY="prodash.deviceId", DEV_NAME_KEY="prodash.deviceName", PUSHED_KEY=PDAuth.ns("prodash.pushedUpTo");
 var HIST_CAP=400, CKPT_EVERY=25, BATCH_MS=2500;
-var BOARD_KEYS=["tasks","log","days","events","lanes","rituals","focus","theme","hiddenBlocks","plans"];
-var KEYED=["tasks","events","lanes","rituals"], MAPS=["log","days","plans"], SCALARS=["focus","theme"];
+var BOARD_KEYS=["tasks","log","days","events","lanes","rituals","focus","theme","hiddenBlocks","plans","roll"];
+var KEYED=["tasks","events","lanes","rituals"], MAPS=["log","days","plans"], SCALARS=["focus","theme","roll"];
 // Plain arrays of primitive ids (not objects with their own .id, so KEYED's
 // per-item union doesn't apply) compared by CONTENT, not reference - a
 // cloned snapshot never shares object identity with the live array even
@@ -2197,9 +2223,9 @@ function day(k){k=k||today();if(!S.log[k])S.log[k]={};return S.log[k];}
 
 // ---------- shift-minute coordinates ----------
 function mins(hhmm){var p=hhmm.split(":");return (+p[0])*60+(+p[1]);}
-function sm(hhmm){return (mins(hhmm)-ROLL+1440)%1440;}          // 07:00 -> 0
+function sm(hhmm){return (mins(hhmm)-rollM()+1440)%1440;}        // the roll time -> 0
 function smEnd(hhmm){var v=sm(hhmm);return v===0?1440:v;}        // 07:00 as an END means 1440
-function nowSm(){var d=new Date();return (d.getHours()*60+d.getMinutes()-ROLL+1440)%1440;}
+function nowSm(){var d=new Date();return (d.getHours()*60+d.getMinutes()-rollM()+1440)%1440;}
 function fmt(hhmm){var p=hhmm.split(":"),h=+p[0],m=p[1],ap=h<12?"am":"pm",hh=h%12;if(hh===0)hh=12;return hh+":"+m+ap;}
 
 function dowOf(k){var p=k.split("-");return new Date(+p[0],+p[1]-1,+p[2]).getDay();}
@@ -2385,7 +2411,7 @@ function renderHeader(){
   var p=today().split("-");
   var d=new Date(+p[0],+p[1]-1,+p[2]);
   document.getElementById("hdrDate").textContent=
-    d.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"})+" shift · 7:00am → 7:00am";
+    d.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"})+" shift · "+rollRange();
   var done=0,l=day();
   S.rituals.forEach(function(r){if(l[r.id])done++;});
   document.getElementById("sRit").textContent=(S.rituals.length?Math.round(done/S.rituals.length*100):0)+"%";
@@ -2488,6 +2514,61 @@ function renderNudges(){
   });
 }
 
+/* ---------- the shift window, now editable ----------
+   Changing this moves the boundary of every logical day, so it is not a
+   cosmetic label: work logged at 3am lands on a different date afterwards.
+   The caption is generated from the value rather than written down, because a
+   hardcoded "rolls over at 7am" sitting under a chip that says 5:00am is worse
+   than no caption at all. */
+function rollRange(){var h=fmt(rollHHMM());return h+" → "+h;}
+function renderRoll(){
+  var b=document.getElementById("rollBtn");
+  if(!b)return;
+  if(b.dataset.editing)return;                 // don't clobber an open input
+  b.textContent=rollRange();
+  var rh=Math.floor(rollM()/60),sub=document.getElementById("rollSub");
+  if(!sub)return;
+  // Pick an example hour that actually falls inside the pre-roll window, so
+  // the sentence stays true at any roll time. Below 2am there is no room for
+  // one, so the clause is dropped rather than made up.
+  var ex = rh>=5 ? rh-4 : (rh>=2 ? rh-1 : null);
+  var exTxt = ex===null ? "" :
+    " — so "+fmt(String(ex).padStart(2,"0")+":00")+" work logs to the right shift";
+  sub.textContent = rollM()===0
+    ? "Your day rolls over at midnight, like an ordinary calendar."
+    : "Your day rolls over at "+fmt(rollHHMM())+", not midnight"+exTxt+".";
+}
+function editRoll(){
+  var b=document.getElementById("rollBtn");
+  if(b.dataset.editing)return;
+  b.dataset.editing="1";
+  var prev=rollHHMM();
+  b.innerHTML='<input type="time" id="rollIn" value="'+prev+'" step="900">';
+  var inp=document.getElementById("rollIn");
+  inp.addEventListener("click",function(e){e.stopPropagation();});
+  function finish(){
+    delete b.dataset.editing;
+    var v=inp.value;
+    if(v&&/^\d{2}:\d{2}$/.test(v)){
+      var m=mins(v);
+      if(m!==rollM()){
+        S.roll=m;
+        save();
+        // Everything downstream of the roll has to be recomputed, including
+        // the calendar, whose day keys are shift keys.
+        renderAll();
+        if(document.body.classList.contains("view-cal"))renderCalendar();
+        stamp("Day now starts at "+fmt(v));
+        return;
+      }
+    }
+    renderRoll();
+  }
+  inp.addEventListener("change",finish);
+  inp.addEventListener("blur",finish);
+  try{inp.focus();}catch(e){}
+}
+
 function renderRituals(){
   var l=day(),c=document.getElementById("rituals"),done=0;
   c.innerHTML="";
@@ -2496,12 +2577,37 @@ function renderRituals(){
     var st=streakOf(r.id);
     var row=document.createElement("div");
     row.className="rit"+(on?" done":"");
+    /* Two kinds of item share this list. Without a target it is a daily
+       non-negotiable and a streak is the honest measure. With one it is a
+       goal - something that does not fit every day on this schedule - and
+       what matters is pace across the week, so it shows progress pips and
+       a hit/target count instead. The daily tick is the same action for
+       both, which is the point of merging them: one place to tick, one
+       place to look. */
+    var goal=+r.target>0, pips="";
+    if(goal){
+      var n=weeklyCount(r.id);
+      for(var i=0;i<r.target;i++)pips+='<i class="'+(i<n?"on":"")+'"></i>';
+      pips='<div class="rit-goal" title="'+n+' of '+r.target+' this week"><div class="wk-p">'+pips+'</div>'+
+           '<span class="rit-gn'+(n>=r.target?" hit":"")+'">'+n+'/'+r.target+'</span></div>';
+    }
     row.innerHTML='<div class="box'+(on?" done":"")+'" role="checkbox" tabindex="0"></div>'+
       '<div class="rit-l">'+esc(r.l)+(r.tag?'<div class="rit-tag">'+esc(r.tag)+'</div>':'')+'</div>'+
-      '<div class="streak'+(st?"":" zero")+'">'+(st?"🔥 "+st:"—")+'</div>'+
-      '<button class="x" data-ract="del" aria-label="Remove non-negotiable">×</button>';
+      (goal?pips:'<div class="streak'+(st?"":" zero")+'">'+(st?"🔥 "+st:"—")+'</div>')+
+      '<button class="rit-goalbtn" data-ract="goal" title="Set or clear a weekly target">◎</button>'+
+      '<button class="x" data-ract="del" aria-label="Remove item">×</button>';
     row.querySelector(".box").addEventListener("click",function(){
       var d=day();d[r.id]=!d[r.id];if(!d[r.id])delete d[r.id];save();renderAll();});
+    row.querySelector("[data-ract=goal]").addEventListener("click",function(){
+      var cur=+r.target>0?String(r.target):"";
+      var v=prompt('Weekly target for "'+r.l+'" — how many times a week?\n\nLeave blank (or 0) to make it a plain daily non-negotiable.',cur);
+      if(v===null)return;
+      v=v.trim();
+      var t=v===""?0:parseInt(v,10);
+      if(isNaN(t)||t<0||t>7){alert("Enter a number from 1 to 7, or leave it blank.");return;}
+      if(t>0)r.target=t; else delete r.target;
+      save();renderAll();
+    });
     row.querySelector("[data-ract=del]").addEventListener("click",function(){
       // history (S.log entries, streaks) is left alone - it just stops
       // corresponding to anything rendered, same as a deleted lane's tasks
@@ -2513,30 +2619,22 @@ function renderRituals(){
   document.getElementById("ritCnt").textContent=done+"/"+S.rituals.length;
 }
 function addRitual(){
-  var nameI=document.getElementById("ritName"),tagI=document.getElementById("ritTag");
+  var nameI=document.getElementById("ritName"),tagI=document.getElementById("ritTag"),
+      tgtI=document.getElementById("ritTarget");
   var l=nameI.value.trim();if(!l){nameI.focus();return;}
-  S.rituals.push({id:"rit_"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
-    l:l,tag:tagI.value.trim()});
+  // Blank target means a daily non-negotiable; the key is left off entirely
+  // rather than stored as 0, so "is this a goal" stays a single truthy check.
+  var t=parseInt(tgtI.value,10);
+  var rec={id:"rit_"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+    l:l,tag:tagI.value.trim()};
+  if(!isNaN(t)&&t>0&&t<=7)rec.target=t;
+  tgtI.value="";
+  S.rituals.push(rec);
   nameI.value="";tagI.value="";
   save();renderAll();
   nameI.focus();
 }
 
-function renderWeekly(){
-  var c=document.getElementById("weekly"),l=day();
-  c.innerHTML="";
-  WEEKLY.forEach(function(w){
-    var n=weeklyCount(w.id),pips="";
-    for(var i=0;i<w.target;i++)pips+='<i class="'+(i<n?"on":"")+'"></i>';
-    var row=document.createElement("div");
-    row.className="wk";
-    row.innerHTML='<div class="wk-l">'+esc(w.l)+'</div><div class="wk-p">'+pips+'</div>'+
-      '<button class="wk-add">'+(l[w.id]?"done":"+")+'</button>';
-    row.querySelector(".wk-add").addEventListener("click",function(){
-      var d=day();d[w.id]=!d[w.id];if(!d[w.id])delete d[w.id];save();renderAll();});
-    c.appendChild(row);
-  });
-}
 
 // Which block was "now" last time we rendered - lets us tell a genuine
 // transition (Day Client -> Dinner) apart from a routine re-render (ticking
@@ -2660,12 +2758,13 @@ function renderLanes(){
       '</div>'+
       '<div class="lane-s">'+esc(L.ritual)+'</div>';
     var body=mine.length
+      // The per-task age badge ("21d") is gone. ageOf() stays, because the
+      // stale-task nudge still uses it - the signal was worth keeping, the
+      // permanent column of orange numbers next to every task was not.
       ? mine.slice().sort(function(a,b){return (a.done?1:0)-(b.done?1:0);}).map(function(t){
-          var age=ageOf(t);
           return '<div class="tsk'+(t.done?" done":"")+'" data-id="'+t.id+'">'+
             '<div class="box'+(t.done?" done":"")+'" data-act="tog"></div>'+
             '<div class="tsk-l">'+esc(t.text)+'</div>'+
-            (!t.done&&age>=2?'<div class="age">'+age+'d</div>':'')+
             '<button class="x" data-act="del" aria-label="delete">×</button></div>';
         }).join("")
       : '<div class="empty">Nothing queued.</div>';
@@ -2878,7 +2977,7 @@ function applyTheme(){
 
 function renderAll(){
   renderHeader();renderNow();renderNudges();renderRituals();
-  renderWeekly();renderTimeline();renderLanes();renderWeek();
+  renderRoll();renderTimeline();renderLanes();renderWeek();
   renderAptLaneOptions();
   if(document.body.classList.contains("view-reports"))renderReportsView();
   applyTheme();
@@ -2889,8 +2988,9 @@ function renderAll(){
 
 // ---------- wiring ----------
 document.getElementById("focusBtn").addEventListener("click",function(){S.focus=!S.focus;save();renderAll();});
+document.getElementById("rollBtn").addEventListener("click",editRoll);
 document.getElementById("ritAddBtn").addEventListener("click",addRitual);
-["ritName","ritTag"].forEach(function(id){
+["ritName","ritTag","ritTarget"].forEach(function(id){
   document.getElementById(id).addEventListener("keydown",function(e){if(e.key==="Enter")addRitual();});});
 // ---------- appointments ----------
 // Rebuilt on every renderAll() (not just once) so a lane added after boot

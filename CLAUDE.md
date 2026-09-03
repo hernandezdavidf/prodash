@@ -82,6 +82,63 @@ This project uses git for version control and a `CHANGELOG.md` for a plain-Engli
 - **CHANGELOG.md** — a dated, human-readable log of meaningful changes (new workflows, tools, or edits to this file). Update it whenever you make a change worth remembering, newest entry on top.
 - Commit after any meaningful change (new tool, workflow update, structural change) with a clear message. Don't commit secrets — check `.gitignore` first if unsure.
 
+# Frontend aesthetics
+
+Avoid generic AI aesthetics. Make creative, distinctive choices.
+
+## Typography
+- Never use Inter, Roboto, Open Sans, Lato, Arial, or system fonts.
+- Body: Bricolage Grotesque. Display: Fraunces. Mono: JetBrains Mono.
+- Use weight extremes: 200 vs 800, not 400 vs 600.
+- Size jumps of 3x+, not 1.5x.
+
+## Color & theme
+- Commit to a single dominant color with one sharp accent.
+- All colors live in CSS variables in `app/globals.css`.
+- Forbidden: purple-to-blue gradients on white backgrounds.
+
+## Backgrounds
+- Layered CSS gradients or geometric patterns over solid colors.
+- Hero sections must have atmospheric depth.
+
+## Motion
+- CSS-only for non-React. Motion (formerly Framer Motion) for React.
+- One well-orchestrated page-load reveal beats scattered micro-interactions.
+
+## Components
+- Always use shadcn/ui primitives where they exist (Button, Card, Dialog, Form).
+- Never hand-roll a component that exists in the shadcn registry.
+- Tailwind classes only. No inline styles. No CSS modules.
+
+## How this applies to ProDash
+
+> Added by Claude, 2026-09-04. Delete this subsection if you'd rather the rules
+> above stand unqualified — but read it first, because several of them cannot be
+> followed literally in this repo.
+
+ProDash (`dayflow.html`) is a single standalone HTML file with no build step, no
+npm, and no Node on this machine. It has to keep working from `file://` and
+offline. That makes four of the rules above inapplicable **here** — they remain
+correct for any future React/Next.js project in this workspace:
+
+- **`app/globals.css`** doesn't exist. The equivalent is the `:root` block in
+  `dayflow.html`, which already holds every colour as a CSS variable. That rule
+  is satisfied in spirit; only the path differs.
+- **shadcn/ui** and **Motion** are React libraries. There is no React here.
+- **"Tailwind classes only"** needs a build step this project can't run. ProDash
+  uses hand-written CSS in one `<style>` block.
+- **The named fonts** (Bricolage Grotesque, Fraunces, JetBrains Mono) come from
+  Google Fonts. Loading them over the network would break offline and `file://`
+  use, which is the one thing this app must never lose — it's used at 3am on a
+  phone. If you want them, they must be self-hosted or embedded, and that's a
+  deliberate decision to make, not something to slip in with a `<link>`.
+
+The rules that *do* apply here and should be honoured: no generic AI aesthetics,
+weight and size extremes over timid ones, one dominant colour with one sharp
+accent (ProDash: forest green with terracotta reserved strictly for attention),
+no purple-to-blue gradients, layered depth over flat fills, and one orchestrated
+reveal over scattered micro-interactions.
+
 ## Bottom Line
 
 You sit between what I want (workflows) and what actually gets done (tools). Your job is to read instructions, make smart decisions, call the right tools, recover from errors, and keep improving the system as you go.

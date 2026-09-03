@@ -2,6 +2,41 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-04 — Editable shift start; Weekly targets folded into Non-negotiables
+
+**The 07:00 roll is now a setting, not a constant.** Click the `7:00am → 7:00am`
+chip on the Shift timeline to change when the logical day begins. This is not a
+label edit: `ROLL` was a module constant feeding `today()`, `sm()` and `nowSm()`,
+so it became `rollM()` reading `S.roll` — a function rather than a cached copy,
+because a stale copy would surface as tasks silently landing on the wrong date
+rather than as an obvious settings bug. Stored as a synced board scalar, since
+two devices disagreeing about when "today" starts would file the same 3am edit
+under two different dates.
+
+The caption underneath is generated from the value instead of written down, and
+handles its own edge cases: at midnight it reads "like an ordinary calendar", and
+below 02:00 it drops the "so 3am work logs to the right shift" clause entirely,
+because there is no pre-roll window left to give an example from. A hardcoded
+sentence under a chip reading 5:00am would be worse than no sentence.
+
+**Weekly targets and Non-negotiables merged**, since they were two lists holding
+the same habits and disagreeing about which owned a given one. The card is now
+**Non-negotiables & Goals**: any item can carry `target` (1–7 a week), set via
+the ◎ button or the `×/wk` field when adding. With a target it shows progress
+pips and a hit/target count; without one it shows a streak, exactly as before.
+The daily tick is the same action for both — one place to tick, one place to
+look. `weeklyCount()` survives the removal of the card it was written for, and
+`.wk-p` pip styling is reused rather than duplicated.
+
+**Removed the per-task day badge** (`21d`). `ageOf()` stays because the
+stale-task nudge still uses it — the signal was worth keeping, a permanent column
+of orange numbers beside every task was not.
+
+Also added a **Frontend aesthetics** section to `CLAUDE.md`, with a subsection
+recording which of its rules cannot apply to a single-file, build-step-free app
+that must keep working offline from `file://` (shadcn, Tailwind, Motion, and
+network-loaded Google Fonts).
+
 ## 2026-09-04 — My Personal Calendar: recurrence, lesson-plan days, derived reminders
 
 A fourth tab holding personal scheduling: **Month**, **Week**, **Day**,
