@@ -2,6 +2,59 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-04 — New colour system: energy semantics, not decoration
+
+Rebuilt on five anchors — `#E53935` red, `#FB8C00` orange, `#43A047` green,
+`#ECEFF1` light, `#263238` charcoal — assigned by **what each colour does to
+you**, which is the brief David gave: red raises heart rate, orange carries
+physical drive plus mental endurance, green sparks problem-solving and focus.
+
+- **Green = focus.** Brand, progress fills, checkboxes, done, focus mode. The
+  colour of a clear head, so it marks what you are working on and what is
+  finished.
+- **Orange = endurance.** The now-bar, streaks, the dual night shift, the
+  circadian low, appointment bands. It sits on screen for hours without
+  alarming, which is precisely the job it has here.
+- **Red = adrenaline, and kept scarce.** Must-attend, overdue, sync failure,
+  destructive actions. Red that shows up constantly stops raising anyone's
+  pulse, which would waste the only colour here whose whole purpose is to.
+- **Charcoal + light are the spine, and they swap.** `#263238` is text on
+  `#ECEFF1` in light, and the card surface under `#ECEFF1` text in dark. Using
+  the palette's own two neutrals for both halves is what keeps the themes
+  recognisably one system rather than two designs.
+
+**The header is charcoal, not brand green.** White on `#43A047` is 3.3:1 —
+fine for the 26px title, failing for the 12px labels beside it — so a green
+hero would have forced darkening the brand into something that is no longer the
+palette colour. On `#263238` the same text is 14.8:1. It also frees green to be
+the thing that *moves* on that surface (progress, stats, buttons) instead of
+being the surface, which is what focus should look like: the one lit thing.
+Layered radial and linear gradients give it depth rather than a flat fill.
+
+**Two semantic splits that the old palette couldn't express.** Sync "needs
+reconnecting" and sync "failed" shared one orange dot; failure now takes red,
+reconnection keeps orange, because one is a chore and the other is data not
+being saved. And a task open 3+ shifts is now the one nudge tier allowed to use
+red — overdue, not merely pending.
+
+**Lane hues were retuned, not left alone.** They moved to a harmonised
+Material-600 set that deliberately excludes green, orange and red. The rule that
+always applied to orange — never a lane, so orange always means "look here" —
+now extends to all three semantic colours. A lane answers "whose time is this",
+never "how urgent is this".
+
+**Contrast was measured, not eyeballed.** Every text token was computed against
+its own background in both themes; all pass AA (lowest 5.13:1). Three fixes came
+out of it: the green fill darkened to `#2E7D32` in both themes so white clears
+4.5:1; `--on-alert` deleted rather than shipped, since white on `#E53935` is
+4.2:1 and anything needing text on red uses `--alert-ink` instead; and the icon
+grey `--sage` (3.35:1 — correct for glyphs, which need only 3:1) was swapped for
+`--muted` on the three places it was carrying actual text.
+
+The two dark blocks were verified token-for-token identical afterwards — that
+drift is a bug this file has hit before, so it is now checked rather than
+assumed.
+
 ## 2026-09-04 — Editable shift start; Weekly targets folded into Non-negotiables
 
 **The 07:00 roll is now a setting, not a constant.** Click the `7:00am → 7:00am`

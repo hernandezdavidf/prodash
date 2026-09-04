@@ -21,40 +21,72 @@
 <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
 
 <style>
-/* Palette. Variable NAMES are historical (forest/sage/olive/terra) but the values
-   are the strong green/blue/yellow/orange scheme. Roles, not hues:
-     --forest    brand green — header, buttons, checkboxes, progress fills
-     --olive     vivid green accent — borders, focus rings
-     --olive-lt  light green wash — hovers, gradients
-     --terra     ORANGE, the single attention colour: nudges, streaks, now-marker,
-                 overdue. Never used for a lane, so orange always means "look here".
-     --sage      neutral slate for secondary labels
-     --night     deep indigo, sleep only
-   Lane hues (blue/sky/indigo/green/yellow/slate) live on each lane object in
-   S.lanes; --ln-x1..x6 are the swatch choices offered for a custom lane. */
-/* Tokens ending -ink are TEXT versions of a colour; the plain token is the FILL.
-   They must stay separate: a hue dark enough to carry white text is too dark to
-   BE text on a dark card, and vice versa. Same for --on-brand, which is the text
-   that sits on brand-coloured fills and stays light in both themes. */
+/* ============================ PALETTE ====================================
+   Five anchors: #E53935 red, #FB8C00 orange, #43A047 green, #ECEFF1 light,
+   #263238 charcoal. Each carries a MEANING about energy, not just a role, and
+   the meanings are what decide where each one is allowed to appear:
+
+     GREEN   focus and problem-solving. Brand, progress, done, focus mode.
+             The colour of a clear head — so it marks what you are working
+             ON and what you have finished.
+     ORANGE  physical drive plus mental endurance. The grind: the now-bar,
+             streaks, the dual night shift, the circadian low. Present for
+             hours at a time without alarming, which is exactly the job.
+     RED     adrenaline. Act now: must-attend, overdue, errors, destructive
+             actions. Deliberately SCARCE — red that appears constantly stops
+             raising anyone's heart rate, which would waste the one colour
+             here that is supposed to.
+     CHARCOAL + LIGHT  the neutral spine. They swap roles between themes:
+             #263238 is text on #ECEFF1 in light, and the card surface under
+             #ECEFF1 text in dark. Using the palette's own neutrals for both
+             is what keeps the two themes recognisably one system.
+
+   Because a lane means "whose time is this" and never "how urgent is this",
+   lane hues are a harmonised Material-600 set that deliberately excludes
+   green, orange and red — if a lane could be orange, orange would stop
+   meaning endurance. Same rule that always applied to orange, now extended
+   to all three semantic colours.
+
+   Tokens ending -ink are TEXT versions of a colour; the plain token is the
+   FILL. They must stay separate: a hue dark enough to carry white text is too
+   light to BE text on white, and vice versa. Every -ink token below clears
+   4.5:1 on its background. */
 :root{
   color-scheme: light;
-  --forest:#15803D; --forest-dk:#14532D; --forest-ink:#15803D;
-  --sage:#64748B; --olive:#16A34A; --olive-lt:#DCFCE7;
-  --ivory:#F6F7F9; --paper:#ffffff; --on-brand:#F0FDF4;
-  --terra:#EA580C; --terra-lt:#FFEDD5; --terra-ink:#9A3412;
+  /* GREEN — focus. The fill is darkened from #43A047 because the palette
+     green carries white text at only 3.3:1; #2E7D32 reaches 5.2:1. The raw
+     palette green survives as --olive, used where it sits on light. */
+  --forest:#2E7D32; --forest-dk:#1B5E20; --forest-ink:#2E7D32;
+  --olive:#43A047; --olive-lt:#E8F5E9;
+  --on-brand:#FFFFFF;
+  /* ORANGE — drive and endurance. */
+  --terra:#FB8C00; --terra-lt:#FFF3E0; --terra-ink:#BF360C;
   /* text that sits ON an orange fill. Orange is light in both themes, so this
      stays near-black in both and is deliberately NOT overridden in dark. */
   --on-warm:#231206;
-  --night:#312E81; --night-ink:#312E81;
-  --line:#E2E8F0; --ink:#0F172A; --muted:#5D6B7E;
-  --ln-dayclient:#2563EB; --ln-nightclienta:#4F46E5; --ln-nightclientb:#0284C7;
-  --ln-biz:#16A34A;      --ln-grow:#CA8A04; --ln-other:#64748B;
+  /* RED — adrenaline. Used sparingly, on purpose. */
+  /* --alert is for EDGES ONLY: borders, dots, left-rules. White on #E53935
+     is 4.2:1, under AA, so anything that must carry text on red uses
+     --alert-ink as its background instead (5.6:1 with white). */
+  --alert:#E53935; --alert-lt:#FFEBEE; --alert-ink:#C62828;
+  /* NEUTRAL SPINE — the palette's own two neutrals plus the blue-grey ramp
+     between them, so every grey in the app is a relative of #263238 rather
+     than an unrelated slate. */
+  --ivory:#ECEFF1; --paper:#FFFFFF;
+  --line:#CFD8DC; --ink:#263238; --muted:#546E7A; --sage:#78909C;
+  /* Sleep is calm, not a hue: charcoal rather than the old indigo, so the one
+     protected block of the day reads as absence of demand. */
+  --night:#37474F; --night-ink:#455A64;
+  /* rgb triples for gradients and shadows that need alpha. Charcoal shadows
+     sit better on a blue-grey ground than neutral black. */
+  --shadow-rgb:38,50,56; --glow-rgb:67,160,71;
+  --ln-dayclient:#1E88E5; --ln-nightclienta:#3949AB; --ln-nightclientb:#00ACC1;
+  --ln-biz:#00897B;       --ln-grow:#8E24AA;         --ln-other:#607D8B;
   /* Swatch palette offered when adding a custom lane. Decorative fills only
-     (a 9px dot, a 3px bar) - never text, so no -ink pair is needed. Deliberately
-     avoids blue/indigo/sky/green/amber/slate (already job hues) and orange
-     (reserved for --terra, the one colour that always means "attention"). */
-  --ln-x1:#E11D48; --ln-x2:#0D9488; --ln-x3:#7C3AED;
-  --ln-x4:#C026D3; --ln-x5:#0891B2; --ln-x6:#65A30D;
+     (a 9px dot, a 3px bar) - never text, so no -ink pair is needed. Avoids
+     green, orange and red, which all carry meaning above. */
+  --ln-x1:#D81B60; --ln-x2:#5E35B1; --ln-x3:#039BE5;
+  --ln-x4:#6D4C41; --ln-x5:#546E7A; --ln-x6:#00695C;
   --serif:Georgia,"Times New Roman",serif;
   --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
 }
@@ -67,47 +99,52 @@
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     color-scheme: dark;
-    --forest:#166534; --forest-dk:#14532D; --forest-ink:#4ADE80;
-    --sage:#94A3B8; --olive:#4ADE80; --olive-lt:#14532D;
-    --ivory:#0B1120; --paper:#131C2E; --on-brand:#F0FDF4;
-    --terra:#FB923C; --terra-lt:#431407; --terra-ink:#FDBA74;
-    --night:#4F46E5; --night-ink:#A5B4FC;
-    --line:#243044; --ink:#E9EEF6; --muted:#8A99AD;
-    --ln-dayclient:#60A5FA; --ln-nightclienta:#818CF8; --ln-nightclientb:#38BDF8;
-    --ln-biz:#4ADE80;      --ln-grow:#FACC15; --ln-other:#94A3B8;
-    --ln-x1:#FB7185; --ln-x2:#2DD4BF; --ln-x3:#A78BFA;
-    --ln-x4:#E879F9; --ln-x5:#22D3EE; --ln-x6:#A3E635;
+    /* The palette's two neutrals swap jobs here: #263238 becomes the card
+       surface and #ECEFF1 becomes the text, with a darker charcoal beneath so
+       cards still lift off the page. */
+    --forest:#2E7D32; --forest-dk:#1B5E20; --forest-ink:#81C784;
+    --olive:#66BB6A; --olive-lt:#1B3A20;
+    --on-brand:#FFFFFF;
+    --terra:#FB8C00; --terra-lt:#3E2723; --terra-ink:#FFB74D;
+    --alert:#EF5350; --alert-lt:#3E1F1F; --alert-ink:#EF9A9A;
+    --ivory:#1A2327; --paper:#263238;
+    --line:#37474F; --ink:#ECEFF1; --muted:#B0BEC5; --sage:#90A4AE;
+    --night:#455A64; --night-ink:#90A4AE;
+    --shadow-rgb:0,0,0; --glow-rgb:102,187,106;
+    --ln-dayclient:#64B5F6; --ln-nightclienta:#7986CB; --ln-nightclientb:#4DD0E1;
+    --ln-biz:#4DB6AC;       --ln-grow:#BA68C8;         --ln-other:#90A4AE;
+    --ln-x1:#F06292; --ln-x2:#9575CD; --ln-x3:#4FC3F7;
+    --ln-x4:#A1887F; --ln-x5:#B0BEC5; --ln-x6:#80CBC4;
   }
 }
 :root[data-theme="dark"]{
   color-scheme: dark;
-  --forest:#166534; --forest-dk:#14532D; --forest-ink:#4ADE80;
-  --sage:#94A3B8; --olive:#4ADE80; --olive-lt:#14532D;
-  --ivory:#0B1120; --paper:#131C2E; --on-brand:#F0FDF4;
-  --terra:#FB923C; --terra-lt:#431407; --terra-ink:#FDBA74;
-  --night:#4F46E5; --night-ink:#A5B4FC;
-  --line:#243044; --ink:#E9EEF6; --muted:#8A99AD;
-  --ln-dayclient:#60A5FA; --ln-nightclienta:#818CF8; --ln-nightclientb:#38BDF8;
-  --ln-biz:#4ADE80;      --ln-grow:#FACC15; --ln-other:#94A3B8;
-  --ln-x1:#FB7185; --ln-x2:#2DD4BF; --ln-x3:#A78BFA;
-  --ln-x4:#E879F9; --ln-x5:#22D3EE; --ln-x6:#A3E635;
+  /* Identical to the media-query block above. Edit them together, always. */
+  --forest:#2E7D32; --forest-dk:#1B5E20; --forest-ink:#81C784;
+  --olive:#66BB6A; --olive-lt:#1B3A20;
+  --on-brand:#FFFFFF;
+  --terra:#FB8C00; --terra-lt:#3E2723; --terra-ink:#FFB74D;
+  --alert:#EF5350; --alert-lt:#3E1F1F; --alert-ink:#EF9A9A;
+  --ivory:#1A2327; --paper:#263238;
+  --line:#37474F; --ink:#ECEFF1; --muted:#B0BEC5; --sage:#90A4AE;
+  --night:#455A64; --night-ink:#90A4AE;
+  --shadow-rgb:0,0,0; --glow-rgb:102,187,106;
+  --ln-dayclient:#64B5F6; --ln-nightclienta:#7986CB; --ln-nightclientb:#4DD0E1;
+  --ln-biz:#4DB6AC;       --ln-grow:#BA68C8;         --ln-other:#90A4AE;
+  --ln-x1:#F06292; --ln-x2:#9575CD; --ln-x3:#4FC3F7;
+  --ln-x4:#A1887F; --ln-x5:#B0BEC5; --ln-x6:#80CBC4;
 }
 /* .nudge no longer needs a dark override of its own - it's var(--paper) with
    a solid border now, not a translucent rgba wash, so both theme blocks
    already repaint it correctly. Shadows still need a bump: a light-mode
    shadow barely shows once the card it's cast on is already near-black. */
+/* Both gradients below now read --glow-rgb, which each theme block already
+   sets, so these two pairs no longer need per-theme copies of a hardcoded
+   green. One less place for the light and dark halves to drift apart. */
 @media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]) .blk.now{
-    background:linear-gradient(90deg,rgba(74,222,128,.25),rgba(74,222,128,.04));
-    box-shadow:0 1px 4px rgba(0,0,0,.35)}
-  :root:not([data-theme="light"]) header:after{
-    background:radial-gradient(circle,rgba(74,222,128,.22),transparent 70%)}
+  :root:not([data-theme="light"]) .blk.now{box-shadow:0 1px 4px rgba(0,0,0,.4)}
 }
-:root[data-theme="dark"] .blk.now{
-  background:linear-gradient(90deg,rgba(74,222,128,.25),rgba(74,222,128,.04));
-  box-shadow:0 1px 4px rgba(0,0,0,.35)}
-:root[data-theme="dark"] header:after{
-  background:radial-gradient(circle,rgba(74,222,128,.22),transparent 70%)}
+:root[data-theme="dark"] .blk.now{box-shadow:0 1px 4px rgba(0,0,0,.4)}
 
 *{box-sizing:border-box}
 body{margin:0;background:var(--ivory);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
@@ -116,8 +153,19 @@ h1,h2,h3{font-family:var(--serif);font-weight:700;margin:0}
 button{font-family:var(--sans);cursor:pointer;border:none;background:none;color:inherit;font-size:inherit}
 input,textarea{font-family:var(--sans);font-size:14px;color:var(--ink)}
 
-header{background:var(--forest);color:var(--on-brand);border-radius:14px;padding:20px 24px;margin-bottom:14px;position:relative;overflow:hidden}
-header:after{content:"";position:absolute;right:-40px;top:-40px;width:220px;height:220px;background:radial-gradient(circle,rgba(74,222,128,.32),transparent 70%)}
+/* The hero is charcoal rather than brand green, for two reasons. White on the
+   palette green reaches only 3.3:1 - fine for the 26px title, failing for the
+   12px sub-labels beside it - while white on #263238 is ~14.8:1, so the whole
+   block is legible without darkening the brand into something that is no
+   longer the palette colour. And it lets green become the thing that MOVES on
+   this surface (the progress fill, the stats) instead of being the surface
+   itself, which is what "focus" should look like: the one lit thing.
+   Layered gradients rather than a flat fill give it depth. */
+header{background:
+    radial-gradient(120% 140% at 12% -20%, rgba(var(--glow-rgb),.28), transparent 60%),
+    linear-gradient(135deg,#263238 0%,#31424A 58%,#263238 100%);
+  color:var(--on-brand);border-radius:14px;padding:20px 24px;margin-bottom:14px;position:relative;overflow:hidden}
+header:after{content:"";position:absolute;right:-40px;top:-40px;width:220px;height:220px;background:radial-gradient(circle,rgba(var(--glow-rgb),.34),transparent 70%)}
 /* Used to be a two-column flex (title left, stats right); stats now lives
    under the date instead, so this is just the title block's positioning
    context - kept as its own rule in case something else joins it later. */
@@ -145,7 +193,7 @@ header h1{font-size:26px;letter-spacing:.3px}
 .stat b{display:block;font-family:var(--serif);font-size:21px;line-height:1.1}
 .stat span{font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:var(--on-brand)}
 .daybar{margin-top:16px;position:relative;z-index:1}
-.daybar-track{height:6px;background:rgba(250,249,246,.2);border-radius:3px;overflow:hidden}
+.daybar-track{height:6px;background:rgba(236,239,241,.22);border-radius:3px;overflow:hidden}
 .daybar-fill{height:100%;background:var(--olive);border-radius:3px;transition:width .4s}
 .daybar-lbl{display:flex;justify-content:space-between;font-size:11px;color:var(--on-brand);margin-top:6px}
 
@@ -163,6 +211,12 @@ header h1{font-size:26px;letter-spacing:.3px}
 .pill.sync i{width:7px;height:7px;border-radius:50%;background:var(--line);display:block}
 .pill.sync.ok i{background:var(--olive)}
 .pill.sync.warn i{background:var(--terra)}
+/* "Needs reconnecting" and "actually failed" used to share one orange dot.
+   They are different problems - one is a chore, the other is data not being
+   saved - so failure now takes the adrenaline colour and reconnection keeps
+   the endurance one. */
+.pill.sync.err i{background:var(--alert)}
+.pill.sync.err{border-color:var(--alert);color:var(--alert-ink)}
 .pill.sync.ok{border-color:var(--olive)}
 .synced-note{font-size:10.5px;color:var(--muted);text-align:right;margin-top:3px;max-width:230px}
 
@@ -203,7 +257,7 @@ header h1{font-size:26px;letter-spacing:.3px}
 .box.done:after{content:"";width:5px;height:9px;border:solid var(--on-brand);border-width:0 2px 2px 0;transform:rotate(45deg) translate(-1px,-1px)}
 .rit-l{flex:1;font-size:13px}
 .rit.done .rit-l{color:var(--muted);text-decoration:line-through}
-.rit-tag{font-size:9.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--sage);font-weight:700}
+.rit-tag{font-size:9.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:700}
 .rit .x{color:var(--sage);font-size:15px;line-height:1;padding:0 2px;flex:none}
 .rit:hover .x{color:var(--terra-ink)}
 .streak{font-size:11px;color:var(--terra-ink);font-weight:700;white-space:nowrap}
@@ -251,10 +305,10 @@ header h1{font-size:26px;letter-spacing:.3px}
 .blk-b{width:3px;border-radius:2px;background:var(--sage);align-self:stretch;min-height:20px}
 .blk-n{font-size:12.5px;font-weight:600}
 .blk-d{font-size:10.5px;color:var(--muted)}
-.blk.now{background:linear-gradient(90deg,rgba(22,163,74,.3),rgba(22,163,74,.05));
+.blk.now{background:linear-gradient(90deg,rgba(var(--glow-rgb),.30),rgba(var(--glow-rgb),.05));
   border-radius:6px;padding:6px 6px 6px 9px;margin:0 -6px;
   border-left:3px solid var(--terra);
-  box-shadow:0 1px 4px rgba(22,163,74,.18)}
+  box-shadow:0 1px 4px rgba(var(--glow-rgb),.20)}
 .blk.now .blk-b{background:var(--terra)}
 .blk.now .blk-n{color:var(--forest-ink);font-weight:800}
 .now-badge{display:inline-block;font-size:8.5px;font-weight:800;letter-spacing:.6px;
@@ -264,7 +318,7 @@ header h1{font-size:26px;letter-spacing:.3px}
 .blk.sleepb .blk-n{color:var(--night-ink)}
 
 /* one-off appointments in the timeline */
-.blk.ev{background:linear-gradient(90deg,rgba(234,88,12,.10),transparent);border-radius:6px;padding-left:6px;margin-left:-6px}
+.blk.ev{background:linear-gradient(90deg,rgba(251,140,0,.12),transparent);border-radius:6px;padding-left:6px;margin-left:-6px}
 .blk.ev .blk-n{color:var(--terra-ink)}
 .blk .x{color:var(--sage);font-size:15px;line-height:1;padding:0 4px;align-self:center}
 .blk .x:hover{color:var(--terra-ink)}
@@ -366,14 +420,14 @@ header h1{font-size:26px;letter-spacing:.3px}
    --forest directly (via a translucent panel per bubble, not a wash on the
    whole lane) so it needs its own contrast pass, not .nudge's old
    var(--paper)-card styling. */
-#nudges{margin-top:14px;padding-top:12px;border-top:1px solid rgba(240,253,244,.22);
+#nudges{margin-top:14px;padding-top:12px;border-top:1px solid rgba(236,239,241,.20);
   display:flex;flex-direction:column;gap:6px;position:relative;z-index:1}
 #nudges:empty{display:none;margin-top:0;padding-top:0;border-top:none}
 /* Flat translucent chip, not a bubble-card - a dark wash over the green
    keeps var(--on-brand) comfortably above 4.5:1 (measured ~5.1:1) without
    needing a separate text colour per theme. Colour-coding moves to the
    left border only; body text stays uniform on-brand. */
-.nudge{background:rgba(11,17,10,.18);border:1px solid rgba(240,253,244,.22);
+.nudge{background:rgba(0,0,0,.22);border:1px solid rgba(236,239,241,.20);
   border-left:3px solid var(--terra);border-radius:8px;
   padding:7px 30px 7px 10px;font-size:12px;color:var(--on-brand);
   display:flex;gap:7px;align-items:flex-start;position:relative;
@@ -381,6 +435,11 @@ header h1{font-size:26px;letter-spacing:.3px}
 @keyframes nudgeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 .nudge b{color:inherit}
 .nudge.cool{border-left-color:var(--night-ink)}
+/* The one nudge tier that is allowed to raise a pulse: something is overdue,
+   not merely pending. Red on the left edge only - a red-filled nudge among
+   five others would spend the colour on decoration. */
+.nudge.urgent{border-left-color:var(--alert);border-left-width:4px}
+.nudge.urgent b{color:#FFCDD2}
 /* Appointments get their own tier, distinct from the default "you're behind
    on something" orange - they're neutral facts, not a warning, so a calmer
    accent fits. Must-attend escalates past that into --ln-x1 (unused
@@ -389,10 +448,10 @@ header h1{font-size:26px;letter-spacing:.3px}
    established meaning) - deliberately its own hue rather than just a bolder
    orange, so it reads as a distinct tier at a glance, not a shade of the same one. */
 .nudge.apt{border-left-color:var(--olive)}
-.nudge.apt-must{border-left-color:var(--ln-x1)}
+.nudge.apt-must{border-left-color:var(--alert)}
 .nudge .x{position:absolute;top:4px;right:4px;color:var(--on-brand);opacity:.75;font-size:15px;line-height:1;
   padding:4px 7px;border-radius:7px}
-.nudge .x:hover{opacity:1;background:rgba(240,253,244,.16)}
+.nudge .x:hover{opacity:1;background:rgba(236,239,241,.16)}
 .dual{background:var(--night);color:var(--on-brand);font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border-radius:4px;padding:1px 5px}
 
 /* ---- tabs: Board / Reports ---- */
@@ -425,7 +484,7 @@ body.view-reports .board-only,body.view-history .board-only,body.view-cal .board
 .rep-counts{font-size:11px;color:var(--muted);white-space:nowrap}
 .rep-row{display:flex;gap:9px;align-items:center;padding:5px 0;border-bottom:1px dashed var(--line);font-size:12.5px}
 .rep-row:last-child{border-bottom:none}
-.rep-status{width:14px;text-align:center;color:var(--sage);font-weight:700}
+.rep-status{width:14px;text-align:center;color:var(--muted);font-weight:700}
 .rep-row.done .rep-status{color:var(--forest-ink)}
 .rep-row.done .rep-title{color:var(--muted);text-decoration:line-through}
 .rep-title{flex:1;word-break:break-word}
@@ -455,7 +514,7 @@ body.view-reports .board-only,body.view-history .board-only,body.view-cal .board
 .chip.bad{background:var(--terra);color:var(--on-warm)}
 .chip.neutral{background:var(--ivory);color:var(--muted);border-color:var(--line)}
 .chip.dev{background:var(--ivory);color:var(--ink);border-color:var(--line);text-transform:none;letter-spacing:0;font-weight:600}
-.rev-id{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:10px;color:var(--sage)}
+.rev-id{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:10px;color:var(--muted)}
 .hist-btn{border:1px solid var(--line);border-radius:7px;padding:4px 10px;font-size:11.5px;
   font-weight:600;color:var(--forest-ink);background:var(--paper)}
 .hist-btn:hover{background:var(--ivory);border-color:var(--olive)}
@@ -537,7 +596,7 @@ body.view-reports .board-only,body.view-history .board-only,body.view-cal .board
   padding:20px;background:var(--ivory);overflow-y:auto}
 #authGate[hidden]{display:none}
 .ag-card{width:100%;max-width:420px;background:var(--paper);border:1px solid var(--line);
-  border-radius:14px;padding:26px 24px;box-shadow:0 10px 40px rgba(15,23,42,.10)}
+  border-radius:14px;padding:26px 24px;box-shadow:0 10px 40px rgba(var(--shadow-rgb),.14)}
 .ag-brand{font-family:var(--serif);font-size:23px;color:var(--forest-ink);margin:0 0 2px}
 .ag-sub{font-size:12.5px;color:var(--muted);margin:0 0 18px}
 .ag-h{font-size:15px;font-weight:700;color:var(--ink);margin:0 0 4px}
@@ -562,7 +621,7 @@ body.view-reports .board-only,body.view-history .board-only,body.view-cal .board
 .ag-foot{margin-top:16px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:12.5px}
 .ag-msg{display:none;margin-bottom:14px;padding:10px 12px;border-radius:8px;font-size:12.5px;line-height:1.5}
 .ag-msg.on{display:block}
-.ag-msg.err{background:var(--terra-lt);color:var(--terra-ink);border:1px solid var(--terra)}
+.ag-msg.err{background:var(--alert-lt);color:var(--alert-ink);border:1px solid var(--alert)}
 .ag-msg.ok{background:var(--olive-lt);color:var(--forest-dk);border:1px solid var(--olive)}
 .ag-q{font-weight:600;color:var(--ink);font-size:13.5px;margin:0 0 14px;padding:10px 12px;
   background:var(--ivory);border-radius:8px;border:1px solid var(--line)}
@@ -1213,7 +1272,7 @@ return {
   .cal-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
   .cal-tag{font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:999px;background:var(--ivory);color:var(--muted)}
   .cal-tag.rep{background:var(--olive-lt);color:var(--forest-dk)}
-  .cal-tag.must{background:var(--terra-lt);color:var(--terra-ink)}
+  .cal-tag.must{background:var(--alert-lt);color:var(--alert-ink)}
   .cal-actions{margin-left:auto;display:flex;gap:6px;flex-shrink:0}
   .cal-tick{width:22px;height:22px;flex-shrink:0;cursor:pointer;margin-top:1px}
 
@@ -1237,10 +1296,10 @@ return {
 
   /* Activity editor */
   #actModal{position:fixed;inset:0;z-index:9998;display:flex;align-items:flex-start;justify-content:center;
-    padding:24px 16px;background:rgba(15,23,42,.5);overflow-y:auto}
+    padding:24px 16px;background:rgba(var(--shadow-rgb),.55);overflow-y:auto}
   #actModal[hidden]{display:none}
   .am-card{width:100%;max-width:470px;background:var(--paper);border:1px solid var(--line);
-    border-radius:13px;padding:22px;box-shadow:0 14px 50px rgba(15,23,42,.28)}
+    border-radius:13px;padding:22px;box-shadow:0 14px 50px rgba(var(--shadow-rgb),.34)}
   .am-card h3{margin:0 0 14px;font-family:var(--serif);font-size:19px;color:var(--forest-ink)}
   .am-row{display:flex;gap:10px}
   .am-row>.ag-f{flex:1;min-width:0}
@@ -1256,10 +1315,10 @@ return {
     color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;resize:vertical}
   .am-actions{display:flex;gap:9px;align-items:center;margin-top:18px}
   .am-actions .ag-btn{width:auto;flex:1}
-  .am-del{margin-left:auto;color:var(--terra-ink);border-color:var(--terra)}
-  .am-del:hover{background:var(--terra-lt)}
+  .am-del{margin-left:auto;color:var(--alert-ink);border-color:var(--alert)}
+  .am-del:hover{background:var(--alert-lt)}
   .am-msg{display:none;margin-bottom:12px;padding:9px 11px;border-radius:8px;font-size:12.5px;
-    background:var(--terra-lt);color:var(--terra-ink);border:1px solid var(--terra)}
+    background:var(--alert-lt);color:var(--alert-ink);border:1px solid var(--alert)}
   .am-msg.on{display:block}
 
   @media(max-width:720px){
@@ -1632,7 +1691,7 @@ function idbDel(k){return idb().then(function(db){return new Promise(function(re
 function setSync(state,note){
   syncState=state;
   var b=document.getElementById("syncBtn"),t=document.getElementById("syncTxt"),n=document.getElementById("syncNote");
-  b.className="pill sync"+(state==="synced"?" ok":(state==="needs"||state==="error"?" warn":""));
+  b.className="pill sync"+(state==="synced"?" ok":state==="error"?" err":state==="needs"?" warn":"");
   t.textContent = state==="synced"?"Synced to file"
                 : state==="needs" ?"Reconnect file"
                 : state==="error" ?"Sync error"
@@ -1707,7 +1766,7 @@ function setCloud(state,note){
   cloudState=state;
   var b=document.getElementById("cloudBtn"),t=document.getElementById("cloudTxt"),n=document.getElementById("cloudNote");
   if(!b)return;
-  b.className="pill sync"+(state==="synced"?" ok":(state==="error"?" warn":""));
+  b.className="pill sync"+(state==="synced"?" ok":(state==="error"?" err":""));
   t.textContent = state==="synced" ? "Cloud synced"
                 : state==="error"  ? "Cloud sync error"
                 :                    "Cloud: tap to sync";
@@ -1798,7 +1857,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="2.2";
+var APP_VERSION="2.3";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -1809,6 +1868,7 @@ var APP_VERSION="2.2";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-04T23:55:00+08:00",text:"New colour system. Green now means focus and problem-solving, orange means drive and endurance -- the night shift, streaks, the long grind -- and red means adrenaline: must-attend, overdue, and errors only, kept rare so it still registers. The header is charcoal so the green can be the thing that moves on it. Every text colour was checked for contrast in both light and dark."},
   {ts:"2026-09-04T23:30:00+08:00",text:"The shift start time is now editable - click the 7:00am chip on the Shift timeline to change when your day rolls over, and the note underneath updates itself. Weekly targets merged into Non-negotiables, which is now Non-negotiables & Goals: give any item a weekly target and it tracks your pace instead of a streak. Removed the day-count badge from tasks."},
   {ts:"2026-09-04T22:10:00+08:00",text:"Added My Personal Calendar — month, week, day, year, agenda and recurring views for your own schedule. Activities can repeat daily, weekly, monthly or yearly, each day can carry an objective like a lesson plan, and anything with a start and end time automatically shows on the Board's Shift Timeline and in your daily reminders."},
   {ts:"2026-08-15T21:40:00+08:00",text:"ProDash now asks you to log in. Everyone gets their own separate board that follows them to any device, instead of one shared board behind one shared password. Includes sign-up, forgot-password with a secret question, and a 15-minute lock after three wrong passwords."},
@@ -2498,7 +2558,8 @@ function renderNudges(){
     if(tm)out.push(["","tomorrow-first","<b>First up tomorrow: "+esc(tm.n)+" at "+fmt(tm.s)+".</b>"]);
   }
   var stale=S.tasks.filter(function(t){return !t.done&&ageOf(t)>=3;}).length;
-  if(stale)out.push(["","stale-tasks","<b>"+stale+" task"+(stale>1?"s have":" has")+" been open 3+ shifts.</b> Do it, delegate it, or delete it."]);
+  // Overdue, not just pending - this is the one that gets the adrenaline tier.
+  if(stale)out.push(["urgent","stale-tasks","<b>"+stale+" task"+(stale>1?"s have":" has")+" been open 3+ shifts.</b> Do it, delegate it, or delete it."]);
 
   var visible=out.filter(function(x){return !dismissedNudges[x[1]];});
   var c=document.getElementById("nudges");
