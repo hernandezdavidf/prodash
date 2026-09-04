@@ -80,6 +80,11 @@
   /* rgb triples for gradients and shadows that need alpha. Charcoal shadows
      sit better on a blue-grey ground than neutral black. */
   --shadow-rgb:38,50,56; --glow-rgb:67,160,71;
+  /* Consolidated Checklist notebook stock. Ruled paper is the one place red
+     and blue appear decoratively rather than semantically, so they are their
+     own tokens - nothing should read a ruling line as an alert. */
+  --paper-note:#FFFDF6; --rule-a:rgba(30,136,229,.34); --rule-b:rgba(229,57,53,.26);
+  --rule-margin:rgba(229,57,53,.42); --note-ink:#1F2A30;
   --ln-dayclient:#1E88E5; --ln-nightclienta:#3949AB; --ln-nightclientb:#00ACC1;
   --ln-biz:#00897B;       --ln-grow:#8E24AA;         --ln-other:#607D8B;
   /* Swatch palette offered when adding a custom lane. Decorative fills only
@@ -111,6 +116,8 @@
     --line:#37474F; --ink:#ECEFF1; --muted:#B0BEC5; --sage:#90A4AE;
     --night:#455A64; --night-ink:#90A4AE;
     --shadow-rgb:0,0,0; --glow-rgb:102,187,106;
+    --paper-note:#1E272B; --rule-a:rgba(100,181,246,.22); --rule-b:rgba(239,83,80,.20);
+    --rule-margin:rgba(239,83,80,.30); --note-ink:#ECEFF1;
     --ln-dayclient:#64B5F6; --ln-nightclienta:#7986CB; --ln-nightclientb:#4DD0E1;
     --ln-biz:#4DB6AC;       --ln-grow:#BA68C8;         --ln-other:#90A4AE;
     --ln-x1:#F06292; --ln-x2:#9575CD; --ln-x3:#4FC3F7;
@@ -129,6 +136,8 @@
   --line:#37474F; --ink:#ECEFF1; --muted:#B0BEC5; --sage:#90A4AE;
   --night:#455A64; --night-ink:#90A4AE;
   --shadow-rgb:0,0,0; --glow-rgb:102,187,106;
+  --paper-note:#1E272B; --rule-a:rgba(100,181,246,.22); --rule-b:rgba(239,83,80,.20);
+  --rule-margin:rgba(239,83,80,.30); --note-ink:#ECEFF1;
   --ln-dayclient:#64B5F6; --ln-nightclienta:#7986CB; --ln-nightclientb:#4DD0E1;
   --ln-biz:#4DB6AC;       --ln-grow:#BA68C8;         --ln-other:#90A4AE;
   --ln-x1:#F06292; --ln-x2:#9575CD; --ln-x3:#4FC3F7;
@@ -1129,6 +1138,89 @@ return {
     </div>
   </div>
 
+  <style>
+  /* ---- Consolidated Checklist -----------------------------------------
+     One continuous ruled page holding every task on the board, grouped by
+     lane. It reads the same S.tasks the Classic columns do and toggles
+     through the same toggleTask(), so the two views can never disagree
+     about what is done.
+
+     RHYTHM IS THE WHOLE TRICK: --rl is the ruling pitch, and every element
+     on the page - rows, headers, wrapped lines of a long task - is either
+     exactly --rl tall or a whole multiple of it, with line-height:var(--rl)
+     rather than padding. That is what keeps text sitting ON the lines
+     instead of drifting off them the moment a task wraps to two lines. If
+     you add anything here, give it a height that is a multiple of --rl. */
+  .bview{display:flex;justify-content:flex-start;margin-bottom:12px}
+  #checklist[hidden],.cols[hidden]{display:none}
+
+  .chk-paper{--rl:38px;position:relative;border:1px solid var(--line);border-radius:12px;
+    overflow:hidden;background-color:var(--paper-note);
+    background-image:repeating-linear-gradient(to bottom,
+      transparent 0, transparent calc(var(--rl) - 1px),
+      var(--rule-a) calc(var(--rl) - 1px), var(--rule-a) var(--rl),
+      transparent var(--rl), transparent calc(var(--rl)*2 - 1px),
+      var(--rule-b) calc(var(--rl)*2 - 1px), var(--rule-b) calc(var(--rl)*2));
+    box-shadow:0 2px 10px rgba(var(--shadow-rgb),.10)}
+  /* The margin rule every school notebook has. Decorative only - it sits
+     behind the content and never boxes anything in. */
+  .chk-paper:before{content:"";position:absolute;left:54px;top:0;bottom:0;width:1px;
+    background:var(--rule-margin);z-index:0}
+  .chk-inner{position:relative;z-index:1}
+
+  .chk-head{display:flex;align-items:center;gap:9px;height:var(--rl);padding:0 14px 0 68px;
+    color:#fff;font-family:var(--serif);font-weight:700;font-size:14px;letter-spacing:.2px;
+    /* A flat 28% black wash over whatever hue the lane carries. Lane colours
+       range from dark indigo to bright cyan, and white text fails on the
+       lighter end; this floors every one of them past 4.5:1 without needing
+       a hand-picked "dark version" of each lane colour. */
+    background-image:linear-gradient(rgba(0,0,0,.28),rgba(0,0,0,.28))}
+  .chk-head .chk-hc{margin-left:auto;font-family:var(--sans);font-size:11px;font-weight:700;
+    opacity:.92;letter-spacing:.3px}
+
+  .chk-row{display:flex;align-items:flex-start;gap:11px;padding:0 14px 0 68px;
+    min-height:var(--rl);position:relative}
+  .chk-row:hover{background:rgba(var(--glow-rgb),.07)}
+  .chk-t{flex:1;min-width:0;font-family:var(--serif);font-size:15px;line-height:var(--rl);
+    color:var(--note-ink);word-break:break-word}
+  /* Crossed off the way you would on paper: a red pen line, not a grey-out. */
+  .chk-row.done .chk-t{text-decoration:line-through;text-decoration-color:var(--alert);
+    text-decoration-thickness:2px;opacity:.5}
+  .chk-box{width:19px;height:19px;min-width:19px;margin-top:calc((var(--rl) - 19px)/2);
+    border:2px solid var(--olive);border-radius:5px;background:transparent;
+    display:flex;align-items:center;justify-content:center;transition:.15s;padding:0;cursor:pointer}
+  .chk-box.done{background:var(--forest);border-color:var(--forest)}
+  .chk-box.done:after{content:"";width:5px;height:9px;border:solid #fff;border-width:0 2px 2px 0;
+    transform:rotate(45deg) translate(-1px,-1px)}
+  .chk-x{color:var(--sage);font-size:16px;line-height:var(--rl);padding:0 2px;opacity:0;transition:.15s}
+  .chk-row:hover .chk-x{opacity:.75}
+  .chk-x:hover{opacity:1;color:var(--alert-ink)}
+
+  .chk-top{display:flex;flex-wrap:wrap;gap:14px;align-items:baseline;margin-bottom:12px}
+  .chk-title{font-family:var(--serif);font-size:19px;color:var(--forest-ink)}
+  .chk-sum{font-size:12.5px;color:var(--muted)}
+  .chk-empty{padding:0 14px 0 68px;height:var(--rl);line-height:var(--rl);
+    font-family:var(--serif);font-size:14px;color:var(--muted);font-style:italic}
+  /* Orphans: a task whose lane was deleted still belongs to "every task on
+     the board", so it gets its own section rather than quietly vanishing. */
+  .chk-head.orphan{background-color:var(--sage)}
+  @media(max-width:620px){
+    .chk-paper{--rl:34px}
+    .chk-paper:before{left:34px}
+    .chk-head,.chk-row,.chk-empty{padding-left:46px}
+    .chk-t{font-size:14px}
+  }
+  </style>
+
+  <div class="bview board-only">
+    <div class="sub-tabs">
+      <button class="sub-tab on" data-bview="classic">Classic view</button>
+      <button class="sub-tab" data-bview="checklist">Consolidated checklist</button>
+    </div>
+  </div>
+
+  <div id="checklist" class="board-only" hidden></div>
+
   <div class="cols board-only">
     <div>
       <div class="card timelinecard">
@@ -1601,6 +1693,8 @@ function norm(s){
   // two devices disagreeing about when "today" begins would put the same
   // 3am edit on two different dates.
   if(typeof s.roll!=="number"||s.roll<0||s.roll>=1440)s.roll=420;
+  // Which Board layout is showing: the lane columns, or the ruled checklist.
+  if(["classic","checklist"].indexOf(s.boardView)<0)s.boardView="classic";
   if(typeof s.updatedAt!=="number")s.updatedAt=0;
   // Board History. Both are MERGED across devices rather than last-write-wins
   // (see adopt()) - an audit trail that loses the losing side's entries can't
@@ -1857,7 +1951,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="2.3";
+var APP_VERSION="2.4";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -1868,6 +1962,7 @@ var APP_VERSION="2.3";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-05T00:20:00+08:00",text:"The Board now has two layouts. Classic view is the lane columns, unchanged. Consolidated checklist puts every task from every lane onto one sheet of ruled notebook paper, grouped under coloured lane headings, and crosses finished items through in red pen. Ticking something in either view updates the other."},
   {ts:"2026-09-04T23:55:00+08:00",text:"New colour system. Green now means focus and problem-solving, orange means drive and endurance -- the night shift, streaks, the long grind -- and red means adrenaline: must-attend, overdue, and errors only, kept rare so it still registers. The header is charcoal so the green can be the thing that moves on it. Every text colour was checked for contrast in both light and dark."},
   {ts:"2026-09-04T23:30:00+08:00",text:"The shift start time is now editable - click the 7:00am chip on the Shift timeline to change when your day rolls over, and the note underneath updates itself. Weekly targets merged into Non-negotiables, which is now Non-negotiables & Goals: give any item a weekly target and it tracks your pace instead of a streak. Removed the day-count badge from tasks."},
   {ts:"2026-09-04T22:10:00+08:00",text:"Added My Personal Calendar — month, week, day, year, agenda and recurring views for your own schedule. Activities can repeat daily, weekly, monthly or yearly, each day can carry an objective like a lesson plan, and anything with a start and end time automatically shows on the Board's Shift Timeline and in your daily reminders."},
@@ -1896,8 +1991,8 @@ var APP_VERSION_HISTORY=[
    pushed" is per-account, though - it tracks a specific board's revisions. */
 var DEV_KEY="prodash.deviceId", DEV_NAME_KEY="prodash.deviceName", PUSHED_KEY=PDAuth.ns("prodash.pushedUpTo");
 var HIST_CAP=400, CKPT_EVERY=25, BATCH_MS=2500;
-var BOARD_KEYS=["tasks","log","days","events","lanes","rituals","focus","theme","hiddenBlocks","plans","roll"];
-var KEYED=["tasks","events","lanes","rituals"], MAPS=["log","days","plans"], SCALARS=["focus","theme","roll"];
+var BOARD_KEYS=["tasks","log","days","events","lanes","rituals","focus","theme","hiddenBlocks","plans","roll","boardView"];
+var KEYED=["tasks","events","lanes","rituals"], MAPS=["log","days","plans"], SCALARS=["focus","theme","roll","boardView"];
 // Plain arrays of primitive ids (not objects with their own .id, so KEYED's
 // per-item union doesn't apply) compared by CONTENT, not reference - a
 // cloned snapshot never shares object identity with the live array even
@@ -2630,6 +2725,94 @@ function editRoll(){
   try{inp.focus();}catch(e){}
 }
 
+/* Ticking a task has to mean exactly the same thing in the Classic columns and
+   in the Consolidated Checklist, so both call these rather than each carrying
+   their own copy. The completedAt stamp in particular is load-bearing: Reports
+   answers "what got done this week" from it, and a second view that forgot to
+   set it would silently drop its completions out of every report. */
+/* ---------- Consolidated Checklist ----------
+   Every task on the board on one ruled page, grouped by lane. Deliberately a
+   RENDERING of S.tasks rather than a separate list: nothing is copied, so
+   there is nothing to keep in step. Lanes appear in the user's own lane order
+   so the page matches the columns they already know. */
+function renderChecklist(){
+  var host=document.getElementById("checklist");
+  if(!host)return;
+  var tasks=S.tasks||[], lanes=S.lanes||[];
+  var doneAll=tasks.filter(function(t){return t.done;}).length;
+
+  var head='<div class="chk-top"><div class="chk-title">Everything on the board</div>'+
+    '<div class="chk-sum">'+doneAll+' of '+tasks.length+' done'+
+    (tasks.length?' · '+Math.round(doneAll/tasks.length*100)+'%':'')+'</div></div>';
+
+  if(!tasks.length){
+    host.innerHTML=head+'<div class="chk-paper"><div class="chk-inner">'+
+      '<div class="chk-empty">Nothing on the board yet — add a task in Classic view.</div>'+
+      '</div></div>';
+    return;
+  }
+
+  var seen={}, body="";
+  lanes.forEach(function(L){
+    var mine=tasks.filter(function(t){return t.lane===L.id;});
+    mine.forEach(function(t){seen[t.id]=1;});
+    if(!mine.length)return;                       // empty lanes would be noise here
+    body+=section(L.name,L.color,mine);
+  });
+  // A task whose lane was deleted is still on the board, and "include all
+  // tasks" means all of them - so it surfaces here instead of disappearing.
+  var orphans=tasks.filter(function(t){return !seen[t.id];});
+  if(orphans.length)body+=section("Unassigned",null,orphans);
+
+  host.innerHTML=head+'<div class="chk-paper"><div class="chk-inner">'+body+'</div></div>';
+
+  host.querySelectorAll(".chk-row [data-act]").forEach(function(el){
+    el.addEventListener("click",function(){
+      var id=el.closest(".chk-row").getAttribute("data-id");
+      if(el.getAttribute("data-act")==="tog")toggleTask(id); else deleteTask(id);
+      save();renderAll();
+    });
+  });
+
+  function section(name,color,list){
+    // Open tasks first, so the page reads as "what is left" with the crossed-
+    // off items collected underneath, the way a worked-through list looks.
+    var sorted=list.slice().sort(function(a,b){return (a.done?1:0)-(b.done?1:0);});
+    var d=list.filter(function(t){return t.done;}).length;
+    return '<div class="chk-head'+(color?'':' orphan')+'"'+(color?' style="background-color:'+color+'"':'')+'>'+
+        esc(name)+'<span class="chk-hc">'+d+'/'+list.length+'</span></div>'+
+      sorted.map(function(t){
+        return '<div class="chk-row'+(t.done?" done":"")+'" data-id="'+esc(t.id)+'">'+
+          '<button class="chk-box'+(t.done?" done":"")+'" data-act="tog" role="checkbox" aria-checked="'+
+            (t.done?"true":"false")+'" aria-label="'+esc(t.text)+'"></button>'+
+          '<div class="chk-t">'+esc(t.text)+'</div>'+
+          '<button class="chk-x" data-act="del" aria-label="Delete task">&times;</button>'+
+        '</div>';
+      }).join("");
+  }
+}
+
+function setBoardView(v){
+  S.boardView=(v==="checklist")?"checklist":"classic";
+  var chk=S.boardView==="checklist";
+  document.getElementById("checklist").hidden=!chk;
+  document.querySelector(".cols").hidden=chk;
+  document.querySelectorAll("[data-bview]").forEach(function(b){
+    b.classList.toggle("on",b.dataset.bview===S.boardView);});
+  if(chk)renderChecklist();
+}
+
+function toggleTask(id){
+  S.tasks.forEach(function(t){
+    if(t.id!==id)return;
+    t.done=!t.done;
+    if(t.done)t.completedAt=today(); else delete t.completedAt;
+  });
+}
+function deleteTask(id){
+  S.tasks=S.tasks.filter(function(t){return t.id!==id;});
+}
+
 function renderRituals(){
   var l=day(),c=document.getElementById("rituals"),done=0;
   c.innerHTML="";
@@ -2846,13 +3029,8 @@ function renderLanes(){
       var a=e.target.getAttribute("data-act");if(!a)return;
       var row=e.target.closest(".tsk");if(!row)return;
       var id=row.getAttribute("data-id");
-      if(a==="tog")S.tasks.forEach(function(t){if(t.id===id){
-        t.done=!t.done;
-        // stamped so Reports can filter completions by date - "added" alone
-        // can't answer "what got done this week" once a task sits open for a while
-        if(t.done)t.completedAt=today(); else delete t.completedAt;
-      }});
-      else if(a==="del")S.tasks=S.tasks.filter(function(t){return t.id!==id;});
+      if(a==="tog")toggleTask(id);
+      else if(a==="del")deleteTask(id);
       save();renderAll();
     });
     if(renaming){
@@ -3039,6 +3217,10 @@ function applyTheme(){
 function renderAll(){
   renderHeader();renderNow();renderNudges();renderRituals();
   renderRoll();renderTimeline();renderLanes();renderWeek();
+  // Both Board layouts re-render together. The checklist is cheap (one pass
+  // over S.tasks) and this way a change made in either one is reflected in the
+  // other the moment you switch, with no staleness to reason about.
+  setBoardView(S.boardView);
   renderAptLaneOptions();
   if(document.body.classList.contains("view-reports"))renderReportsView();
   applyTheme();
@@ -3049,6 +3231,9 @@ function renderAll(){
 
 // ---------- wiring ----------
 document.getElementById("focusBtn").addEventListener("click",function(){S.focus=!S.focus;save();renderAll();});
+document.querySelectorAll("[data-bview]").forEach(function(b){
+  b.addEventListener("click",function(){ setBoardView(b.dataset.bview); save(); });
+});
 document.getElementById("rollBtn").addEventListener("click",editRoll);
 document.getElementById("ritAddBtn").addEventListener("click",addRitual);
 ["ritName","ritTag","ritTarget"].forEach(function(id){

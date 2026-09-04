@@ -2,6 +2,51 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-05 — Board gains a second layout: Consolidated Checklist
+
+The Board now switches between **Classic view** (the lane columns, untouched)
+and **Consolidated checklist** — every task from every lane on one sheet of
+ruled notebook paper, grouped under colour-coded lane headings, with finished
+items struck through in red.
+
+**It is a rendering, not a second list.** The checklist reads the same
+`S.tasks` the columns do, so there is no copy to keep in step. Ticking in
+either view calls the same new `toggleTask()` / `deleteTask()` helpers, which
+the Classic handler was refactored to use as well. That refactor is the point:
+`toggleTask` stamps `completedAt`, which **Reports** relies on to answer "what
+got done this week", and a second view carrying its own toggle logic would
+eventually forget that stamp and silently drop its completions out of every
+report.
+
+**The ruling rhythm is the whole trick.** `--rl` is the line pitch, and every
+element on the page — rows, lane headers, and each wrapped line of a long task
+— is exactly `--rl` tall or a whole multiple of it, achieved with
+`line-height:var(--rl)` rather than padding. Without that, text drifts off the
+ruling the moment a task wraps to a second line. Verified: a deliberately long
+task measured 68px against a 34px pitch, and every element on the page came
+back a clean multiple.
+
+**Lane headings are solid bands in the lane's own colour**, which preserves the
+lane context the brief asked for. Lane hues run from dark indigo to bright
+cyan, and white text fails on the light end, so each band carries a flat 28%
+black wash over the hue. That floors every lane past AA without needing a
+hand-picked "dark version" of each colour: cyan `#00ACC1` is 2.74:1 with white
+raw and 4.93:1 washed, the worst case in the set.
+
+**Tasks whose lane was deleted get an "Unassigned" section** rather than
+vanishing — "include all tasks across all board lanes" has to survive a lane
+being removed.
+
+Red and blue appear here as ruling lines and a margin rule, which is the one
+place in the app they are decorative rather than semantic. They are their own
+tokens (`--rule-a`, `--rule-b`, `--rule-margin`, `--paper-note`, `--note-ink`)
+in all three palette blocks, so nothing reads a ruling line as an alert and the
+notebook repaints correctly in dark. Note ink measures 14.4:1 on paper in
+light, 13.2:1 in dark.
+
+The chosen layout is stored as `boardView` and synced like `theme` and `focus`,
+so the Board opens the same way on every device.
+
 ## 2026-09-04 — New colour system: energy semantics, not decoration
 
 Rebuilt on five anchors — `#E53935` red, `#FB8C00` orange, `#43A047` green,
