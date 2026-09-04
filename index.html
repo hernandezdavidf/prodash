@@ -366,6 +366,14 @@ header h1{font-size:26px;letter-spacing:.3px}
   border:1px solid var(--olive);border-radius:6px;padding:2px 6px;background:var(--paper);
   color:var(--ink);outline:none}
 .lane-n{font-size:11px;color:var(--muted);background:var(--ivory);border-radius:999px;padding:1px 7px;border:1px solid var(--line)}
+/* Pin toggle. Hollow star = not pinned, filled + green = pinned, which reads
+   as a state rather than an action and needs no label. */
+.lane-pin{flex:none;color:var(--sage);font-size:14px;line-height:1;padding:2px 3px;border-radius:5px;transition:.15s}
+.lane-pin:hover{color:var(--forest-ink)}
+.lane-pin.on{color:var(--olive)}
+/* Pinned lanes carry a green top edge so the pinned group is visible as a
+   group, not just as "the ones that happen to be first". */
+.lane.pinned{box-shadow:inset 0 3px 0 var(--olive)}
 .lane-edit,.lane-del{flex:none;color:var(--sage);font-size:13px;line-height:1;padding:2px 3px;border-radius:5px}
 .lane-edit:hover{color:var(--forest-ink);background:var(--olive-lt)}
 .lane-del{font-size:16px;font-weight:700}
@@ -1156,10 +1164,16 @@ return {
      read that list back - so a mis-click permanently deleted Sleep or the
      company hour from every day. They are listed here instead, dashed and
      muted to read as "off", and clicking one puts it back. */
-  .hb-wrap{margin-top:11px;padding-top:11px;border-top:1px dashed var(--line);
-    display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-  .hb-l{width:100%;font-size:10px;font-weight:700;text-transform:uppercase;
-    letter-spacing:.6px;color:var(--muted);margin-bottom:3px}
+  .hb-wrap{margin-top:11px;padding-top:11px;border-top:1px dashed var(--line)}
+  .hb-l{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;
+    color:var(--muted);cursor:pointer;list-style:none;display:flex;align-items:center;gap:7px}
+  .hb-l::-webkit-details-marker{display:none}
+  /* Own disclosure triangle, so it can sit before the text and rotate. */
+  .hb-l:before{content:"\25B8";font-size:11px;transition:transform .15s;display:inline-block}
+  .hb-wrap[open] .hb-l:before{transform:rotate(90deg)}
+  .hb-l:hover{color:var(--forest-ink)}
+  .hb-hint{font-weight:600;letter-spacing:.3px;text-transform:none;opacity:.7;font-size:10.5px}
+  .hb-chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:9px}
   .hb-chip{font-size:11.5px;padding:3px 10px;border-radius:999px;border:1px dashed var(--line);
     color:var(--muted);background:var(--paper);transition:.15s}
   .hb-chip:hover{border-style:solid;border-color:var(--olive);color:var(--forest-ink)}
@@ -1191,6 +1205,7 @@ return {
     background-image:linear-gradient(rgba(0,0,0,.28),rgba(0,0,0,.28))}
   .chk-head .chk-hc{margin-left:auto;font-family:var(--sans);font-size:11px;font-weight:700;
     opacity:.92;letter-spacing:.3px}
+  .chk-pin{font-size:12px;opacity:.95}
 
   .chk-row{display:flex;align-items:flex-start;gap:11px;padding:0 14px 0 68px;
     min-height:var(--rl);position:relative}
@@ -1966,7 +1981,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="2.5";
+var APP_VERSION="2.6";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -2756,19 +2771,38 @@ function editRoll(){
    it removal is permanent and invisible - you cannot even see WHAT you removed.
    Shown right under the timeline it belongs to, so the undo lives next to the
    thing it undoes rather than in a settings screen. */
+// Session-only: whether the hidden-blocks list is expanded. Not in S, because
+// "is this drawer open" is not board data and should not sync to your phone.
+var hbOpen=false;
 function renderHiddenBlocks(){
   var host=document.getElementById("hiddenList");
   if(!host)return;
   var hidden=(S.hiddenBlocks||[]);
   if(!hidden.length){host.innerHTML="";return;}
-  host.innerHTML='<div class="hb-wrap"><div class="hb-l">Hidden from your schedule — tap to put back</div>'+
+  /* Read the open state off the live element rather than trusting a flag kept
+     by the "toggle" event: that event fires ASYNCHRONOUSLY, so collapsing the
+     drawer and immediately doing something that saves (pinning a lane, ticking
+     a task) re-rendered from a stale flag and sprang it back open. Reading the
+     DOM here is synchronous and therefore always current. */
+  var existing=document.getElementById("hbDetails");
+  if(existing)hbOpen=existing.open;
+  /* Collapsed by default. Someone who has pruned their routine down to the
+     few blocks they actually keep can end up with a dozen chips here, and an
+     undo list that outgrows the timeline it sits under stops being an undo
+     list and becomes clutter. <details> gives the disclosure for free, keyboard
+     and screen-reader behaviour included; hbOpen survives the re-render that
+     every save triggers, so it does not snap shut while you are using it. */
+  host.innerHTML='<details class="hb-wrap" id="hbDetails"'+(hbOpen?" open":"")+'>'+
+    '<summary class="hb-l">'+hidden.length+' hidden from your schedule'+
+      '<span class="hb-hint">tap to put back</span></summary>'+
+    '<div class="hb-chips">'+
     hidden.map(function(id){
       var b=BLOCKS.filter(function(x){return x.id===id;})[0];
       // An id with no matching BLOCK means the seed schedule changed under a
       // saved board. Still listed, so it can be cleared rather than lingering.
       return '<button class="hb-chip" data-restore="'+esc(id)+'">'+
         esc(b?b.n:id)+(b?' <span>'+fmt(b.s)+'</span>':'')+' &#8634;</button>';
-    }).join("")+'</div>';
+    }).join("")+'</div></details>';
   host.querySelectorAll("[data-restore]").forEach(function(el){
     el.addEventListener("click",function(){
       var id=el.getAttribute("data-restore");
@@ -2781,7 +2815,9 @@ function renderHiddenBlocks(){
 function renderChecklist(){
   var host=document.getElementById("checklist");
   if(!host)return;
-  var tasks=S.tasks||[], lanes=S.lanes||[];
+  // laneOrder(), not S.lanes: a lane pinned on the Board is pinned here too,
+  // which is the whole point of a pin that follows you between layouts.
+  var tasks=S.tasks||[], lanes=laneOrder();
   var doneAll=tasks.filter(function(t){return t.done;}).length;
 
   var head='<div class="chk-top"><div class="chk-title">Everything on the board</div>'+
@@ -2800,7 +2836,7 @@ function renderChecklist(){
     var mine=tasks.filter(function(t){return t.lane===L.id;});
     mine.forEach(function(t){seen[t.id]=1;});
     if(!mine.length)return;                       // empty lanes would be noise here
-    body+=section(L.name,L.color,mine);
+    body+=section(L.name,L.color,mine,L.pinned);
   });
   // A task whose lane was deleted is still on the board, and "include all
   // tasks" means all of them - so it surfaces here instead of disappearing.
@@ -2817,12 +2853,13 @@ function renderChecklist(){
     });
   });
 
-  function section(name,color,list){
+  function section(name,color,list,pinned){
     // Open tasks first, so the page reads as "what is left" with the crossed-
     // off items collected underneath, the way a worked-through list looks.
     var sorted=list.slice().sort(function(a,b){return (a.done?1:0)-(b.done?1:0);});
     var d=list.filter(function(t){return t.done;}).length;
     return '<div class="chk-head'+(color?'':' orphan')+'"'+(color?' style="background-color:'+color+'"':'')+'>'+
+        (pinned?'<span class="chk-pin" title="Pinned to the top">&#9733;</span>':'')+
         esc(name)+'<span class="chk-hc">'+d+'/'+list.length+'</span></div>'+
       sorted.map(function(t){
         return '<div class="chk-row'+(t.done?" done":"")+'" data-id="'+esc(t.id)+'">'+
@@ -3012,26 +3049,49 @@ var laneFormOpen=false, laneDraft={name:"",ritual:"",color:LANE_PALETTE[0]};
 // a task in a different lane, the 60s tick, a file sync landing).
 var laneRenamingId=null, laneRenamingDraft="";
 
+/* Display order for lanes: pinned first, everything else after, each group
+   keeping the order you arranged it in. This is a SORT rather than a physical
+   move in S.lanes, so unpinning drops a lane back where it always sat instead
+   of stranding it at the top of the unpinned group. Both Board layouts and the
+   Consolidated Checklist read this, so "pinned" means the same thing wherever
+   lanes appear. */
+function laneOrder(){
+  var L=S.lanes||[];
+  return L.filter(function(x){return x.pinned;})
+          .concat(L.filter(function(x){return !x.pinned;}));
+}
+// The pinned and unpinned lanes behave as two separate lists for reordering:
+// nudging a pinned lane down must not push it out of the pinned group, which
+// is what a single flat list would do at the boundary.
+function laneTier(L){
+  return (S.lanes||[]).filter(function(x){return !!x.pinned===!!L.pinned;});
+}
+
 function renderLanes(){
   var c=document.getElementById("lanes"),cur=currentBlock();
   var act=[];
   if(cur){if(cur.lane)act.push(cur.lane);if(cur.lane2)act.push(cur.lane2);}
   c.innerHTML="";
-  S.lanes.forEach(function(L,idx){
+  laneOrder().forEach(function(L){
     var mine=S.tasks.filter(function(t){return t.lane===L.id;});
     var open=mine.filter(function(t){return !t.done;});
     var isAct=act.indexOf(L.id)>=0;
     var el=document.createElement("div");
-    el.className="lane"+(S.focus&&act.length&&!isAct?" dim":"")+(isAct?" active":"");
+    el.className="lane"+(S.focus&&act.length&&!isAct?" dim":"")+(isAct?" active":"")+(L.pinned?" pinned":"");
     el.draggable=true;
     el.dataset.id=L.id;
+    el.dataset.pinned=L.pinned?"1":"0";
     var renaming=laneRenamingId===L.id;
+    // Ends are measured against this lane's own group, not the whole board, so
+    // the last pinned lane shows "down" disabled rather than offering a move
+    // that would silently do nothing.
+    var tier=laneTier(L), ti=tier.indexOf(L);
     // Dragging (the grip) needs a mouse - no touch browser fires HTML5 drag
     // events. These buttons are the touch-compatible way to do the same
     // thing, sitting right next to the grip so mouse users get both.
     var reorderBtns='<div class="reorder">'+
-      '<button data-lact="up" title="Move up" aria-label="Move lane up"'+(idx===0?" disabled":"")+'>&#9650;</button>'+
-      '<button data-lact="down" title="Move down" aria-label="Move lane down"'+(idx===S.lanes.length-1?" disabled":"")+'>&#9660;</button>'+
+      '<button data-lact="up" title="Move up" aria-label="Move lane up"'+(ti<=0?" disabled":"")+'>&#9650;</button>'+
+      '<button data-lact="down" title="Move down" aria-label="Move lane down"'+(ti>=tier.length-1?" disabled":"")+'>&#9660;</button>'+
       '</div>';
     var h='<div class="lane-h"><span class="grip" title="Drag to reorder">&#9776;</span>'+
       reorderBtns+
@@ -3040,7 +3100,10 @@ function renderLanes(){
         ? '<input class="lane-name-edit" id="lnEdit" value="'+esc(laneRenamingDraft)+'">'
         : '<h3>'+esc(L.name)+'</h3>')+
       '<div class="lane-n">'+open.length+'</div>'+
-      (renaming?'':'<button class="lane-edit" data-lact="rename" title="Rename lane" aria-label="Rename lane">&#9998;</button>'+
+      (renaming?'':'<button class="lane-pin'+(L.pinned?" on":"")+'" data-lact="pin" aria-pressed="'+(L.pinned?"true":"false")+
+        '" title="'+(L.pinned?"Unpin from the top":"Pin to the top of the board")+
+        '" aria-label="'+(L.pinned?"Unpin lane":"Pin lane to top")+'">'+(L.pinned?"&#9733;":"&#9734;")+'</button>'+
+      '<button class="lane-edit" data-lact="rename" title="Rename lane" aria-label="Rename lane">&#9998;</button>'+
       '<button class="lane-del" data-lact="delete" title="Remove lane" aria-label="Remove lane">&times;</button>')+
       '</div>'+
       '<div class="lane-s">'+esc(L.ritual)+'</div>';
@@ -3067,6 +3130,11 @@ function renderLanes(){
         }else if(la==="delete")deleteLane(L.id);
         else if(la==="up")moveLane(L.id,-1);
         else if(la==="down")moveLane(L.id,1);
+        else if(la==="pin"){
+          if(L.pinned)delete L.pinned; else L.pinned=true;
+          save();renderAll();
+          stamp(L.pinned?'"'+L.name+'" pinned to the top':'"'+L.name+'" unpinned');
+        }
         return;
       }
       var a=e.target.getAttribute("data-act");if(!a)return;
@@ -3196,10 +3264,16 @@ function deleteLane(id){
 // direction requested. Buttons at either end are disabled in the markup
 // (idx===0 / idx===length-1), but guard here too in case that ever drifts.
 function moveLane(id,dir){
-  var i=S.lanes.findIndex(function(x){return x.id===id;});
-  var j=i+dir;
-  if(i<0||j<0||j>=S.lanes.length)return;
-  var tmp=S.lanes[i];S.lanes[i]=S.lanes[j];S.lanes[j]=tmp;
+  var lane=(S.lanes||[]).filter(function(x){return x.id===id;})[0];
+  if(!lane)return;
+  // Reorder within the lane's own group. Swapping raw array neighbours would
+  // let a pinned lane trade places with an unpinned one, which laneOrder()
+  // then undoes on the next render - a button that visibly does nothing.
+  var tier=laneTier(lane), ti=tier.indexOf(lane), tj=ti+dir;
+  if(ti<0||tj<0||tj>=tier.length)return;
+  var other=tier[tj];
+  var i=S.lanes.indexOf(lane), j=S.lanes.indexOf(other);
+  S.lanes[i]=other; S.lanes[j]=lane;
   save();renderAll();
 }
 
@@ -3213,12 +3287,27 @@ function laneDragOver(e){
   var over=e.target.closest(".lane");
   document.querySelectorAll(".lane.drag-over").forEach(function(x){
     if(x!==over)x.classList.remove("drag-over");});
-  if(over&&over.dataset.id!==draggedLaneId)over.classList.add("drag-over");
+  // No drop indicator across the pinned boundary: pinned lanes always sit
+  // above unpinned ones, so a cross-group drop cannot change anything. Showing
+  // a target there would promise a move that laneOrder() immediately undoes.
+  if(over&&over.dataset.id!==draggedLaneId&&sameTier(over.dataset.id,draggedLaneId))
+    over.classList.add("drag-over");
+}
+function sameTier(idA,idB){
+  var a=(S.lanes||[]).filter(function(x){return x.id===idA;})[0];
+  var b=(S.lanes||[]).filter(function(x){return x.id===idB;})[0];
+  return !!a&&!!b&&!!a.pinned===!!b.pinned;
 }
 function laneDrop(e){
   if(!draggedLaneId)return;
   e.preventDefault();
   var over=e.target.closest(".lane");
+  // Dropping onto the other group is a no-op rather than a silent array
+  // shuffle the sort would immediately reverse. To move a lane between groups,
+  // use the star - that is what pinning is for.
+  if(over&&over.dataset.id&&!sameTier(over.dataset.id,draggedLaneId)){
+    draggedLaneId=null;renderAll();return;
+  }
   var fromIdx=S.lanes.findIndex(function(L){return L.id===draggedLaneId;});
   if(fromIdx<0)return;
   var item=S.lanes.splice(fromIdx,1)[0];
