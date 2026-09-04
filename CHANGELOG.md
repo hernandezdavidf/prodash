@@ -2,6 +2,35 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-05 — Long unbroken text wraps instead of widening its card
+
+A OneDrive share link pasted into a non-negotiable's tag overflowed the card.
+A URL is a single unbreakable "word", so it sets the element's min-content
+width and pushes the container past its column.
+
+Two properties are needed together, which is why the obvious one-line fix
+doesn't work: `overflow-wrap:anywhere` (unlike `break-word`, it also *shrinks
+min-content size*) plus `min-width:0`, because a flex child defaults to
+`min-width:auto` and refuses to go below its content width whatever the
+wrapping rule says. This is the same pairing the calendar grid needed, for the
+same underlying reason.
+
+Applied across every element rendering free text — ritual labels and tags,
+timeline names and descriptions, lane and report headings, calendar row titles
+and notes — rather than only where it was reported, since the next long paste
+lands somewhere else. `.tsk-l` already carried a version of this: the identical
+bug, found once before in task titles.
+
+**One deliberate exception.** The Consolidated Checklist's lane band truncates
+with an ellipsis and puts the full name on a `title` attribute instead of
+wrapping. That band has to stay exactly one ruling tall or the whole notebook
+page slips off its lines — verified the rhythm still holds with a long name.
+
+Checked by sweeping Board, Checklist, Calendar day and Agenda views with long
+URLs injected into task text, ritual labels, ritual tags, lane names,
+appointment names and notes, measuring every descendant against its container:
+zero escapes, and no horizontal page scroll.
+
 ## 2026-09-05 — Lane pinning; the hidden-blocks drawer collapses
 
 **Lanes can be pinned** with a star on their header — hollow when off, filled
