@@ -258,6 +258,23 @@ header h1{font-size:26px;letter-spacing:.3px}
   overflow-y:auto;overflow-x:hidden;resize:vertical;
   border-radius:6px;scroll-behavior:smooth}
 
+/* ---- text the user typed must never widen its container ------------------
+   A pasted URL is a single unbreakable "word", so it sets the element's
+   min-content width and pushes the whole card past its column - which is
+   exactly what a OneDrive share link in a non-negotiable's tag did.
+
+   Both halves are needed. `overflow-wrap:anywhere` permits a break mid-word
+   AND (unlike `break-word`) shrinks the min-content size, which is what lets
+   a flex item get narrower than its longest word. `min-width:0` is the other
+   half: a flex child defaults to min-width:auto and refuses to shrink below
+   its content no matter what the wrapping rule says.
+
+   Applied to every element that renders free text rather than to one of them,
+   because the next long paste will land somewhere else. .tsk-l already had a
+   version of this - it is the same bug, found once before in task titles. */
+.rit-l,.rit-tag,.tsk-l,.blk-n,.blk-d,.lane-h h3,.rep-lane-h h3,
+.cal-rn,.cal-rd,.chk-t,.rev-note{min-width:0;overflow-wrap:anywhere}
+
 .rit{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px dashed var(--line)}
 .rit:last-child{border-bottom:none}
 .box{width:19px;height:19px;min-width:19px;border:2px solid var(--olive);border-radius:5px;display:flex;align-items:center;justify-content:center;transition:.15s;background:var(--paper)}
@@ -1203,9 +1220,14 @@ return {
        lighter end; this floors every one of them past 4.5:1 without needing
        a hand-picked "dark version" of each lane colour. */
     background-image:linear-gradient(rgba(0,0,0,.28),rgba(0,0,0,.28))}
-  .chk-head .chk-hc{margin-left:auto;font-family:var(--sans);font-size:11px;font-weight:700;
-    opacity:.92;letter-spacing:.3px}
-  .chk-pin{font-size:12px;opacity:.95}
+  .chk-head .chk-hc{margin-left:auto;flex-shrink:0;font-family:var(--sans);font-size:11px;
+    font-weight:700;opacity:.92;letter-spacing:.3px}
+  /* The lane name TRUNCATES here rather than wrapping, unlike every other bit
+     of user text in the app. This band has to stay exactly one ruling tall or
+     the whole page slips off its lines, and a wrapped name would make it two.
+     The full name is on the title attribute, and unabbreviated in Classic view. */
+  .chk-hn{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .chk-pin{font-size:12px;opacity:.95;flex-shrink:0}
 
   .chk-row{display:flex;align-items:flex-start;gap:11px;padding:0 14px 0 68px;
     min-height:var(--rl);position:relative}
@@ -1981,7 +2003,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="2.6";
+var APP_VERSION="2.7";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -2861,7 +2883,8 @@ function renderChecklist(){
     var d=list.filter(function(t){return t.done;}).length;
     return '<div class="chk-head'+(color?'':' orphan')+'"'+(color?' style="background-color:'+color+'"':'')+'>'+
         (pinned?'<span class="chk-pin" title="Pinned to the top">&#9733;</span>':'')+
-        esc(name)+'<span class="chk-hc">'+d+'/'+list.length+'</span></div>'+
+        '<span class="chk-hn" title="'+esc(name)+'">'+esc(name)+'</span>'+
+        '<span class="chk-hc">'+d+'/'+list.length+'</span></div>'+
       sorted.map(function(t){
         return '<div class="chk-row'+(t.done?" done":"")+'" data-id="'+esc(t.id)+'">'+
           '<button class="chk-box'+(t.done?" done":"")+'" data-act="tog" role="checkbox" aria-checked="'+
