@@ -2,6 +2,75 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-05 — Layered document tabs on a content panel
+
+The main nav is no longer four pills. It is a fanned strip of folder tabs: each
+overlaps the next, the active one sits raised and in front, and it merges into
+the sheet holding the view below with no border across the join.
+
+**The whole illusion is one property.** Every tab pulls itself 1px down over the
+panel's top border with `margin-bottom:-1px`, and the only difference between an
+active and an inactive tab is what colour that overlapping 1px row is painted:
+`--line`, so the panel edge reads as continuous under an inactive tab; `--panel`,
+so it *erases* that edge under the active one. No transforms, no `clip-path`, no
+pseudo-element in the base technique — border colour and stacking order. Which
+also means it degrades to nothing worse than "rectangles with rounded tops".
+
+`clip-path` trapezoids were the obvious alternative and were rejected: it clips
+the border too, so a tab loses its outline entirely, and an unsupported
+`clip-path` is simply ignored — so the design has to work as rectangles anyway.
+
+**One panel, not four.** Only one view's content is ever visible: three view divs
+carry `hidden` and the four Board siblings are hidden by `body.view-* .board-only`.
+So a single wrapper always contains exactly the active view. The alternative — a
+fifth wrapper around the Board's four loose siblings — duplicates the `board-only`
+mechanism for no benefit.
+
+**Four new tokens** (`--panel`, `--tab-face`, `--tab-ink`, `--lift`) in `:root`
+and *both* dark blocks. The panel steps **away from `--paper`** in both themes —
+down from white in light, down from the lighter card in dark — so cards keep
+maximum separation and still read via their borders. `--tab-ink` exists because
+`--muted` fails AA on these faces (4.41 and 3.82); `#455A64` restores 5.12.
+
+**Lanes float, per an explicit request.** `--lift` is restated in `.lane`,
+`.lane.pinned`, `.lane.active` *and* a new `.lane.pinned.active`, because
+`box-shadow` does not accumulate — a later rule replaces an earlier one outright.
+Adding the lift to `.lane` alone would have silently dropped it on every pinned
+and every active lane. That also fixes a pre-existing bug: `.lane.active` came
+later in the sheet and was eating `.lane.pinned`, so a pinned *and* active lane
+lost its olive top bar.
+
+**A z-index specificity trap, caught in testing.** `.tabbar .tab:nth-child(n)` is
+(0,3,0) and outranked plain `.tab.on` at (0,2,0), so the active tab kept its
+positional z-index. That looked fine only because Board happens to be first —
+selecting Board History put the active tab *behind* every other tab. Both the
+active and focus rules are now qualified to match.
+
+**The `.sub-tab` handler bug.** A global handler bound all 13 sub-tabs across
+three unrelated groups, stripped `.on` from all of them, and ran `renderHistory()`
+with `curHView` undefined. Board pills survived by accident (their handler
+registers first), Calendar pills by accident (theirs runs last) — but clicking a
+Board History sub-tab and returning to the Board left Classic/Consolidated with
+no pill highlighted. Scoped to `[data-hview]`, which also removes the
+registration-order dependency the old arrangement was relying on.
+
+**Accessibility:** `role="tablist"`/`tab`, `aria-selected`, `aria-controls`, a
+roving `tabindex` so the strip is one tab stop, and Left/Right/Home/End moving
+between tabs. `setView` now drives all four from one map so the class, the ARIA
+state and the tabindex cannot drift apart.
+
+**Responsive:** the strip deliberately does **not** wrap — if the active tab
+landed on a first row it would have no panel edge to merge into. Below 620px the
+labels shorten ("My Personal Calendar" → "Calendar") and the panel goes
+full-bleed, which actually *widens* content from 335px to 347px at 375px.
+
+**Two pre-existing overflow bugs found while measuring**, both confirmed against
+a pre-change baseline: long URLs in the nudge strip pushed the page sideways on
+every view (missed by the earlier wrapping pass because that sweep measured
+children *against* `.nudge` as a container, so a nudge overflowing the *page*
+passed), and the Reports filter row did the same via a date input's intrinsic
+minimum width. Both fixed; all five views now measure clean at 375px.
+
 ## 2026-09-05 — Long unbroken text wraps instead of widening its card
 
 A OneDrive share link pasted into a non-negotiable's tag overflowed the card.

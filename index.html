@@ -80,6 +80,17 @@
   /* rgb triples for gradients and shadows that need alpha. Charcoal shadows
      sit better on a blue-grey ground than neutral black. */
   --shadow-rgb:38,50,56; --glow-rgb:67,160,71;
+  /* Layered document tabs. --panel is the sheet the tabs sit on AND the face of
+     the active tab - they must be the same value, because that identity is what
+     erases the join between them. --tab-face is one step further back for the
+     inactive tabs. Both step AWAY from --paper so cards keep maximum separation:
+     in light --paper is already white so the panel goes down; in dark --paper is
+     lighter than the page so the panel goes down again. Same rule, both themes.
+     --tab-ink exists because --muted fails AA on these faces (4.41 and 3.82).
+     --lift holds the lane elevation so the dark alpha bump is a token edit
+     rather than a duplicated rule in both dark blocks. */
+  --panel:#E4E9EB; --tab-face:#D3DADD; --tab-ink:#455A64;
+  --lift:0 2px 10px rgba(var(--shadow-rgb),.10);
   /* Consolidated Checklist notebook stock. Ruled paper is the one place red
      and blue appear decoratively rather than semantically, so they are their
      own tokens - nothing should read a ruling line as an alert. */
@@ -116,6 +127,8 @@
     --line:#37474F; --ink:#ECEFF1; --muted:#B0BEC5; --sage:#90A4AE;
     --night:#455A64; --night-ink:#90A4AE;
     --shadow-rgb:0,0,0; --glow-rgb:102,187,106;
+    --panel:#141B1E; --tab-face:#0F1416; --tab-ink:#B0BEC5;
+    --lift:0 2px 12px rgba(var(--shadow-rgb),.45);
     --paper-note:#1E272B; --rule-a:rgba(100,181,246,.22); --rule-b:rgba(239,83,80,.20);
     --rule-margin:rgba(239,83,80,.30); --note-ink:#ECEFF1;
     --ln-dayclient:#64B5F6; --ln-nightclienta:#7986CB; --ln-nightclientb:#4DD0E1;
@@ -136,6 +149,8 @@
   --line:#37474F; --ink:#ECEFF1; --muted:#B0BEC5; --sage:#90A4AE;
   --night:#455A64; --night-ink:#90A4AE;
   --shadow-rgb:0,0,0; --glow-rgb:102,187,106;
+  --panel:#141B1E; --tab-face:#0F1416; --tab-ink:#B0BEC5;
+  --lift:0 2px 12px rgba(var(--shadow-rgb),.45);
   --paper-note:#1E272B; --rule-a:rgba(100,181,246,.22); --rule-b:rgba(239,83,80,.20);
   --rule-margin:rgba(239,83,80,.30); --note-ink:#ECEFF1;
   --ln-dayclient:#64B5F6; --ln-nightclienta:#7986CB; --ln-nightclientb:#4DD0E1;
@@ -274,6 +289,13 @@ header h1{font-size:26px;letter-spacing:.3px}
    version of this - it is the same bug, found once before in task titles. */
 .rit-l,.rit-tag,.tsk-l,.blk-n,.blk-d,.lane-h h3,.rep-lane-h h3,
 .cal-rn,.cal-rd,.chk-t,.rev-note{min-width:0;overflow-wrap:anywhere}
+/* The nudge strip was missed the first time round. It sits in <header>, and the
+   sweep that checked the rest measured children AGAINST .nudge as a container -
+   so a nudge that overflowed the PAGE passed. overflow-wrap inherits, so one
+   declaration covers the inner div and the <b> the renderer emits; min-width:0
+   on the flex child is what actually lets it narrow. */
+.nudge{overflow-wrap:anywhere}
+.nudge>div{min-width:0}
 
 .rit{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px dashed var(--line)}
 .rit:last-child{border-bottom:none}
@@ -363,6 +385,7 @@ header h1{font-size:26px;letter-spacing:.3px}
 
 .lanes{display:grid;grid-template-columns:repeat(auto-fit,minmax(224px,1fr));gap:13px}
 .lane{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:13px;
+  box-shadow:var(--lift);
   transition:opacity .2s,box-shadow .2s,outline-color .15s}
 .lane-h{display:flex;align-items:center;gap:8px;margin-bottom:3px}
 .grip{cursor:grab;color:var(--sage);font-size:13px;line-height:1;letter-spacing:-1px;
@@ -390,14 +413,21 @@ header h1{font-size:26px;letter-spacing:.3px}
 .lane-pin.on{color:var(--olive)}
 /* Pinned lanes carry a green top edge so the pinned group is visible as a
    group, not just as "the ones that happen to be first". */
-.lane.pinned{box-shadow:inset 0 3px 0 var(--olive)}
+/* Every lane state re-states --lift, because box-shadow does not accumulate:
+   a later rule replaces an earlier one outright. Adding the lift to .lane alone
+   would have silently dropped it on every pinned and every active lane.
+   Listing them together also fixes a pre-existing bug - .lane.active came later
+   in the sheet and was eating .lane.pinned, so a pinned AND active lane lost
+   its olive top bar. */
+.lane.pinned{box-shadow:inset 0 3px 0 var(--olive),var(--lift)}
 .lane-edit,.lane-del{flex:none;color:var(--sage);font-size:13px;line-height:1;padding:2px 3px;border-radius:5px}
 .lane-edit:hover{color:var(--forest-ink);background:var(--olive-lt)}
 .lane-del{font-size:16px;font-weight:700}
 .lane-del:hover{color:var(--terra-ink);background:var(--terra-lt)}
 .lane-s{font-size:10.5px;color:var(--muted);margin-bottom:9px;min-height:14px}
 .lane.dim{opacity:.32;filter:grayscale(.65)}
-.lane.active{box-shadow:0 0 0 2px var(--forest-ink)}
+.lane.active{box-shadow:0 0 0 2px var(--forest-ink),var(--lift)}
+.lane.pinned.active{box-shadow:inset 0 3px 0 var(--olive),0 0 0 2px var(--forest-ink),var(--lift)}
 /* dragging a lane to reorder the board */
 .lane.dragging{opacity:.35}
 .lane.drag-over{outline:2px dashed var(--forest-ink);outline-offset:3px}
@@ -488,12 +518,85 @@ header h1{font-size:26px;letter-spacing:.3px}
 .nudge .x:hover{opacity:1;background:rgba(236,239,241,.16)}
 .dual{background:var(--night);color:var(--on-brand);font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border-radius:4px;padding:1px 5px}
 
-/* ---- tabs: Board / Reports ---- */
-.tabbar{display:flex;gap:6px;margin:14px 0 0}
-.tab{padding:7px 16px;border-radius:999px;border:1px solid var(--line);background:var(--paper);
-  color:var(--muted);font-weight:600;font-size:12.5px}
-.tab:hover{background:var(--ivory)}
-.tab.on{background:var(--forest);color:var(--on-brand);border-color:var(--forest)}
+/* ---- main nav: layered document tabs -------------------------------------
+   The whole illusion is one property. Every tab pulls itself 1px down over the
+   panel's top border with margin-bottom:-1px, and the ONLY difference between
+   an inactive tab and the active one is what colour that overlapping 1px row
+   is painted: --line, so the panel's edge reads as continuous underneath the
+   inactive tabs; --panel, so it erases that edge under the active one and the
+   two surfaces merge. No transforms, no clip-path, no pseudo-element in the
+   base technique - it is border colour and stacking order, which is why it
+   degrades to nothing more exotic than "rectangles with rounded tops". */
+.tabbar{display:flex;align-items:flex-end;gap:0;margin:16px 0 0;padding-left:14px;
+  position:relative;z-index:2}
+.tab{position:relative;margin:0 -10px -1px 0;padding:8px 20px 7px;
+  border:1px solid var(--line);border-radius:12px 12px 0 0;
+  background:var(--tab-face);color:var(--tab-ink);
+  font-weight:600;font-size:12.5px;line-height:1.25;white-space:nowrap;
+  transition:background .15s,color .15s,padding-top .15s}
+.tab:last-child{margin-right:0}
+/* Descending z-index so each tab overlaps the NEXT one and the strip reads
+   left-to-right like a fanned stack. Default paint order would do the
+   opposite. A 5th tab added later gets z-index:auto, already behind the 4th -
+   the direction degrades correctly rather than inverting. */
+.tabbar .tab:nth-child(1){z-index:4}
+.tabbar .tab:nth-child(2){z-index:3}
+.tabbar .tab:nth-child(3){z-index:2}
+.tabbar .tab:nth-child(4){z-index:1}
+.tab:not(.on):hover{background:var(--panel);color:var(--ink)}
+/* Qualified as .tabbar .tab.on so it matches the nth-child rules above at
+   (0,3,0) and wins on source order - as plain .tab.on it lost, and the active
+   tab kept whatever positional z-index its slot carried. That looked fine only
+   because Board happens to be first; selecting Board History put the active tab
+   BEHIND every other tab.
+   align-items:flex-end bottom-aligns the strip, so the active tab's extra
+   padding-top makes it RISE rather than sink - that height difference is the
+   "in front" cue, on top of the colour and the z-index. */
+.tabbar .tab.on{z-index:10;background:var(--panel);color:var(--ink);
+  border-bottom-color:var(--panel);padding-top:11px;padding-bottom:8px}
+/* Inset offset: the ring would otherwise be half-hidden under the neighbouring
+   tab that overlaps this one's edge. */
+.tabbar .tab:focus-visible{outline:2px solid var(--forest-ink);outline-offset:-3px;z-index:11}
+/* Guards the join against a hairline at fractional display scaling (125%/150%),
+   where the 1px overlap can round apart. left/right:0 resolve against the
+   PADDING box, so this spans the interior without covering the tab's own side
+   borders. Purely additive - the margin/border pair already does the work. */
+.tab.on:after{content:"";position:absolute;left:0;right:0;bottom:-2px;height:3px;
+  background:var(--panel)}
+
+/* The sheet the tabs open onto. Only one view's content is ever inside it: the
+   three non-board views carry `hidden`, and the four board siblings are hidden
+   by body.view-* .board-only below - which is why one shared panel works and
+   no per-view wrapper is needed.
+   DO NOT add transform, filter, backdrop-filter, will-change or contain:paint
+   here. Any of them makes this a containing block for position:fixed, which
+   would trap #actModal (the activity editor) inside the panel. position:
+   relative alone is what the z-index needs. */
+.viewpanel{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  padding:18px 18px 22px;min-height:320px;position:relative;z-index:0}
+/* Layered tabs are wider than the pills they replaced (the overlap needs
+   padding), and .tabbar deliberately does NOT wrap: if the active tab landed
+   on a first row it would have no panel edge to merge into, and the whole
+   "joined to the sheet" premise would break depending on which view you were
+   in. So narrow screens shorten the labels and tighten the geometry instead.
+   620px reuses a breakpoint already in this file rather than inventing one. */
+@media(max-width:620px){
+  .tab-lg{display:none}                    /* "My Personal "Calendar, "Board "History */
+  .tab{padding:8px 12px 7px;font-size:11.5px;margin-right:-8px}
+  .tab.on{padding-top:10px;padding-bottom:8px}
+  /* Full-bleed sheet on phones. -20px lands exactly on .wrap's border box
+     (.wrap padding is 20px), so this cannot cause horizontal overflow, and the
+     14px inset is NARROWER than the 20px it replaces - content gets wider, not
+     tighter, which is what the calendar's 7-column grid needs at this width. */
+  .tabbar{margin-left:-20px;margin-right:-20px;padding-left:14px}
+  .viewpanel{margin-left:-20px;margin-right:-20px;padding:14px 14px 20px;
+    border-left:none;border-right:none;border-radius:0}
+}
+@media(max-width:400px){
+  .tab{padding:8px 9px 7px;font-size:11px}
+}
+
+
 body.view-reports .board-only,body.view-history .board-only,body.view-cal .board-only{display:none}
 /* #view-reports itself is shown/hidden by toggling its `hidden` attribute in
    setView() - a CSS rule here can't win against the UA [hidden]{display:none}
@@ -501,10 +604,14 @@ body.view-reports .board-only,body.view-history .board-only,body.view-cal .board
 
 /* ---- reports ---- */
 .rep-controls{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin:12px 0}
-.rep-fld{display:flex;flex-direction:column;gap:3px}
+/* min-width:0 + max-width on the controls: a date input reports a wide
+   intrinsic minimum, and as a flex child .rep-fld would not shrink below it,
+   so the Reports filter row pushed the page sideways at phone width. Same
+   not-shrinking bug as the long-URL wrapping, different trigger. */
+.rep-fld{display:flex;flex-direction:column;gap:3px;min-width:0}
 .rep-fld label{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700}
 .rep-fld input,.rep-fld select{border:1px solid var(--line);border-radius:7px;padding:6px 9px;
-  background:var(--ivory);color:var(--ink);outline:none;font-size:12.5px}
+  background:var(--ivory);color:var(--ink);outline:none;font-size:12.5px;max-width:100%}
 .rep-fld input:focus,.rep-fld select:focus{border-color:var(--olive);background:var(--paper)}
 .rep-quick{border:1px solid var(--line);border-radius:7px;padding:0 12px;font-size:12px;height:31px;
   color:var(--forest-ink);font-weight:600;background:var(--paper)}
@@ -595,6 +702,10 @@ body.view-reports .board-only,body.view-history .board-only,body.view-cal .board
    closer to the full 44px, since a mis-tap there matters more and they're
    used far less often. */
 @media (pointer: coarse){
+  /* Bigger targets, and less overlap so the dead strip on each tab left
+     edge shrinks where mis-taps cost most. */
+  .tab{padding-top:11px;padding-bottom:10px;margin-right:-8px}
+  .tab.on{padding-top:14px;padding-bottom:11px}
   .box{width:26px;height:26px;min-width:26px}
   .grip{padding:11px 9px;margin:-11px -9px}
   .lane-edit,.lane-del{padding:10px;margin:-8px -6px}
@@ -1132,12 +1243,21 @@ return {
     </div>
   </header>
 
-  <nav class="tabbar">
-    <button class="tab on" id="tabBoard">Board</button>
-    <button class="tab" id="tabCal">My Personal Calendar</button>
-    <button class="tab" id="tabReports">Reports</button>
-    <button class="tab" id="tabHistory">Board History</button>
+  <!-- Layered document tabs. role="tablist" on the <nav> costs the navigation
+       landmark but is the correct semantics for a tab strip; the labels inside
+       .tab-lg are dropped on narrow screens (see the 620px block). The initial
+       aria-selected/tabindex values MUST be right here in the markup, because
+       nothing calls setView() at boot - "Board" is the start state purely by
+       these static attributes. -->
+  <nav class="tabbar" role="tablist" aria-label="Main views">
+    <button class="tab on" id="tabBoard" role="tab" aria-selected="true" aria-controls="viewPanel" tabindex="0">Board</button>
+    <button class="tab" id="tabCal" role="tab" aria-selected="false" aria-controls="viewPanel" tabindex="-1"><span class="tab-lg">My Personal </span>Calendar</button>
+    <button class="tab" id="tabReports" role="tab" aria-selected="false" aria-controls="viewPanel" tabindex="-1">Reports</button>
+    <button class="tab" id="tabHistory" role="tab" aria-selected="false" aria-controls="viewPanel" tabindex="-1"><span class="tab-lg">Board </span>History</button>
   </nav>
+
+  <div class="viewpanel" id="viewPanel" role="tabpanel" aria-labelledby="tabBoard" tabindex="-1">
+
 
   <div class="nowbar board-only" id="nowbar">
     <div>
@@ -1518,6 +1638,8 @@ return {
       <div id="calBody"></div>
     </div>
   </div>
+
+  </div><!-- /.viewpanel : closes the sheet opened just under the tab strip -->
 
   <!-- Activity editor. One dialog creates and edits, so the two can never
        drift apart in what they allow. -->
@@ -2003,7 +2125,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="2.7";
+var APP_VERSION="2.8";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -2014,6 +2136,7 @@ var APP_VERSION="2.7";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-05T03:30:00+08:00",text:"The main tabs are now layered document tabs. The one you are on sits in front, raised slightly, and joins seamlessly onto the sheet holding the view below it; the others sit behind it. Arrow keys move between tabs. Long links in the reminder strip wrap properly, and the Reports filters no longer push the page sideways on a phone."},
   {ts:"2026-09-05T02:40:00+08:00",text:"Long links and other unbroken text now wrap inside their card instead of stretching it sideways. A OneDrive link pasted into a non-negotiable's tag was pushing the whole card past the column; the same fix covers task titles, lane names, timeline entries and calendar notes."},
   {ts:"2026-09-05T02:05:00+08:00",text:"Lanes can be pinned to the top of the board with the star on their header — pinned lanes lead in both the Classic view and the Consolidated checklist. Unpinning puts a lane back where it was. The list of routine blocks you have hidden from the timeline is now folded away behind one line instead of filling the card."},
   {ts:"2026-09-05T00:55:00+08:00",text:"Routine blocks you remove from the Shift timeline can now be put back. Anything you hide with the x is listed under the timeline as Hidden from your schedule -- tap it to restore it. Previously removing one was permanent with no way to see what you had removed."},
@@ -3791,12 +3914,41 @@ document.getElementById("tabBoard").addEventListener("click",function(){setView(
 document.getElementById("tabCal").addEventListener("click",function(){setView("cal");});
 document.getElementById("tabReports").addEventListener("click",function(){setView("reports");});
 document.getElementById("tabHistory").addEventListener("click",function(){setView("history");});
-document.querySelectorAll(".sub-tab").forEach(function(b){
+/* Scoped to [data-hview]. This used to bind EVERY .sub-tab - all 13 across
+   three unrelated groups - so a Board or Calendar sub-tab click stripped .on
+   off the other two groups and ran renderHistory() with curHView undefined.
+   The Board pills survived by accident (their handler is registered first) and
+   the Calendar pills survived by accident (theirs runs last); the History
+   group's own victims had nothing to re-assert them, so clicking a Board
+   History sub-tab and returning to the Board left Classic/Consolidated with no
+   pill highlighted at all. The three groups are disjoint, so narrowing the
+   selector is the entire fix - and it removes the registration-order
+   dependency the old arrangement was quietly relying on. */
+document.querySelectorAll("[data-hview]").forEach(function(b){
   b.addEventListener("click",function(){
-    document.querySelectorAll(".sub-tab").forEach(function(x){x.classList.toggle("on",x===b);});
+    document.querySelectorAll("[data-hview]").forEach(function(x){x.classList.toggle("on",x===b);});
     curHView=b.dataset.hview;
     renderHistory();
   });
+});
+
+/* Arrow-key navigation across the tab strip. Follow-focus (the view changes as
+   you arrow onto a tab) rather than manual activation: every view renders
+   synchronously from local state, nothing is fetched, so there is no cost to
+   landing on one. */
+document.querySelector(".tabbar").addEventListener("keydown",function(e){
+  var tabs=[].slice.call(document.querySelectorAll('.tabbar [role="tab"]'));
+  var views=["board","cal","reports","history"];
+  var i=tabs.indexOf(document.activeElement); if(i<0)return;
+  var n;
+  if(e.key==="ArrowRight")     n=(i+1)%tabs.length;
+  else if(e.key==="ArrowLeft") n=(i-1+tabs.length)%tabs.length;
+  else if(e.key==="Home")      n=0;
+  else if(e.key==="End")       n=tabs.length-1;
+  else return;
+  e.preventDefault();
+  setView(views[n]);
+  tabs[n].focus();
 });
 /* ==================== MY PERSONAL CALENDAR: views ==========================
    Every view reads S.events through occursOn(); none of them keep their own
@@ -4212,6 +4364,9 @@ amEl("amStart").addEventListener("change",function(){
   else amMsg("");
 });
 
+// One place naming the four main tabs, so setView and the keyboard handler
+// agree on both the order and the element ids.
+var MAIN_TABS={board:"tabBoard",cal:"tabCal",reports:"tabReports",history:"tabHistory"};
 function setView(v){
   document.body.classList.toggle("view-reports",v==="reports");
   document.body.classList.toggle("view-history",v==="history");
@@ -4222,10 +4377,18 @@ function setView(v){
   document.getElementById("view-reports").hidden=(v!=="reports");
   document.getElementById("view-history").hidden=(v!=="history");
   document.getElementById("view-cal").hidden=(v!=="cal");
-  document.getElementById("tabBoard").classList.toggle("on",v==="board");
-  document.getElementById("tabCal").classList.toggle("on",v==="cal");
-  document.getElementById("tabReports").classList.toggle("on",v==="reports");
-  document.getElementById("tabHistory").classList.toggle("on",v==="history");
+  /* Driven from one map rather than four repeated lines, so the class, the
+     aria state and the roving tabindex cannot fall out of step - which they
+     would the first time someone added a fifth tab and updated only the
+     classList line. */
+  Object.keys(MAIN_TABS).forEach(function(k){
+    var el=document.getElementById(MAIN_TABS[k]), on=(k===v);
+    el.classList.toggle("on",on);
+    el.setAttribute("aria-selected",on?"true":"false");
+    // Roving tabindex: the whole strip is ONE tab stop, arrows move within it.
+    el.tabIndex=on?0:-1;
+  });
+  document.getElementById("viewPanel").setAttribute("aria-labelledby",MAIN_TABS[v]||"tabBoard");
   if(v==="cal")renderCalendar();
   if(v==="reports")renderReportsView();
   if(v==="history"){ curHView=curHView||"log"; flushHistory(); renderHistory(); }
