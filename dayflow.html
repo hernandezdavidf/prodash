@@ -1151,6 +1151,20 @@ return {
      rather than padding. That is what keeps text sitting ON the lines
      instead of drifting off them the moment a task wraps to two lines. If
      you add anything here, give it a height that is a multiple of --rl. */
+  /* Routine blocks you have taken off the timeline. Removing one used to be a
+     one-way door - dayBlocks() filtered on S.hiddenBlocks and nothing anywhere
+     read that list back - so a mis-click permanently deleted Sleep or the
+     company hour from every day. They are listed here instead, dashed and
+     muted to read as "off", and clicking one puts it back. */
+  .hb-wrap{margin-top:11px;padding-top:11px;border-top:1px dashed var(--line);
+    display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .hb-l{width:100%;font-size:10px;font-weight:700;text-transform:uppercase;
+    letter-spacing:.6px;color:var(--muted);margin-bottom:3px}
+  .hb-chip{font-size:11.5px;padding:3px 10px;border-radius:999px;border:1px dashed var(--line);
+    color:var(--muted);background:var(--paper);transition:.15s}
+  .hb-chip:hover{border-style:solid;border-color:var(--olive);color:var(--forest-ink)}
+  .hb-chip span{opacity:.65;font-variant-numeric:tabular-nums}
+
   .bview{display:flex;justify-content:flex-start;margin-bottom:12px}
   #checklist[hidden],.cols[hidden]{display:none}
 
@@ -1227,6 +1241,7 @@ return {
         <h2>Shift timeline <button class="cnt roll-edit" id="rollBtn" title="Click to change when your day starts">7:00am → 7:00am</button></h2>
         <div class="sub" id="rollSub"></div>
         <div id="timeline"></div>
+        <div id="hiddenList"></div>
         <div class="apt-add">
           <input id="aptN" placeholder="Appointment — what and where">
           <div class="apt-row">
@@ -1951,7 +1966,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="2.4";
+var APP_VERSION="2.5";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -1962,6 +1977,7 @@ var APP_VERSION="2.4";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-05T00:55:00+08:00",text:"Routine blocks you remove from the Shift timeline can now be put back. Anything you hide with the x is listed under the timeline as Hidden from your schedule -- tap it to restore it. Previously removing one was permanent with no way to see what you had removed."},
   {ts:"2026-09-05T00:20:00+08:00",text:"The Board now has two layouts. Classic view is the lane columns, unchanged. Consolidated checklist puts every task from every lane onto one sheet of ruled notebook paper, grouped under coloured lane headings, and crosses finished items through in red pen. Ticking something in either view updates the other."},
   {ts:"2026-09-04T23:55:00+08:00",text:"New colour system. Green now means focus and problem-solving, orange means drive and endurance -- the night shift, streaks, the long grind -- and red means adrenaline: must-attend, overdue, and errors only, kept rare so it still registers. The header is charcoal so the green can be the thing that moves on it. Every text colour was checked for contrast in both light and dark."},
   {ts:"2026-09-04T23:30:00+08:00",text:"The shift start time is now editable - click the 7:00am chip on the Shift timeline to change when your day rolls over, and the note underneath updates itself. Weekly targets merged into Non-negotiables, which is now Non-negotiables & Goals: give any item a weekly target and it tracks your pace instead of a streak. Removed the day-count badge from tasks."},
@@ -2735,6 +2751,33 @@ function editRoll(){
    RENDERING of S.tasks rather than a separate list: nothing is copied, so
    there is nothing to keep in step. Lanes appear in the user's own lane order
    so the page matches the columns they already know. */
+/* The other half of hiding a routine block. dayBlocks() filters on
+   S.hiddenBlocks; this is the only thing that reads that list back, so without
+   it removal is permanent and invisible - you cannot even see WHAT you removed.
+   Shown right under the timeline it belongs to, so the undo lives next to the
+   thing it undoes rather than in a settings screen. */
+function renderHiddenBlocks(){
+  var host=document.getElementById("hiddenList");
+  if(!host)return;
+  var hidden=(S.hiddenBlocks||[]);
+  if(!hidden.length){host.innerHTML="";return;}
+  host.innerHTML='<div class="hb-wrap"><div class="hb-l">Hidden from your schedule — tap to put back</div>'+
+    hidden.map(function(id){
+      var b=BLOCKS.filter(function(x){return x.id===id;})[0];
+      // An id with no matching BLOCK means the seed schedule changed under a
+      // saved board. Still listed, so it can be cleared rather than lingering.
+      return '<button class="hb-chip" data-restore="'+esc(id)+'">'+
+        esc(b?b.n:id)+(b?' <span>'+fmt(b.s)+'</span>':'')+' &#8634;</button>';
+    }).join("")+'</div>';
+  host.querySelectorAll("[data-restore]").forEach(function(el){
+    el.addEventListener("click",function(){
+      var id=el.getAttribute("data-restore");
+      S.hiddenBlocks=(S.hiddenBlocks||[]).filter(function(x){return x!==id;});
+      save();renderAll();stamp("Put back on your schedule");
+    });
+  });
+}
+
 function renderChecklist(){
   var host=document.getElementById("checklist");
   if(!host)return;
@@ -2929,7 +2972,7 @@ function renderTimeline(forceCenter){
       // recurring routine slot - removing it takes it off every day it
       // would otherwise appear on, not just today. There's no restore UI
       // yet, same as removing a lane or a non-negotiable - if unsure, leave it.
-      if(!confirm('Remove "'+b.n+'" from your daily schedule? This removes it every day it appears, not just today - there\'s no undo built in yet.'))return;
+      if(!confirm('Remove "'+b.n+'" from your daily schedule?\n\nThis takes it off every day it appears, not just today. You can put it back from the "Hidden from your schedule" row under the timeline.'))return;
       S.hiddenBlocks=(S.hiddenBlocks||[]).concat([b.id]);
       save();renderAll();});
     if(isNow){ nowEl=el; }
@@ -3216,7 +3259,7 @@ function applyTheme(){
 
 function renderAll(){
   renderHeader();renderNow();renderNudges();renderRituals();
-  renderRoll();renderTimeline();renderLanes();renderWeek();
+  renderRoll();renderTimeline();renderHiddenBlocks();renderLanes();renderWeek();
   // Both Board layouts re-render together. The checklist is cheap (one pass
   // over S.tasks) and this way a change made in either one is reflected in the
   // other the moment you switch, with no staleness to reason about.
