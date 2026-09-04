@@ -2,6 +2,38 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-05 — Lane pinning; the hidden-blocks drawer collapses
+
+**Lanes can be pinned** with a star on their header — hollow when off, filled
+green when on. Pinned lanes lead the Classic view *and* the Consolidated
+Checklist (where the lane band carries a ★ too), because a pin that only worked
+in one layout would not be much of a pin.
+
+Pinning is a **sort over `S.lanes`, not a physical move**, so unpinning returns
+a lane to where it always sat rather than stranding it at the top of the
+unpinned group. The two groups then behave as independent lists for reordering:
+▲▼ disable at each group's own ends, `moveLane` swaps within a group, and a
+cross-group drag is a deliberate no-op that shows no drop indicator — the sort
+would undo it on the next render, so offering the move would be a lie. The star
+is how a lane changes groups.
+
+Within the pinned group lanes keep their **board order**, not the order they
+were pinned in. Predictability won over recency: pinning something should not
+also silently reorder what is already pinned.
+
+**The hidden-routine-blocks list is now collapsed** behind "N hidden from your
+schedule". Prune a routine to the blocks you actually keep and it reaches a
+dozen-plus chips — at which point an undo list taller than the timeline it
+undoes has stopped being a safety net and become clutter. Native `<details>`,
+so keyboard and screen-reader behaviour come free.
+
+Its open state is read off the live element at render time rather than from a
+flag maintained by the `toggle` event. **That event fires asynchronously**, so
+collapsing the drawer and immediately doing anything that saves — ticking a
+task, pinning a lane — re-rendered from a stale flag and sprang it back open.
+Found in testing, and the sort of bug that only appears when two interactions
+land in the same tick.
+
 ## 2026-09-05 — Board gains a second layout: Consolidated Checklist
 
 The Board now switches between **Classic view** (the lane columns, untouched)
