@@ -116,13 +116,13 @@ Avoid generic AI aesthetics. Make creative, distinctive choices.
 > above stand unqualified — but read it first, because several of them cannot be
 > followed literally in this repo.
 
-ProDash (`dayflow.html`) is a single standalone HTML file with no build step, no
+ProDash (`index.html`) is a single standalone HTML file with no build step, no
 npm, and no Node on this machine. It has to keep working from `file://` and
 offline. That makes four of the rules above inapplicable **here** — they remain
 correct for any future React/Next.js project in this workspace:
 
 - **`app/globals.css`** doesn't exist. The equivalent is the `:root` block in
-  `dayflow.html`, which already holds every colour as a CSS variable. That rule
+  `index.html`, which already holds every colour as a CSS variable. That rule
   is satisfied in spirit; only the path differs.
 - **shadcn/ui** and **Motion** are React libraries. There is no React here.
 - **"Tailwind classes only"** needs a build step this project can't run. ProDash

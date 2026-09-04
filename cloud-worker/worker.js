@@ -12,7 +12,7 @@
 // WHY THE WORKER EXISTS AT ALL (read this before "simplifying" it away)
 // ---------------------------------------------------------------------------
 // The account registry lives in a Google Sheet. The browser must NEVER touch
-// that sheet directly: dayflow.html is a public static file, so any API key,
+// that sheet directly: index.html is a public static file, so any API key,
 // OAuth client secret or service-account key placed in it is readable by
 // anyone who views source — which would hand out every user's password hash
 // and secret-question answer at once.

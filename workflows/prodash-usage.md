@@ -1,6 +1,6 @@
 # Workflow: Running the shift with ProDash
 
-**App:** `dayflow.html` — "How's our Dave looking? · Productivity Dashboard (ProDash)".
+**App:** `index.html` — "How's our Dave looking? · Productivity Dashboard (ProDash)".
 Double-click it. No internet, no install, no login.
 
 ---
@@ -10,7 +10,7 @@ Double-click it. No internet, no install, no login.
 ProDash writes straight to a real JSON file, which is why your data follows you
 between PCs instead of living in one browser.
 
-1. Open `dayflow.html`.
+1. Open `index.html`.
 2. Click the sync pill in the Now bar (it says **Local only — connect**).
 3. Pick `00 - EVESYS\Schedule and Tasks\dayflow-data.json`.
 4. The pill turns green: **Synced to file**.

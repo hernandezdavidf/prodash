@@ -1,21 +1,27 @@
 // ProDash service worker.
 //
-// Bump CACHE_VERSION whenever dayflow.html (or this file) changes in a way
+// Bump CACHE_VERSION whenever index.html (or this file) changes in a way
 // that should reach every device promptly - the old cache is deleted on the
 // next activate, so this is the mechanism that pushes an update out.
 //
+// The app moved from dayflow.html to index.html so the URL is a clean
+// ".../prodash/" instead of ".../prodash/dayflow.html". Bumping the version
+// below is what evicts the old cached dayflow.html; without it a phone would
+// keep serving the file from the previous name indefinitely.
+//
 // Two strategies, deliberately different:
-//   - the app shell (dayflow.html, manifest.json): network-first, falling
+//   - the app shell (index.html, manifest.json): network-first, falling
 //     back to cache when offline. This is a frequently-edited personal app;
 //     cache-first here would mean "why isn't my update showing up" every
 //     single time something changes. Online should always mean fresh.
 //   - static assets (icons): cache-first. They never change without also
 //     changing CACHE_VERSION, so there's nothing to gain by re-fetching them
 //     every load, and it's one less network round-trip before the icon paints.
-const CACHE_VERSION = "prodash-v1";
+const CACHE_VERSION = "prodash-v2";
 
 const APP_SHELL = [
-  "./dayflow.html",
+  "./",
+  "./index.html",
   "./manifest.json",
 ];
 const STATIC_ASSETS = [
@@ -64,7 +70,7 @@ self.addEventListener("fetch", (event) => {
           caches.open(CACHE_VERSION).then((cache) => cache.put(req, copy));
           return res;
         })
-        .catch(() => caches.match(req).then((cached) => cached || caches.match("./dayflow.html")))
+        .catch(() => caches.match(req).then((cached) => cached || caches.match("./index.html")))
     );
     return;
   }
