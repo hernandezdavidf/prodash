@@ -314,6 +314,13 @@ header h1{font-size:26px;letter-spacing:.3px}
    on the flex child is what actually lets it narrow. */
 .nudge{overflow-wrap:anywhere}
 .nudge>div{min-width:0}
+/* The "now" bar, third member of this family. It only overflows while an
+   appointment with a long name happens to BE the current block, which is why
+   two earlier sweeps missed it - the bug is time-dependent, not layout-
+   dependent. Same pairing as everywhere else: the flex child must be allowed
+   to shrink, and the text must be allowed to break. */
+.nowbar>div:first-child{min-width:0}
+.nowbar .nt,.nowbar .nm{overflow-wrap:anywhere}
 
 .rit{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px dashed var(--line)}
 .rit:last-child{border-bottom:none}
@@ -1360,7 +1367,60 @@ return {
   .hb-chip:hover{border-style:solid;border-color:var(--olive);color:var(--forest-ink)}
   .hb-chip span{opacity:.65;font-variant-numeric:tabular-nums}
 
-  .bview{display:flex;justify-content:flex-start;margin-bottom:12px}
+  /* ---- Board layout switcher: pennant tabs --------------------------------
+     Banner shape with a downward point, icon, uppercase label and a gradient,
+     per the reference. EVERY rule here is scoped under .bview on purpose:
+     `.sub-tab` is shared by thirteen buttons across three unrelated groups
+     (this one, the Calendar view switcher, the Board History sub-views), so an
+     unscoped change would restyle all of them.
+
+     Colour follows the app's rule that hue carries meaning rather than
+     decoration, which is why this does NOT copy the reference's magenta and
+     yellow, and does not give each tab its own hue: orange means endurance and
+     red means adrenaline here, so spending either on a view switcher would
+     dilute the one thing they are for. The active tab is brand green because
+     green means focus - "this is the view you are in" - and the inactive one is
+     neutral. */
+  .bview{display:flex;justify-content:flex-start;margin-bottom:16px}
+  .bview .sub-tabs{gap:10px;margin:0;align-items:flex-start}
+  .bview .sub-tab{
+    position:relative;display:flex;align-items:center;gap:8px;
+    /* the extra bottom padding is the pennant's point, which the clip-path
+       below cuts out of it - without it the notch would eat the label */
+    padding:9px 20px 20px;
+    border:0;border-radius:8px 8px 0 0;
+    font-size:11.5px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;
+    background:linear-gradient(180deg,var(--ivory),var(--line));
+    color:var(--tab-ink);
+    clip-path:polygon(0 0,100% 0,100% calc(100% - 11px),50% 100%,0 calc(100% - 11px));
+    /* drop-shadow, not box-shadow: box-shadow is cast from the unclipped border
+       box, so it would draw a rectangle behind a pennant. filter follows the
+       clipped silhouette. */
+    filter:drop-shadow(0 2px 2px rgba(var(--shadow-rgb),.22));
+    transition:filter .15s,color .15s}
+  .bview .sub-tab:hover{filter:drop-shadow(0 3px 4px rgba(var(--shadow-rgb),.3))}
+  .bview .sub-tab:not(.on):hover{color:var(--ink)}
+  /* Gradient stays inside a range where white clears AA: the palette green
+     #43A047 is only 3.3:1 with white, and 11.5px bold is nowhere near WCAG's
+     large-text threshold, so the band runs --forest -> --forest-dk instead. */
+  .bview .sub-tab.on{
+    background:linear-gradient(180deg,var(--forest),var(--forest-dk));
+    color:var(--on-brand);
+    filter:drop-shadow(0 3px 4px rgba(var(--shadow-rgb),.34))}
+  .bview .sub-tab.on:hover{filter:drop-shadow(0 4px 6px rgba(var(--shadow-rgb),.38))}
+  /* The ring would be clipped away with the rest of the box, so focus is shown
+     as a glow that survives the clip. */
+  .bview .sub-tab:focus-visible{outline:none;
+    filter:drop-shadow(0 0 0 2px var(--olive)) drop-shadow(0 3px 4px rgba(var(--shadow-rgb),.34))}
+  .bview .bv-i{flex:none;fill:currentColor;margin-top:-1px}
+  .bview .bv-i-s{fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+  @media(max-width:620px){
+    /* "Consolidated view" and "Classic view" lose their qualifier - two
+       pennants at uppercase-with-tracking do not fit a phone otherwise. */
+    .bview .bv-lg{display:none}
+    .bview .sub-tab{padding:8px 14px 18px;font-size:11px;letter-spacing:.5px}
+    .bview .sub-tabs{gap:7px}
+  }
   #checklist[hidden],.cols[hidden]{display:none}
 
   .chk-paper{--rl:38px;position:relative;border:1px solid var(--line);border-radius:12px;
@@ -1429,8 +1489,14 @@ return {
 
   <div class="bview board-only">
     <div class="sub-tabs">
-      <button class="sub-tab on" data-bview="classic">Classic view</button>
-      <button class="sub-tab" data-bview="checklist">Consolidated checklist</button>
+      <button class="sub-tab on" data-bview="classic">
+        <svg class="bv-i" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><rect x="1" y="2" width="3.6" height="12" rx="1"/><rect x="6.2" y="2" width="3.6" height="12" rx="1"/><rect x="11.4" y="2" width="3.6" height="12" rx="1"/></svg>
+        <span>Classic<span class="bv-lg"> view</span></span>
+      </button>
+      <button class="sub-tab" data-bview="checklist">
+        <svg class="bv-i bv-i-s" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="M1.6 4.4 3.2 6l2.8-2.8"/><path d="M1.6 11.2l1.6 1.6L6 10"/><path d="M8.6 4.4h5.8M8.6 11.4h5.8"/></svg>
+        <span><span class="bv-lg">Consolidated </span>Checklist</span>
+      </button>
     </div>
   </div>
 
@@ -2359,7 +2425,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="3.1";
+var APP_VERSION="3.2";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -2370,6 +2436,7 @@ var APP_VERSION="3.1";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-05T06:10:00+08:00",text:"The Classic view / Consolidated checklist switcher is now a pair of pennant tabs -- banner shapes with a downward point, an icon and an uppercase label. The one you are on is brand green, the other sits back in neutral grey. Long links in the Now bar also wrap properly instead of stretching the page."},
   {ts:"2026-09-05T05:30:00+08:00",text:"New Expense Tracker tab. Type an amount and a few words, press Add, done - the date fills itself in and category, payment and notes are optional and folded away. It totals your day, month and year automatically, shows where the money goes by category (uncategorised included), charts the last twelve months, and lets you search, filter and edit anything you have recorded."},
   {ts:"2026-09-05T04:45:00+08:00",text:"Lane names are readable again. The name now gets a row to itself instead of sharing one with six buttons, so long names like \"My Company + Personal\" wrap at the spaces rather than breaking mid-word. The lane's buttons moved to a quiet row underneath."},
   {ts:"2026-09-05T04:10:00+08:00",text:"Tidied the controls. Focus mode is gone. Theme moved up beside Sign out. The two sync buttons are now a compact pair reading just Local and Cloud, stacked one above the other, with their status text on hover instead of permanently on screen."},

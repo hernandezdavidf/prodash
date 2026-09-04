@@ -2,6 +2,46 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-05 — Board switcher becomes a pair of pennant tabs
+
+The Classic view / Consolidated checklist pills are now banner tabs: rounded
+top, a downward point cut from the bottom, an icon, an uppercase tracked label,
+a vertical gradient and a shadow that follows the silhouette.
+
+**Colour deliberately does not copy the reference.** The source image used
+magenta and yellow, and gave each tab its own hue. Here hue carries meaning —
+orange is endurance, red is adrenaline and is kept scarce — so spending either
+on a view switcher would dilute the one job they have. The active tab is brand
+green because green means focus ("this is the view you are in") and the inactive
+one is neutral. That also avoids inventing a second identity colour for what is
+one control with two states.
+
+**Every rule is scoped under `.bview`.** `.sub-tab` is shared by thirteen
+buttons across three unrelated groups — this switcher, the Calendar view picker
+and the Board History sub-views — so an unscoped change would have restyled all
+of them. Verified after the change: the Board switcher is clipped, gradient and
+uppercase; Calendar and Board History are still plain 999px pills.
+
+Two implementation notes worth keeping:
+
+- **`filter: drop-shadow`, not `box-shadow`.** A box-shadow is cast from the
+  unclipped border box, so it would draw a rectangular shadow behind a pennant.
+  `filter` follows the clipped shape.
+- **The focus ring is a drop-shadow too**, because `clip-path` removes an
+  `outline` along with the rest of the box.
+
+The gradient runs `--forest` to `--forest-dk` rather than starting at the
+palette green `#43A047`: that green is only 3.3:1 with white, and an 11.5px bold
+label is nowhere near WCAG's large-text threshold. Measured at both gradient
+endpoints in both themes, the worst pair is 5.0:1.
+
+**A third instance of the wrapping bug**, found while measuring this one. The
+"now" bar overflowed the page when an appointment with a long name happened to
+be the current block. Two earlier sweeps missed it because the bug is
+time-dependent rather than layout-dependent — that appointment is only the
+current block during its own window. `.nowbar .nt` and `.nm` now get the same
+`min-width:0` plus `overflow-wrap` pairing as the rest.
+
 ## 2026-09-05 — Expense Tracker
 
 A fifth main tab for money. The design target was one line long: **an amount and
