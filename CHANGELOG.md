@@ -2,6 +2,55 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-05 — Expense Tracker
+
+A fifth main tab for money. The design target was one line long: **an amount and
+a few words is a complete entry.** Everything else — date, category, payment,
+notes — folds away behind a disclosure, because requiring any of it is exactly
+what stops someone logging the coffee they just bought.
+
+**Dates here are wall-clock dates, not the 07:00 shift keys the rest of the app
+uses.** Money reconciles against calendar days and calendar months; a bank
+statement knows nothing about a shift. So a 3am purchase files under that
+morning's date, not the previous evening's shift. This is the one place in the
+app where `today()` is deliberately the wrong function, and there is a comment
+saying so at the call site.
+
+**Uncategorised is a first-class state, not a missing value.** It counts toward
+every total, appears in the breakdown as its own row, and has a dedicated filter.
+It is drawn *hatched rather than coloured*, so it reads as "not sorted yet"
+rather than as a category called Other — which matters because the brief was
+explicit that categorising later must never be a precondition for tracking.
+
+**`S.expenses` is KEYED**, like tasks — so two devices that each add a
+transaction while offline keep *both* on merge, rather than one silently
+replacing the other. For money that is the difference between a record and a
+guess.
+
+Summaries compute today, this month (with a per-day average over days *elapsed*,
+not days in the month), this year and all time. The breakdown ranks categories
+by spend for month / year / all-time, and a twelve-month trend is drawn as CSS
+bars — no chart library, because this app must keep working offline from
+`file://` and a CDN script would break that outright.
+
+Editing reuses the quick-add row rather than opening a dialog, so there is one
+code path for "what does a transaction look like" and no second form to keep in
+step. Escape cancels.
+
+Amount parsing accepts what people actually type on a phone — `1,250`, `₱80`,
+`  42.75  ` — and **refuses anything that isn't a positive number rather than
+storing zero**, because a ₱0 row looks like a real record and is worse than a
+refused one. The currency symbol is a click-to-change setting defaulting to ₱.
+
+Mobile: the amount takes its own full-width line with `inputmode="decimal"` so
+the number pad opens, summaries go two-up, and the delete control stays visible
+under `(pointer: coarse)` since there is no hover on a phone.
+
+One fix found in testing: the summary figures used `overflow-wrap:anywhere`,
+inherited from the app-wide text rule, which broke `₱35,236.07` mid-number into
+`₱35,236.0 / 7`. Numbers now shrink a step on narrow screens instead of wrapping
+— a smaller total beats a broken one.
+
 ## 2026-09-05 — Lane headers: give the name its own row
 
 Lane names were breaking mid-word — "Exercis / e", "PROJE / CTS", "My / Compa /

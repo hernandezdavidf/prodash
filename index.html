@@ -566,14 +566,16 @@ header h1{font-size:26px;letter-spacing:.3px}
   font-weight:600;font-size:12.5px;line-height:1.25;white-space:nowrap;
   transition:background .15s,color .15s,padding-top .15s}
 .tab:last-child{margin-right:0}
+.tab-sm{display:none}   /* the narrow-screen label; swapped in at 620px */
 /* Descending z-index so each tab overlaps the NEXT one and the strip reads
    left-to-right like a fanned stack. Default paint order would do the
    opposite. A 5th tab added later gets z-index:auto, already behind the 4th -
    the direction degrades correctly rather than inverting. */
-.tabbar .tab:nth-child(1){z-index:4}
-.tabbar .tab:nth-child(2){z-index:3}
-.tabbar .tab:nth-child(3){z-index:2}
-.tabbar .tab:nth-child(4){z-index:1}
+.tabbar .tab:nth-child(1){z-index:5}
+.tabbar .tab:nth-child(2){z-index:4}
+.tabbar .tab:nth-child(3){z-index:3}
+.tabbar .tab:nth-child(4){z-index:2}
+.tabbar .tab:nth-child(5){z-index:1}
 .tab:not(.on):hover{background:var(--panel);color:var(--ink)}
 /* Qualified as .tabbar .tab.on so it matches the nth-child rules above at
    (0,3,0) and wins on source order - as plain .tab.on it lost, and the active
@@ -612,7 +614,11 @@ header h1{font-size:26px;letter-spacing:.3px}
    in. So narrow screens shorten the labels and tighten the geometry instead.
    620px reuses a breakpoint already in this file rather than inventing one. */
 @media(max-width:620px){
-  .tab-lg{display:none}                    /* "My Personal "Calendar, "Board "History */
+  /* "My Personal "Calendar, "Board "History, and Expense Tracker -> Expenses.
+     The expense tab swaps whole words rather than dropping a prefix, because
+     "Tracker" alone says nothing about what it tracks. */
+  .tab-lg{display:none}
+  .tab-sm{display:inline}
   .tab{padding:8px 12px 7px;font-size:11.5px;margin-right:-8px}
   .tab.on{padding-top:10px;padding-bottom:8px}
   /* Full-bleed sheet on phones. -20px lands exactly on .wrap's border box
@@ -628,7 +634,7 @@ header h1{font-size:26px;letter-spacing:.3px}
 }
 
 
-body.view-reports .board-only,body.view-history .board-only,body.view-cal .board-only{display:none}
+body.view-reports .board-only,body.view-history .board-only,body.view-cal .board-only,body.view-exp .board-only{display:none}
 /* #view-reports itself is shown/hidden by toggling its `hidden` attribute in
    setView() - a CSS rule here can't win against the UA [hidden]{display:none}
    without matching or exceeding its specificity, so don't add one. */
@@ -1287,6 +1293,7 @@ return {
   <nav class="tabbar" role="tablist" aria-label="Main views">
     <button class="tab on" id="tabBoard" role="tab" aria-selected="true" aria-controls="viewPanel" tabindex="0">Board</button>
     <button class="tab" id="tabCal" role="tab" aria-selected="false" aria-controls="viewPanel" tabindex="-1"><span class="tab-lg">My Personal </span>Calendar</button>
+    <button class="tab" id="tabExp" role="tab" aria-selected="false" aria-controls="viewPanel" tabindex="-1"><span class="tab-lg">Expense Tracker</span><span class="tab-sm">Expenses</span></button>
     <button class="tab" id="tabReports" role="tab" aria-selected="false" aria-controls="viewPanel" tabindex="-1">Reports</button>
     <button class="tab" id="tabHistory" role="tab" aria-selected="false" aria-controls="viewPanel" tabindex="-1"><span class="tab-lg">Board </span>History</button>
   </nav>
@@ -1676,6 +1683,178 @@ return {
     </div>
   </div>
 
+  <style>
+  /* ---- Expense Tracker ----------------------------------------------------
+     The quick-add row is the whole feature. Amount and a few words, one tap,
+     done - everything else (date, category, payment, notes) folds away behind
+     a disclosure, because requiring them is exactly what stops someone logging
+     the coffee they just bought. */
+  .xq{background:var(--olive-lt);border:1px solid var(--olive);border-radius:12px;
+    padding:12px;margin-bottom:14px}
+  .xq-main{display:flex;gap:8px;align-items:stretch}
+  .xq-amt{display:flex;align-items:center;gap:2px;background:var(--paper);
+    border:1px solid var(--line);border-radius:9px;padding:0 4px 0 10px;flex:0 0 132px}
+  .xq-cur{font-weight:800;font-size:15px;color:var(--forest-ink);cursor:pointer;
+    padding:2px 3px;border-radius:5px;flex:none}
+  .xq-cur:hover{background:var(--olive-lt)}
+  .xq-amt input{flex:1;min-width:0;border:0;background:none;outline:none;
+    font-size:18px;font-weight:700;padding:9px 4px;font-variant-numeric:tabular-nums;color:var(--ink)}
+  .xq-main>input{flex:1;min-width:0;border:1px solid var(--line);border-radius:9px;
+    padding:9px 12px;font-size:14px;background:var(--paper);color:var(--ink);outline:none}
+  .xq-main>input:focus,.xq-amt:focus-within{border-color:var(--forest);
+    box-shadow:0 0 0 2px rgba(var(--glow-rgb),.18)}
+  .xq-add{flex:none;background:var(--forest);color:var(--on-brand);border:1px solid var(--forest);
+    border-radius:9px;padding:0 20px;font-weight:700;font-size:14px}
+  .xq-add:hover{background:var(--forest-dk)}
+  .xq-more{margin-top:9px;font-size:11.5px;font-weight:600;color:var(--forest-ink);
+    background:none;border:0;padding:2px 0}
+  .xq-more:hover{text-decoration:underline}
+  .xq-extra{margin-top:9px;padding-top:10px;border-top:1px dashed var(--olive)}
+  .xq-row{display:flex;gap:10px}
+  .xq-row>.ag-f{flex:1;min-width:0}
+  .xq-extra .ag-f label{color:var(--forest-dk)}
+
+  /* Three totals, biggest first. Serif numerals to match the header stats. */
+  .xsum{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+  .xsum-c{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:11px 13px}
+  .xsum-c b{display:block;font-family:var(--serif);font-size:22px;line-height:1.15;
+    color:var(--ink);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+  .xsum-c span{font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;
+    color:var(--muted);font-weight:700}
+  .xsum-c em{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:3px}
+
+  /* Category breakdown: one bar per category, widest first. */
+  .xbar{margin-bottom:9px}
+  .xbar-h{display:flex;align-items:baseline;gap:8px;font-size:12.5px;margin-bottom:3px}
+  .xbar-h b{font-weight:600;color:var(--ink);min-width:0;overflow-wrap:anywhere}
+  .xbar-h .xbar-a{margin-left:auto;font-variant-numeric:tabular-nums;font-weight:700;flex:none}
+  .xbar-h .xbar-p{color:var(--muted);font-size:11px;flex:none}
+  .xbar-t{height:8px;background:var(--ivory);border-radius:999px;overflow:hidden}
+  .xbar-f{height:100%;border-radius:999px;min-width:2px}
+  /* Uncategorised is drawn as an absence - hatched, not a colour - so it reads
+     as "not sorted yet" rather than as a category of its own. */
+  .xbar-f.none{background:repeating-linear-gradient(45deg,var(--sage),var(--sage) 4px,transparent 4px,transparent 8px)}
+
+  /* Twelve-month trend. CSS bars, no chart library: this app has to work
+     offline from file:// and a CDN script would break that outright. */
+  .xtrend{display:flex;align-items:flex-end;gap:4px;height:96px;margin:10px 0 4px}
+  .xtrend-c{flex:1;display:flex;flex-direction:column;justify-content:flex-end;
+    align-items:center;gap:4px;min-width:0;height:100%}
+  .xtrend-b{width:100%;background:var(--olive);border-radius:4px 4px 0 0;min-height:2px}
+  .xtrend-c.now .xtrend-b{background:var(--forest)}
+  .xtrend-c:hover .xtrend-b{background:var(--forest-dk)}
+  .xtrend-l{font-size:9px;color:var(--muted);white-space:nowrap;font-weight:600}
+
+  .xfilters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:11px}
+  .xfilters input,.xfilters select{border:1px solid var(--line);border-radius:8px;
+    padding:6px 9px;font-size:12.5px;background:var(--ivory);color:var(--ink);outline:none;
+    min-width:0;max-width:100%}
+  .xfilters input:focus,.xfilters select:focus{border-color:var(--olive);background:var(--paper)}
+  #xSearch{flex:1;min-width:150px}
+
+  .xday{font-size:11px;font-weight:700;color:var(--forest-ink);text-transform:uppercase;
+    letter-spacing:.5px;margin:14px 0 5px;padding-bottom:4px;border-bottom:1px solid var(--line);
+    display:flex;align-items:baseline;gap:8px}
+  .xday .xday-t{margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums}
+  .xrow{display:flex;align-items:flex-start;gap:10px;padding:7px 0;
+    border-bottom:1px dashed var(--line)}
+  .xrow:last-child{border-bottom:none}
+  .xdot{width:9px;height:9px;min-width:9px;border-radius:50%;margin-top:5px;flex:none}
+  .xdot.none{background:none;border:1.5px dashed var(--sage)}
+  .xrow-m{flex:1;min-width:0;cursor:pointer}
+  .xrow-n{font-size:13px;color:var(--ink);overflow-wrap:anywhere}
+  .xrow-s{font-size:11px;color:var(--muted);margin-top:2px;overflow-wrap:anywhere}
+  .xrow-a{font-variant-numeric:tabular-nums;font-weight:700;font-size:13.5px;flex:none;
+    color:var(--ink);padding-top:1px}
+  .xrow-x{flex:none;color:var(--sage);font-size:15px;line-height:1;padding:0 2px;opacity:0;transition:.15s}
+  .xrow:hover .xrow-x,.xrow:focus-within .xrow-x{opacity:.8}
+  .xrow-x:hover{opacity:1;color:var(--alert-ink)}
+  .xempty{font-size:12.5px;color:var(--muted);padding:18px;text-align:center;
+    border:1px dashed var(--line);border-radius:9px}
+
+  @media(max-width:620px){
+    /* On a phone the amount takes its own full-width line, so the number pad
+       has room and the description is not fighting it for space. */
+    .xq-main{flex-wrap:wrap}
+    .xq-amt{flex:1 0 100%}
+    .xq-main>input{flex:1 0 auto}
+    .xq-add{padding:11px 18px}
+    .xq-row{flex-direction:column;gap:0}
+    .xsum{grid-template-columns:1fr 1fr}
+    /* Shrink the figure rather than let it wrap: overflow-wrap:anywhere is the
+       right default for prose but it breaks a number mid-digit, and
+       "P35,236.0 / 7" is worse than the same total one size smaller. At 17px a
+       seven-figure amount still fits a half-width card at 375px. */
+    .xsum-c b{font-size:17px}
+    .xtrend{height:78px}
+    .xtrend-l{font-size:8px}
+  }
+  @media (pointer: coarse){
+    .xrow-x{opacity:.7}   /* no hover on touch, so the delete must be visible */
+  }
+  </style>
+
+  <!-- ===================== EXPENSE TRACKER =====================
+       Dates here are WALL-CLOCK dates, not the 07:00 shift keys the rest of
+       the app uses. Money reconciles against calendar days and calendar months
+       - a bank statement knows nothing about a shift - and the brief asked for
+       "the date I create the entry". So a 3am purchase files under that
+       morning's date, not the previous evening's shift. This is the one place
+       in the app where today() is deliberately NOT the right function. -->
+  <div id="view-exp" hidden>
+    <div class="card">
+      <h2>Expense Tracker <span class="cnt" id="xCnt">0</span></h2>
+      <div class="sub">Catch it the moment it happens. An amount and a few words is a complete entry &mdash; the date, category and the rest can wait, or never come at all.</div>
+
+      <form class="xq" id="xqForm" autocomplete="off">
+        <div class="xq-main">
+          <div class="xq-amt">
+            <span class="xq-cur" id="xqCur" role="button" tabindex="0" title="Click to change the currency symbol">&#8369;</span>
+            <input id="xqAmt" type="text" inputmode="decimal" placeholder="0.00" aria-label="Amount">
+          </div>
+          <input id="xqName" placeholder="What was it for?" aria-label="Description" maxlength="120">
+          <button class="xq-add" type="submit">Add</button>
+        </div>
+        <button type="button" class="xq-more" id="xqMore" aria-expanded="false" aria-controls="xqExtra">+ date, category, payment, notes</button>
+        <div class="xq-extra" id="xqExtra" hidden>
+          <div class="xq-row">
+            <div class="ag-f"><label for="xqDate">Date</label><input id="xqDate" type="date"></div>
+            <div class="ag-f"><label for="xqCat">Category</label><select id="xqCat"></select></div>
+          </div>
+          <div class="xq-row">
+            <div class="ag-f"><label for="xqPay">Paid with</label><input id="xqPay" list="xqPayList" placeholder="Cash, GCash, card&hellip;" maxlength="40"><datalist id="xqPayList"></datalist></div>
+            <div class="ag-f"><label for="xqNote">Notes</label><input id="xqNote" maxlength="200"></div>
+          </div>
+        </div>
+      </form>
+
+      <div class="xsum" id="xSum"></div>
+    </div>
+
+    <div class="card">
+      <h2>Where it goes</h2>
+      <div class="sub">Biggest first. Anything you never categorised still counts toward every total &mdash; it just shows as unsorted.</div>
+      <div class="sub-tabs">
+        <button class="sub-tab on" data-xview="month">This month</button>
+        <button class="sub-tab" data-xview="year">This year</button>
+        <button class="sub-tab" data-xview="all">All time</button>
+      </div>
+      <div id="xBreak"></div>
+    </div>
+
+    <div class="card">
+      <h2>Transactions <span class="cnt" id="xListCnt">0</span></h2>
+      <div class="xfilters">
+        <input id="xSearch" placeholder="Search description, notes or payment&hellip;" aria-label="Search transactions">
+        <select id="xFilterCat" aria-label="Filter by category"></select>
+        <input id="xFrom" type="date" aria-label="From date">
+        <input id="xTo" type="date" aria-label="To date">
+        <button type="button" class="hist-btn" id="xClearF">Clear</button>
+      </div>
+      <div id="xList"></div>
+    </div>
+  </div>
+
   </div><!-- /.viewpanel : closes the sheet opened just under the tab strip -->
 
   <!-- Activity editor. One dialog creates and edits, so the two can never
@@ -1907,6 +2086,11 @@ function norm(s){
   if(typeof s.roll!=="number"||s.roll<0||s.roll>=1440)s.roll=420;
   // Which Board layout is showing: the lane columns, or the ruled checklist.
   if(["classic","checklist"].indexOf(s.boardView)<0)s.boardView="classic";
+  /* Expenses. KEYED like tasks, so two devices that both add a transaction
+     while offline keep BOTH on merge rather than one overwriting the other -
+     which for money is the difference between a record and a guess. */
+  if(!Array.isArray(s.expenses))s.expenses=[];
+  if(typeof s.cur!=="string"||!s.cur)s.cur="\u20B1";
   if(typeof s.updatedAt!=="number")s.updatedAt=0;
   // Board History. Both are MERGED across devices rather than last-write-wins
   // (see adopt()) - an audit trail that loses the losing side's entries can't
@@ -2175,7 +2359,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="3.0";
+var APP_VERSION="3.1";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -2186,6 +2370,7 @@ var APP_VERSION="3.0";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-05T05:30:00+08:00",text:"New Expense Tracker tab. Type an amount and a few words, press Add, done - the date fills itself in and category, payment and notes are optional and folded away. It totals your day, month and year automatically, shows where the money goes by category (uncategorised included), charts the last twelve months, and lets you search, filter and edit anything you have recorded."},
   {ts:"2026-09-05T04:45:00+08:00",text:"Lane names are readable again. The name now gets a row to itself instead of sharing one with six buttons, so long names like \"My Company + Personal\" wrap at the spaces rather than breaking mid-word. The lane's buttons moved to a quiet row underneath."},
   {ts:"2026-09-05T04:10:00+08:00",text:"Tidied the controls. Focus mode is gone. Theme moved up beside Sign out. The two sync buttons are now a compact pair reading just Local and Cloud, stacked one above the other, with their status text on hover instead of permanently on screen."},
   {ts:"2026-09-05T03:30:00+08:00",text:"The main tabs are now layered document tabs. The one you are on sits in front, raised slightly, and joins seamlessly onto the sheet holding the view below it; the others sit behind it. Arrow keys move between tabs. Long links in the reminder strip wrap properly, and the Reports filters no longer push the page sideways on a phone."},
@@ -2221,8 +2406,8 @@ var APP_VERSION_HISTORY=[
    pushed" is per-account, though - it tracks a specific board's revisions. */
 var DEV_KEY="prodash.deviceId", DEV_NAME_KEY="prodash.deviceName", PUSHED_KEY=PDAuth.ns("prodash.pushedUpTo");
 var HIST_CAP=400, CKPT_EVERY=25, BATCH_MS=2500;
-var BOARD_KEYS=["tasks","log","days","events","lanes","rituals","theme","hiddenBlocks","plans","roll","boardView"];
-var KEYED=["tasks","events","lanes","rituals"], MAPS=["log","days","plans"], SCALARS=["theme","roll","boardView"];
+var BOARD_KEYS=["tasks","log","days","events","lanes","rituals","theme","hiddenBlocks","plans","roll","boardView","expenses","cur"];
+var KEYED=["tasks","events","lanes","rituals","expenses"], MAPS=["log","days","plans"], SCALARS=["theme","roll","boardView","cur"];
 // Plain arrays of primitive ids (not objects with their own .id, so KEYED's
 // per-item union doesn't apply) compared by CONTENT, not reference - a
 // cloned snapshot never shares object identity with the live array even
@@ -3972,6 +4157,7 @@ function applyImport(d,label){
 
 document.getElementById("tabBoard").addEventListener("click",function(){setView("board");});
 document.getElementById("tabCal").addEventListener("click",function(){setView("cal");});
+document.getElementById("tabExp").addEventListener("click",function(){setView("exp");});
 document.getElementById("tabReports").addEventListener("click",function(){setView("reports");});
 document.getElementById("tabHistory").addEventListener("click",function(){setView("history");});
 /* Scoped to [data-hview]. This used to bind EVERY .sub-tab - all 13 across
@@ -3998,7 +4184,7 @@ document.querySelectorAll("[data-hview]").forEach(function(b){
    landing on one. */
 document.querySelector(".tabbar").addEventListener("keydown",function(e){
   var tabs=[].slice.call(document.querySelectorAll('.tabbar [role="tab"]'));
-  var views=["board","cal","reports","history"];
+  var views=["board","cal","exp","reports","history"];   // must match MAIN_TABS order
   var i=tabs.indexOf(document.activeElement); if(i<0)return;
   var n;
   if(e.key==="ArrowRight")     n=(i+1)%tabs.length;
@@ -4424,19 +4610,339 @@ amEl("amStart").addEventListener("change",function(){
   else amMsg("");
 });
 
-// One place naming the four main tabs, so setView and the keyboard handler
+/* ==================== EXPENSE TRACKER ====================================
+   A transaction is {id, d, n, a, cat, pay, note, ts}:
+     d    wall-clock date "YYYY-MM-DD" - NOT a shift key. See the markup note.
+     a    amount as a Number, always positive
+     cat  category id, or "" for uncategorised (which is a first-class state,
+          not a missing value - every total counts it)
+   Stored in S.expenses, declared KEYED so two devices adding transactions
+   offline keep both on merge instead of one replacing the other. For money
+   that is the difference between a record and a guess. */
+var EXP_CATS=[
+  {id:"food",     n:"Food & drink",      c:"var(--ln-x1)"},
+  {id:"transport",n:"Transport",         c:"var(--ln-dayclient)"},
+  {id:"bills",    n:"Bills & utilities", c:"var(--ln-other)"},
+  {id:"health",   n:"Health",            c:"var(--olive)"},
+  {id:"family",   n:"Family",            c:"var(--ln-x3)"},
+  {id:"home",     n:"Home",              c:"var(--ln-x4)"},
+  {id:"shop",     n:"Shopping",          c:"var(--ln-x2)"},
+  {id:"fun",      n:"Fun",               c:"var(--ln-grow)"},
+  {id:"work",     n:"Work & business",   c:"var(--ln-biz)"},
+  {id:"other",    n:"Other",             c:"var(--ln-x5)"}
+];
+var xBreakView="month";
+
+// The real calendar date, deliberately bypassing today()'s 07:00 roll.
+function calToday(){ return key(new Date()); }
+function expCat(id){
+  for(var i=0;i<EXP_CATS.length;i++) if(EXP_CATS[i].id===id) return EXP_CATS[i];
+  return null;
+}
+function money(n){
+  var v=(Math.round(n*100)/100).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+  return (S.cur||"₱")+v;
+}
+/* Accepts what a person actually types on a phone: "1,250", "1 250.50", "₱80".
+   Anything that is not a positive number is rejected rather than silently
+   stored as 0 - a 0 transaction looks like a real record and is worse than a
+   refused one. */
+function parseAmt(s){
+  var t=String(s||"").replace(/[^0-9.\-]/g,"");
+  var n=parseFloat(t);
+  return (isFinite(n)&&n>0)?n:null;
+}
+function expSorted(){
+  return (S.expenses||[]).slice().sort(function(a,b){
+    if(a.d!==b.d) return a.d<b.d?1:-1;      // newest day first
+    return (b.ts||0)-(a.ts||0);             // newest entry within the day first
+  });
+}
+function expSum(list){ var t=0; for(var i=0;i<list.length;i++) t+=(+list[i].a||0); return t; }
+
+function renderExpenses(){
+  var host=document.getElementById("view-exp");
+  if(!host)return;
+  var all=S.expenses||[];
+  document.getElementById("xCnt").textContent=all.length+(all.length===1?" entry":" entries");
+  document.getElementById("xqCur").textContent=S.cur||"₱";
+
+  // Populate the two category selects once per render (cheap, and it keeps them
+  // correct if EXP_CATS ever becomes user-editable).
+  var catOpts='<option value="">Uncategorised</option>'+EXP_CATS.map(function(c){
+    return '<option value="'+c.id+'">'+esc(c.n)+'</option>';}).join("");
+  var qc=document.getElementById("xqCat");
+  if(qc.innerHTML!==catOpts)qc.innerHTML=catOpts;
+  var fc=document.getElementById("xFilterCat"), fcv=fc.value;
+  var filtOpts='<option value="">All categories</option><option value="__none">Uncategorised only</option>'+
+    EXP_CATS.map(function(c){return '<option value="'+c.id+'">'+esc(c.n)+'</option>';}).join("");
+  if(fc.innerHTML!==filtOpts){ fc.innerHTML=filtOpts; fc.value=fcv||""; }
+
+  // Payment methods already used, offered back as suggestions - the fastest
+  // autocomplete is the one built from what you actually type.
+  var pays={},pl=[];
+  all.forEach(function(e){ if(e.pay&&!pays[e.pay]){pays[e.pay]=1;pl.push(e.pay);} });
+  document.getElementById("xqPayList").innerHTML=pl.sort().map(function(p){
+    return '<option value="'+esc(p)+'">';}).join("");
+
+  if(!document.getElementById("xqDate").value)
+    document.getElementById("xqDate").value=calToday();
+
+  renderExpSummary(all);
+  renderExpBreakdown(all);
+  renderExpList(all);
+}
+
+function renderExpSummary(all){
+  var tk=calToday(), mk=tk.slice(0,7), yk=tk.slice(0,4);
+  var day=all.filter(function(e){return e.d===tk;});
+  var mon=all.filter(function(e){return (e.d||"").slice(0,7)===mk;});
+  var yr =all.filter(function(e){return (e.d||"").slice(0,4)===yk;});
+  var dayT=expSum(day), monT=expSum(mon), yrT=expSum(yr);
+  // Days elapsed this month, so the average is "per day so far" rather than
+  // per day of a month that has not finished.
+  // NOT named dnum - that is the calendar's date-to-day-number helper, and
+  // shadowing it inside this function would be a trap for the next edit here.
+  var dayOfMonth=+tk.slice(8,10);
+  var avg=dayOfMonth?monT/dayOfMonth:0;
+  var p=dparts(tk);
+  document.getElementById("xSum").innerHTML=
+    card(money(dayT),"Today",day.length+(day.length===1?" entry":" entries"))+
+    card(money(monT),MONTHS[p.m],mon.length+" so far · "+money(avg)+"/day")+
+    card(money(yrT),yk,yr.length+" this year")+
+    card(money(expSum(all)),"All time",all.length+" total");
+  function card(v,l,sub){
+    return '<div class="xsum-c"><span>'+esc(l)+'</span><b>'+esc(v)+'</b><em>'+esc(sub)+'</em></div>';
+  }
+}
+
+function renderExpBreakdown(all){
+  var tk=calToday(), scope;
+  if(xBreakView==="month")      scope=all.filter(function(e){return (e.d||"").slice(0,7)===tk.slice(0,7);});
+  else if(xBreakView==="year")  scope=all.filter(function(e){return (e.d||"").slice(0,4)===tk.slice(0,4);});
+  else                          scope=all.slice();
+  var host=document.getElementById("xBreak");
+  var total=expSum(scope);
+  if(!scope.length){
+    host.innerHTML='<div class="xempty">Nothing recorded in this period yet.</div>'+trendHTML(all);
+    return;
+  }
+  var by={};
+  scope.forEach(function(e){ var k=e.cat||""; by[k]=(by[k]||0)+(+e.a||0); });
+  var rows=Object.keys(by).map(function(k){
+    var c=expCat(k);
+    return {k:k,label:c?c.n:"Uncategorised",colour:c?c.c:null,v:by[k]};
+  }).sort(function(a,b){return b.v-a.v;});
+  var max=rows[0].v;
+  host.innerHTML=rows.map(function(r){
+    var pct=total?Math.round(r.v/total*100):0;
+    var w=max?Math.max(2,Math.round(r.v/max*100)):0;
+    return '<div class="xbar"><div class="xbar-h"><b>'+esc(r.label)+'</b>'+
+      '<span class="xbar-p">'+pct+'%</span>'+
+      '<span class="xbar-a">'+esc(money(r.v))+'</span></div>'+
+      '<div class="xbar-t"><div class="xbar-f'+(r.colour?'':' none')+'" style="width:'+w+'%'+
+        (r.colour?';background:'+r.colour:'')+'"></div></div></div>';
+  }).join("")+trendHTML(all);
+}
+
+/* Twelve months back from this one. Built from the same S.expenses array, so
+   it cannot disagree with the totals above it. */
+function trendHTML(all){
+  var tk=calToday(), p=dparts(tk), cells=[], max=0;
+  for(var i=11;i>=0;i--){
+    var m=p.m-i, y=p.y+Math.floor(m/12); m=((m%12)+12)%12;
+    var mk=monthKey(y,m);
+    var v=expSum(all.filter(function(e){return (e.d||"").slice(0,7)===mk;}));
+    if(v>max)max=v;
+    cells.push({mk:mk,m:m,y:y,v:v,now:i===0});
+  }
+  if(!max) return "";
+  return '<div class="xday" style="margin-top:18px">Last 12 months</div>'+
+    '<div class="xtrend">'+cells.map(function(c){
+      var h=Math.max(2,Math.round(c.v/max*100));
+      return '<div class="xtrend-c'+(c.now?" now":"")+'" title="'+MONTHS[c.m]+' '+c.y+' · '+esc(money(c.v))+'">'+
+        '<div class="xtrend-b" style="height:'+h+'%"></div>'+
+        '<div class="xtrend-l">'+MONTHS[c.m].slice(0,1)+'</div></div>';
+    }).join("")+'</div>';
+}
+
+function renderExpList(all){
+  var q=(document.getElementById("xSearch").value||"").trim().toLowerCase();
+  var cat=document.getElementById("xFilterCat").value;
+  var from=document.getElementById("xFrom").value, to=document.getElementById("xTo").value;
+  var list=expSorted().filter(function(e){
+    if(from&&e.d<from)return false;
+    if(to&&e.d>to)return false;
+    if(cat==="__none"){ if(e.cat)return false; }
+    else if(cat&&e.cat!==cat)return false;
+    if(q){
+      var hay=((e.n||"")+" "+(e.note||"")+" "+(e.pay||"")).toLowerCase();
+      if(hay.indexOf(q)<0)return false;
+    }
+    return true;
+  });
+  var cnt=document.getElementById("xListCnt");
+  cnt.textContent=list.length+(list.length===1?" entry":" entries")+
+    (list.length!==all.length?" of "+all.length:"")+" · "+money(expSum(list));
+  var host=document.getElementById("xList");
+  if(!list.length){
+    host.innerHTML='<div class="xempty">'+(all.length?"Nothing matches those filters.":"No transactions yet. Add one above — an amount and a few words is enough.")+'</div>';
+    return;
+  }
+  // Grouped by day with a per-day subtotal, which is the unit people actually
+  // review ("what did I spend yesterday?").
+  var out="",curDay=null;
+  list.forEach(function(e){
+    if(e.d!==curDay){
+      curDay=e.d;
+      var dayTotal=expSum(list.filter(function(x){return x.d===curDay;}));
+      var p=dparts(curDay);
+      var lbl=curDay===calToday()?"Today":(curDay===addDays(calToday(),-1)?"Yesterday":
+        DOW[dowOf(curDay)]+", "+MONTHS[p.m]+" "+p.d);
+      out+='<div class="xday">'+esc(lbl)+'<span class="xday-t">'+esc(money(dayTotal))+'</span></div>';
+    }
+    var c=expCat(e.cat);
+    var meta=[];
+    if(c)meta.push(c.n);
+    if(e.pay)meta.push(e.pay);
+    if(e.note)meta.push(e.note);
+    out+='<div class="xrow" data-xid="'+esc(e.id)+'">'+
+      '<div class="xdot'+(c?'':' none')+'"'+(c?' style="background:'+c.c+'"':'')+'></div>'+
+      '<div class="xrow-m" data-xedit="'+esc(e.id)+'" title="Click to edit">'+
+        '<div class="xrow-n">'+esc(e.n||"(no description)")+'</div>'+
+        (meta.length?'<div class="xrow-s">'+esc(meta.join(" · "))+'</div>':'')+
+      '</div>'+
+      '<div class="xrow-a">'+esc(money(+e.a||0))+'</div>'+
+      '<button class="xrow-x" data-xdel="'+esc(e.id)+'" aria-label="Delete transaction">&times;</button>'+
+    '</div>';
+  });
+  host.innerHTML=out;
+  host.querySelectorAll("[data-xdel]").forEach(function(b){
+    b.addEventListener("click",function(){
+      var e=(S.expenses||[]).filter(function(x){return x.id===b.dataset.xdel;})[0];
+      if(!e)return;
+      if(!confirm("Delete "+money(+e.a||0)+(e.n?' for "'+e.n+'"':"")+"?"))return;
+      S.expenses=S.expenses.filter(function(x){return x.id!==e.id;});
+      save();renderExpenses();stamp("Transaction deleted");
+    });
+  });
+  host.querySelectorAll("[data-xedit]").forEach(function(m){
+    m.addEventListener("click",function(){ editExpense(m.dataset.xedit); });
+  });
+}
+
+/* Editing reuses the quick-add row rather than opening a dialog: the fields are
+   already there, and it keeps one code path for "what does a transaction look
+   like". The form remembers which id it is editing via xEditing. */
+var xEditing=null;
+function editExpense(id){
+  var e=(S.expenses||[]).filter(function(x){return x.id===id;})[0];
+  if(!e)return;
+  xEditing=id;
+  document.getElementById("xqAmt").value=(+e.a||0);
+  document.getElementById("xqName").value=e.n||"";
+  document.getElementById("xqDate").value=e.d||calToday();
+  document.getElementById("xqCat").value=e.cat||"";
+  document.getElementById("xqPay").value=e.pay||"";
+  document.getElementById("xqNote").value=e.note||"";
+  xShowExtra(true);
+  document.querySelector(".xq-add").textContent="Save";
+  document.getElementById("xqForm").scrollIntoView({block:"center"});
+  document.getElementById("xqAmt").focus();
+  stamp("Editing — press Save, or Escape to cancel");
+}
+function xResetForm(){
+  xEditing=null;
+  var f=document.getElementById("xqForm");
+  ["xqAmt","xqName","xqPay","xqNote"].forEach(function(id){document.getElementById(id).value="";});
+  document.getElementById("xqCat").value="";
+  document.getElementById("xqDate").value=calToday();
+  document.querySelector(".xq-add").textContent="Add";
+}
+function xShowExtra(on){
+  document.getElementById("xqExtra").hidden=!on;
+  document.getElementById("xqMore").setAttribute("aria-expanded",on?"true":"false");
+  document.getElementById("xqMore").textContent=on?"− hide extra fields":"+ date, category, payment, notes";
+}
+
+document.getElementById("xqForm").addEventListener("submit",function(ev){
+  ev.preventDefault();
+  var amtI=document.getElementById("xqAmt");
+  var a=parseAmt(amtI.value);
+  if(a===null){ amtI.focus(); amtI.select(); stamp("Enter an amount first"); return; }
+  var rec={
+    n:document.getElementById("xqName").value.trim(),
+    a:a,
+    d:document.getElementById("xqDate").value||calToday(),
+    cat:document.getElementById("xqCat").value||"",
+    pay:document.getElementById("xqPay").value.trim(),
+    note:document.getElementById("xqNote").value.trim()
+  };
+  if(xEditing){
+    var e=(S.expenses||[]).filter(function(x){return x.id===xEditing;})[0];
+    if(e){ e.n=rec.n; e.a=rec.a; e.d=rec.d; e.cat=rec.cat; e.pay=rec.pay; e.note=rec.note; }
+    stamp("Transaction updated");
+  }else{
+    rec.id="exp_"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+    rec.ts=Date.now();
+    S.expenses.push(rec);
+    stamp("Added "+money(a));
+  }
+  save(); xResetForm(); renderExpenses();
+  // Straight back to the amount box: the next thing you do after logging one
+  // expense is very often logging another.
+  document.getElementById("xqAmt").focus();
+});
+
+document.getElementById("xqMore").addEventListener("click",function(){
+  xShowExtra(document.getElementById("xqExtra").hidden);
+});
+document.getElementById("xqForm").addEventListener("keydown",function(ev){
+  if(ev.key==="Escape"&&xEditing){ xResetForm(); stamp("Edit cancelled"); }
+});
+document.getElementById("xqCur").addEventListener("click",function(){
+  var v=prompt("Currency symbol to show before every amount:",S.cur||"₱");
+  if(v===null)return;
+  v=v.trim().slice(0,3);
+  S.cur=v||"₱"; save(); renderExpenses();
+});
+document.getElementById("xqCur").addEventListener("keydown",function(ev){
+  if(ev.key==="Enter"||ev.key===" "){ ev.preventDefault(); this.click(); }
+});
+document.querySelectorAll("[data-xview]").forEach(function(b){
+  b.addEventListener("click",function(){
+    xBreakView=b.dataset.xview;
+    document.querySelectorAll("[data-xview]").forEach(function(x){x.classList.toggle("on",x===b);});
+    renderExpBreakdown(S.expenses||[]);
+  });
+});
+["xSearch","xFilterCat","xFrom","xTo"].forEach(function(id){
+  var el=document.getElementById(id);
+  el.addEventListener(id==="xSearch"?"input":"change",function(){ renderExpList(S.expenses||[]); });
+});
+document.getElementById("xClearF").addEventListener("click",function(){
+  document.getElementById("xSearch").value="";
+  document.getElementById("xFilterCat").value="";
+  document.getElementById("xFrom").value="";
+  document.getElementById("xTo").value="";
+  renderExpList(S.expenses||[]);
+});
+
+// One place naming the main tabs, so setView and the keyboard handler
 // agree on both the order and the element ids.
-var MAIN_TABS={board:"tabBoard",cal:"tabCal",reports:"tabReports",history:"tabHistory"};
+var MAIN_TABS={board:"tabBoard",cal:"tabCal",exp:"tabExp",reports:"tabReports",history:"tabHistory"};
 function setView(v){
   document.body.classList.toggle("view-reports",v==="reports");
   document.body.classList.toggle("view-history",v==="history");
   document.body.classList.toggle("view-cal",v==="cal");
+  document.body.classList.toggle("view-exp",v==="exp");
   // the CSS class alone can't win: the static `hidden` attribute in the markup
   // forces display:none via the UA stylesheet no matter what a class-based
   // rule says, so the attribute itself has to be flipped here.
   document.getElementById("view-reports").hidden=(v!=="reports");
   document.getElementById("view-history").hidden=(v!=="history");
   document.getElementById("view-cal").hidden=(v!=="cal");
+  document.getElementById("view-exp").hidden=(v!=="exp");
   /* Driven from one map rather than four repeated lines, so the class, the
      aria state and the roving tabindex cannot fall out of step - which they
      would the first time someone added a fifth tab and updated only the
@@ -4450,6 +4956,7 @@ function setView(v){
   });
   document.getElementById("viewPanel").setAttribute("aria-labelledby",MAIN_TABS[v]||"tabBoard");
   if(v==="cal")renderCalendar();
+  if(v==="exp")renderExpenses();
   if(v==="reports")renderReportsView();
   if(v==="history"){ curHView=curHView||"log"; flushHistory(); renderHistory(); }
   else curHView=null;
