@@ -242,7 +242,25 @@ header h1{font-size:26px;letter-spacing:.3px}
 .pill.sync.err i{background:var(--alert)}
 .pill.sync.err{border-color:var(--alert);color:var(--alert-ink)}
 .pill.sync.ok{border-color:var(--olive)}
-.synced-note{font-size:10.5px;color:var(--muted);text-align:right;margin-top:3px;max-width:230px}
+/* The two sync pills, stacked and shrunk. Their status line used to sit
+   permanently under each button, which meant two lines of small grey prose
+   were on screen at all times to say "nothing is wrong". It is now a tooltip:
+   present when you ask for it, absent otherwise. */
+.syncstack{display:flex;flex-direction:column;gap:5px;flex-shrink:0;align-items:flex-end}
+.synctip{position:relative}
+.pill.mini{padding:4px 11px;font-size:11.5px;gap:6px}
+.pill.mini i{width:6px;height:6px}
+/* Inverted chip: --ink on --paper reverses correctly in both themes without a
+   second pair of tokens (charcoal-on-white in light, light-on-charcoal in dark). */
+.synced-note{position:absolute;right:0;top:calc(100% + 6px);z-index:20;
+  width:max-content;max-width:240px;text-align:left;
+  background:var(--ink);color:var(--paper);font-size:11px;line-height:1.45;
+  padding:6px 9px;border-radius:7px;box-shadow:0 4px 14px rgba(var(--shadow-rgb),.28);
+  opacity:0;visibility:hidden;transition:opacity .13s;pointer-events:none}
+/* focus-within covers the keyboard path - the tooltip is the only place the
+   state is written, so it must not be mouse-only. */
+.synctip:hover .synced-note,.synctip:focus-within .synced-note{opacity:1;visibility:visible}
+.synced-note:empty{display:none}
 
 /* minmax(0, ...) on every track, not bare 1fr/330px: a plain "1fr" track's
    implicit minimum is auto (its content's min-content size), so a single
@@ -425,7 +443,6 @@ header h1{font-size:26px;letter-spacing:.3px}
 .lane-del{font-size:16px;font-weight:700}
 .lane-del:hover{color:var(--terra-ink);background:var(--terra-lt)}
 .lane-s{font-size:10.5px;color:var(--muted);margin-bottom:9px;min-height:14px}
-.lane.dim{opacity:.32;filter:grayscale(.65)}
 .lane.active{box-shadow:0 0 0 2px var(--forest-ink),var(--lift)}
 .lane.pinned.active{box-shadow:inset 0 3px 0 var(--olive),0 0 0 2px var(--forest-ink),var(--lift)}
 /* dragging a lane to reorder the board */
@@ -1233,6 +1250,7 @@ return {
           <b id="whoName"></b>
           <span id="whoUser"></span>
         </div>
+        <button class="hdr-out" id="themeBtn" title="Light / dark / follow the system">Theme: auto</button>
         <button class="hdr-out" id="signOutBtn">Sign out</button>
       </div>
     </div>
@@ -1266,20 +1284,22 @@ return {
       <div class="nm" id="nowMeta"></div>
     </div>
     <div class="spacer"></div>
-    <button class="pill" id="focusBtn">Focus mode: off</button>
-    <button class="pill" id="themeBtn" title="Light / dark / follow the system">Theme: auto</button>
-    <div>
-      <button class="pill sync" id="syncBtn"><i></i><span id="syncTxt">Local only</span></button>
-      <div class="synced-note" id="syncNote"></div>
-    </div>
-    <div>
-      <!-- Separate from the OneDrive pill above: File System Access API
-           (that one) doesn't exist on any phone browser at all, so this is
-           the sync path that actually reaches a phone. The two are
-           independent and can both be on at once - whichever writes last
-           wins via the same updatedAt/adopt() logic either way. -->
-      <button class="pill sync" id="cloudBtn"><i></i><span id="cloudTxt">Cloud: tap to sync</span></button>
-      <div class="synced-note" id="cloudNote"></div>
+    <!-- The two sync paths, stacked so they read as one pair of related
+         switches rather than two unrelated pills. They ARE separate: the
+         File System Access API (Local) does not exist on any phone browser,
+         so Cloud is the path that actually reaches a phone. Both can be on at
+         once - whichever writes last wins via the same updatedAt/adopt() rule.
+         Labels are one word each; the state and the last-write detail live in
+         the hover tooltip and in aria-label, so nothing is lost. -->
+    <div class="syncstack">
+      <div class="synctip">
+        <button class="pill sync mini" id="syncBtn"><i></i><span id="syncTxt">Local</span></button>
+        <div class="synced-note" id="syncNote"></div>
+      </div>
+      <div class="synctip">
+        <button class="pill sync mini" id="cloudBtn"><i></i><span id="cloudTxt">Cloud</span></button>
+        <div class="synced-note" id="cloudNote"></div>
+      </div>
     </div>
   </div>
 
@@ -1850,7 +1870,8 @@ function norm(s){
   if(!s.tasks)s.tasks=[];
   if(!s.log)s.log={};
   if(!s.days)s.days={};
-  if(typeof s.focus!=="boolean")s.focus=false;
+  /* Focus mode was removed. An old board may still carry a "focus" key; it is
+     no longer in BOARD_KEYS and nothing reads it, so it sits inert. */
   if(!Array.isArray(s.events))s.events=[];
   /* The day's intent, in one line - the "objective" at the top of a lesson
      plan. Kept in its own map rather than on an activity because a day can
@@ -1959,12 +1980,22 @@ function idbDel(k){return idb().then(function(db){return new Promise(function(re
 function setSync(state,note){
   syncState=state;
   var b=document.getElementById("syncBtn"),t=document.getElementById("syncTxt"),n=document.getElementById("syncNote");
-  b.className="pill sync"+(state==="synced"?" ok":state==="error"?" err":state==="needs"?" warn":"");
-  t.textContent = state==="synced"?"Synced to file"
-                : state==="needs" ?"Reconnect file"
-                : state==="error" ?"Sync error"
-                : FS_OK?"Local only — connect":"Local only";
-  n.textContent = note||"";
+  b.className="pill sync mini"+(state==="synced"?" ok":state==="error"?" err":state==="needs"?" warn":"");
+  /* The button says "Local" in every state now - the coloured dot carries the
+     state, and the sentence that used to be the label moves into the tooltip.
+     It also goes on aria-label, because a CSS :hover tooltip is invisible to a
+     screen reader and this is the only place the state is written down. */
+  var what = state==="synced"?"Synced to file"
+           : state==="needs" ?"Reconnect file"
+           : state==="error" ?"Sync error"
+           : FS_OK?"Not connected. Click to pick a file in your OneDrive folder."
+                  :"This browser stores data locally only. Use Export backup to move it.";
+  t.textContent="Local";
+  /* Several callers already pass a note that IS the state sentence (the
+     not-connected and local-only cases), so joining them blindly printed the
+     same sentence twice. Prefix only when the note adds something. */
+  n.textContent = (!note || note===what) ? what : what+" · "+note;
+  b.setAttribute("aria-label","Local file sync — "+n.textContent);
 }
 
 function scheduleWrite(){
@@ -2034,11 +2065,13 @@ function setCloud(state,note){
   cloudState=state;
   var b=document.getElementById("cloudBtn"),t=document.getElementById("cloudTxt"),n=document.getElementById("cloudNote");
   if(!b)return;
-  b.className="pill sync"+(state==="synced"?" ok":(state==="error"?" err":""));
-  t.textContent = state==="synced" ? "Cloud synced"
-                : state==="error"  ? "Cloud sync error"
-                :                    "Cloud: tap to sync";
-  n.textContent = note||"";
+  b.className="pill sync mini"+(state==="synced"?" ok":(state==="error"?" err":""));
+  var what = state==="synced" ? "Cloud synced"
+           : state==="error"  ? "Cloud sync error"
+           :                    "Tap to sync now";
+  t.textContent="Cloud";
+  n.textContent = (!note || note===what) ? what : what+" · "+note;
+  b.setAttribute("aria-label","Cloud sync — "+n.textContent);
 }
 // Read fresh on every call rather than captured once: the token can be
 // replaced (or cleared) while the tab is open, and a stale copy would keep
@@ -2125,7 +2158,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="2.8";
+var APP_VERSION="2.9";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -2136,6 +2169,7 @@ var APP_VERSION="2.8";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-05T04:10:00+08:00",text:"Tidied the controls. Focus mode is gone. Theme moved up beside Sign out. The two sync buttons are now a compact pair reading just Local and Cloud, stacked one above the other, with their status text on hover instead of permanently on screen."},
   {ts:"2026-09-05T03:30:00+08:00",text:"The main tabs are now layered document tabs. The one you are on sits in front, raised slightly, and joins seamlessly onto the sheet holding the view below it; the others sit behind it. Arrow keys move between tabs. Long links in the reminder strip wrap properly, and the Reports filters no longer push the page sideways on a phone."},
   {ts:"2026-09-05T02:40:00+08:00",text:"Long links and other unbroken text now wrap inside their card instead of stretching it sideways. A OneDrive link pasted into a non-negotiable's tag was pushing the whole card past the column; the same fix covers task titles, lane names, timeline entries and calendar notes."},
   {ts:"2026-09-05T02:05:00+08:00",text:"Lanes can be pinned to the top of the board with the star on their header — pinned lanes lead in both the Classic view and the Consolidated checklist. Unpinning puts a lane back where it was. The list of routine blocks you have hidden from the timeline is now folded away behind one line instead of filling the card."},
@@ -2169,8 +2203,8 @@ var APP_VERSION_HISTORY=[
    pushed" is per-account, though - it tracks a specific board's revisions. */
 var DEV_KEY="prodash.deviceId", DEV_NAME_KEY="prodash.deviceName", PUSHED_KEY=PDAuth.ns("prodash.pushedUpTo");
 var HIST_CAP=400, CKPT_EVERY=25, BATCH_MS=2500;
-var BOARD_KEYS=["tasks","log","days","events","lanes","rituals","focus","theme","hiddenBlocks","plans","roll","boardView"];
-var KEYED=["tasks","events","lanes","rituals"], MAPS=["log","days","plans"], SCALARS=["focus","theme","roll","boardView"];
+var BOARD_KEYS=["tasks","log","days","events","lanes","rituals","theme","hiddenBlocks","plans","roll","boardView"];
+var KEYED=["tasks","events","lanes","rituals"], MAPS=["log","days","plans"], SCALARS=["theme","roll","boardView"];
 // Plain arrays of primitive ids (not objects with their own .id, so KEYED's
 // per-item union doesn't apply) compared by CONTENT, not reference - a
 // cloned snapshot never shares object identity with the live array even
@@ -2349,7 +2383,6 @@ function opText(op){
   if(op.k==="events"&&verb)return verb+" appointment “"+esc((op.v||{}).n||"")+"”";
   if(op.k==="log")return "Ticked non-negotiables for "+esc(op.id);
   if(op.k==="days")return "Updated shift notes for "+esc(op.id);
-  if(op.k==="focus")return "Focus mode "+(op.v?"on":"off");
   if(op.k==="theme")return "Theme → "+esc(String(op.v));
   if(op.k==="hiddenBlocks"){
     var was=op.from||[],now=op.v||[];
@@ -3225,7 +3258,7 @@ function renderLanes(){
     var open=mine.filter(function(t){return !t.done;});
     var isAct=act.indexOf(L.id)>=0;
     var el=document.createElement("div");
-    el.className="lane"+(S.focus&&act.length&&!isAct?" dim":"")+(isAct?" active":"")+(L.pinned?" pinned":"");
+    el.className="lane"+(isAct?" active":"")+(L.pinned?" pinned":"");
     el.draggable=true;
     el.dataset.id=L.id;
     el.dataset.pinned=L.pinned?"1":"0";
@@ -3489,9 +3522,12 @@ function renderWeek(){
 function applyTheme(){
   if(S.theme==="auto")document.documentElement.removeAttribute("data-theme");
   else document.documentElement.setAttribute("data-theme",S.theme);
+  // Lives in the header now, so it wears .hdr-out (light-on-charcoal) rather
+  // than .pill. The "on" state the pill used is gone with it: the label already
+  // says which mode is active, and a filled chip up here fought the Sign out
+  // button beside it for attention.
   var tb=document.getElementById("themeBtn");
   tb.textContent="Theme: "+S.theme;
-  tb.className="pill"+(S.theme==="dark"?" on":"");
 }
 
 function renderAll(){
@@ -3504,13 +3540,9 @@ function renderAll(){
   renderAptLaneOptions();
   if(document.body.classList.contains("view-reports"))renderReportsView();
   applyTheme();
-  var fb=document.getElementById("focusBtn");
-  fb.textContent="Focus mode: "+(S.focus?"on":"off");
-  fb.className="pill"+(S.focus?" on":"");
 }
 
 // ---------- wiring ----------
-document.getElementById("focusBtn").addEventListener("click",function(){S.focus=!S.focus;save();renderAll();});
 document.querySelectorAll("[data-bview]").forEach(function(b){
   b.addEventListener("click",function(){ setBoardView(b.dataset.bview); save(); });
 });

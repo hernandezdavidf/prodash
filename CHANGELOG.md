@@ -2,6 +2,39 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-05 — Controls tidy-up: Focus mode out, Theme up, sync pills compacted
+
+**Focus mode removed** entirely — button, the `.lane.dim` rule it existed to
+drive, its click handler, its `renderAll` block, and `focus` from `BOARD_KEYS`
+and `SCALARS`. An old board may still carry a `focus` key; nothing reads it and
+it is no longer a synced key, so it sits inert rather than needing a migration.
+The Board History diff labeller lost its `"Focus mode on/off"` line with it.
+
+**Theme moved into the header**, beside Sign out. It now wears `.hdr-out`
+(light-on-charcoal) instead of `.pill`, and it lost the filled "on" state the
+pill carried in dark mode: the label already says which mode is active, and a
+filled chip up there fought Sign out for attention.
+
+**The two sync pills are now one stacked pair.** Labels shortened to one word
+each — "Local" and "Cloud" — with the coloured dot carrying the state, and the
+sentence that used to *be* the label moved into a hover tooltip. Their status
+lines used to sit permanently beneath them, which meant two lines of small grey
+prose were on screen at all times to say nothing is wrong. The nowbar's visible
+text is now just the current block plus "Local Cloud".
+
+Nothing is lost in the shortening: the tooltip is mirrored onto `aria-label`,
+because a CSS `:hover` tooltip is invisible to a screen reader and this became
+the only place the state is written down. The reveal is `:hover` **and**
+`:focus-within`, so the keyboard path works too.
+
+One bug caught in testing: several `setSync` callers already pass a note that
+*is* the state sentence, so joining state and note blindly printed the same
+sentence twice. The join is now conditional.
+
+Tooltip colours are `--ink` on `--paper`, which inverts correctly in both themes
+from tokens that already exist — charcoal-on-white in light, light-on-charcoal
+in dark — rather than needing a new pair.
+
 ## 2026-09-05 — Layered document tabs on a content panel
 
 The main nav is no longer four pills. It is a fanned strip of folder tabs: each
