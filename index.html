@@ -405,7 +405,17 @@ header h1{font-size:26px;letter-spacing:.3px}
 .lane{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:13px;
   box-shadow:var(--lift);
   transition:opacity .2s,box-shadow .2s,outline-color .15s}
-.lane-h{display:flex;align-items:center;gap:8px;margin-bottom:3px}
+/* Title row: the name owns the full width of the lane, so it wraps at spaces
+   like prose instead of being crushed into a column narrower than one word. */
+.lane-h{display:flex;align-items:flex-start;gap:8px;margin-bottom:5px}
+/* The controls, moved off the title's row. --sage keeps them at the icon-grey
+   the rest of the app uses (3:1, the non-text floor) rather than fading them
+   further, and they sharpen on hover of the lane rather than hiding until then
+   - a hidden control is no use on a touch screen, which is where the reorder
+   buttons exist for in the first place. */
+.lane-tools{display:flex;align-items:center;gap:4px;margin-bottom:6px}
+.lane-tools-r{margin-left:auto;display:flex;align-items:center;gap:1px}
+.lane:hover .lane-tools .grip,.lane:hover .lane-tools .reorder button{color:var(--muted)}
 .grip{cursor:grab;color:var(--sage);font-size:13px;line-height:1;letter-spacing:-1px;
   padding:2px 1px;user-select:none;touch-action:none}
 .grip:active{cursor:grabbing}
@@ -418,12 +428,16 @@ header h1{font-size:26px;letter-spacing:.3px}
 .reorder button:hover{color:var(--forest-ink)}
 .reorder button:disabled{opacity:.25;cursor:default}
 .reorder button:disabled:hover{color:var(--sage)}
-.dot{width:9px;height:9px;border-radius:50%;min-width:9px}
-.lane-h h3{font-size:14px;flex:1}
+.dot{width:9px;height:9px;border-radius:50%;min-width:9px;flex:none;margin-top:5px}
+/* min-width:0 lets it shrink inside the flex row; overflow-wrap stays
+   "anywhere" as the safety net for a pathological single-word name, but with a
+   full-width row the browser now finds the spaces first and only breaks inside
+   a word when that word genuinely cannot fit. */
+.lane-h h3{font-size:14px;flex:1;min-width:0;line-height:1.3}
 .lane-name-edit{flex:1;min-width:0;font-family:var(--serif);font-weight:700;font-size:14px;
   border:1px solid var(--olive);border-radius:6px;padding:2px 6px;background:var(--paper);
   color:var(--ink);outline:none}
-.lane-n{font-size:11px;color:var(--muted);background:var(--ivory);border-radius:999px;padding:1px 7px;border:1px solid var(--line)}
+.lane-n{font-size:11px;color:var(--muted);background:var(--ivory);border-radius:999px;padding:1px 7px;border:1px solid var(--line);flex:none;margin-top:2px}
 /* Pin toggle. Hollow star = not pinned, filled + green = pinned, which reads
    as a state rather than an action and needs no label. */
 .lane-pin{flex:none;color:var(--sage);font-size:14px;line-height:1;padding:2px 3px;border-radius:5px;transition:.15s}
@@ -725,7 +739,10 @@ body.view-reports .board-only,body.view-history .board-only,body.view-cal .board
   .tab.on{padding-top:14px;padding-bottom:11px}
   .box{width:26px;height:26px;min-width:26px}
   .grip{padding:11px 9px;margin:-11px -9px}
-  .lane-edit,.lane-del{padding:10px;margin:-8px -6px}
+  /* .lane-pin was added to the header after this block was written and never
+     joined it, so on a touch screen the star was an 18px target sitting between
+     two 33px ones. Grouped with them now. */
+  .lane-pin,.lane-edit,.lane-del{padding:10px;margin:-8px -6px}
   .lane-del{margin-right:-8px}
   .reorder button{padding:7px 9px}
   .tsk .x,.rit .x{padding:9px 8px;margin:-9px -6px}
@@ -2158,7 +2175,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="2.9";
+var APP_VERSION="3.0";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -2169,6 +2186,7 @@ var APP_VERSION="2.9";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-05T04:45:00+08:00",text:"Lane names are readable again. The name now gets a row to itself instead of sharing one with six buttons, so long names like \"My Company + Personal\" wrap at the spaces rather than breaking mid-word. The lane's buttons moved to a quiet row underneath."},
   {ts:"2026-09-05T04:10:00+08:00",text:"Tidied the controls. Focus mode is gone. Theme moved up beside Sign out. The two sync buttons are now a compact pair reading just Local and Cloud, stacked one above the other, with their status text on hover instead of permanently on screen."},
   {ts:"2026-09-05T03:30:00+08:00",text:"The main tabs are now layered document tabs. The one you are on sits in front, raised slightly, and joins seamlessly onto the sheet holding the view below it; the others sit behind it. Arrow keys move between tabs. Long links in the reminder strip wrap properly, and the Reports filters no longer push the page sideways on a phone."},
   {ts:"2026-09-05T02:40:00+08:00",text:"Long links and other unbroken text now wrap inside their card instead of stretching it sideways. A OneDrive link pasted into a non-negotiable's tag was pushing the whole card past the column; the same fix covers task titles, lane names, timeline entries and calendar notes."},
@@ -3274,18 +3292,28 @@ function renderLanes(){
       '<button data-lact="up" title="Move up" aria-label="Move lane up"'+(ti<=0?" disabled":"")+'>&#9650;</button>'+
       '<button data-lact="down" title="Move down" aria-label="Move lane down"'+(ti>=tier.length-1?" disabled":"")+'>&#9660;</button>'+
       '</div>';
-    var h='<div class="lane-h"><span class="grip" title="Drag to reorder">&#9776;</span>'+
-      reorderBtns+
+    /* Two rows, not one. Six controls used to share the title's row inside a
+       224px column, which squeezed the name to roughly 40px - narrower than the
+       word "Company" - so it broke mid-word into "Compa / ny". Giving the title
+       its own full-width row is the fix; the controls move to a quiet strip
+       beneath it where they no longer compete with the lane's subject. */
+    var h='<div class="lane-h">'+
       '<div class="dot" style="background:'+L.color+'"></div>'+
       (renaming
         ? '<input class="lane-name-edit" id="lnEdit" value="'+esc(laneRenamingDraft)+'">'
         : '<h3>'+esc(L.name)+'</h3>')+
-      '<div class="lane-n">'+open.length+'</div>'+
-      (renaming?'':'<button class="lane-pin'+(L.pinned?" on":"")+'" data-lact="pin" aria-pressed="'+(L.pinned?"true":"false")+
-        '" title="'+(L.pinned?"Unpin from the top":"Pin to the top of the board")+
-        '" aria-label="'+(L.pinned?"Unpin lane":"Pin lane to top")+'">'+(L.pinned?"&#9733;":"&#9734;")+'</button>'+
-      '<button class="lane-edit" data-lact="rename" title="Rename lane" aria-label="Rename lane">&#9998;</button>'+
-      '<button class="lane-del" data-lact="delete" title="Remove lane" aria-label="Remove lane">&times;</button>')+
+      '<div class="lane-n" title="'+open.length+' open">'+open.length+'</div>'+
+      '</div>'+
+      '<div class="lane-tools">'+
+        '<span class="grip" title="Drag to reorder">&#9776;</span>'+
+        reorderBtns+
+        '<div class="lane-tools-r">'+
+        (renaming?'':'<button class="lane-pin'+(L.pinned?" on":"")+'" data-lact="pin" aria-pressed="'+(L.pinned?"true":"false")+
+          '" title="'+(L.pinned?"Unpin from the top":"Pin to the top of the board")+
+          '" aria-label="'+(L.pinned?"Unpin lane":"Pin lane to top")+'">'+(L.pinned?"&#9733;":"&#9734;")+'</button>'+
+        '<button class="lane-edit" data-lact="rename" title="Rename lane" aria-label="Rename lane">&#9998;</button>'+
+        '<button class="lane-del" data-lact="delete" title="Remove lane" aria-label="Remove lane">&times;</button>')+
+        '</div>'+
       '</div>'+
       '<div class="lane-s">'+esc(L.ritual)+'</div>';
     var body=mine.length

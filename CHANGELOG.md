@@ -2,6 +2,40 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-05 — Lane headers: give the name its own row
+
+Lane names were breaking mid-word — "Exercis / e", "PROJE / CTS", "My / Compa /
+ny + / Person / al". The cause was not the wrapping rule but the width: six
+controls (grip, two reorder arrows, pin, rename, delete) shared the title's row
+inside a 224px column, squeezing the name to roughly **40px — narrower than the
+word "Company"**. At that width there is no good break, so the browser broke
+inside words.
+
+Worth noting the earlier text-wrapping pass made this *visible* rather than
+causing it: adding `overflow-wrap:anywhere` to `.lane-h h3` turned a silent
+overflow into a mid-word break. Both are symptoms of the same missing width.
+
+**The header is now two rows.** The title row is the colour dot, the name, and
+the open count — the name owns the full width and wraps at spaces like prose.
+The controls moved to a quiet strip beneath it: grip and reorder arrows left,
+pin/rename/delete right. Measured before and after: the title went from ~40px
+to 167px in a three-column desktop layout, and every real lane name now fits on
+one line except "My Company + Personal", which takes two, breaking at a space.
+
+`overflow-wrap:anywhere` stays as the safety net. With a full-width row the
+browser finds the spaces first and only breaks inside a word when that word
+genuinely cannot fit — verified with a deliberately pathological 33-character
+single-word lane name, which is the only case that still breaks mid-word, and
+correctly so.
+
+**A touch-target inconsistency fixed on the way.** `.lane-pin` was added to the
+lane header after the `(pointer: coarse)` block was written and never joined it,
+so on a phone the star was an 18px target sitting between two 33px ones. It is
+now grouped with `.lane-edit` and `.lane-del` at 34px.
+
+Verified at 375px and at desktop width: every title contained within its lane,
+tools on a single row, no horizontal page overflow.
+
 ## 2026-09-05 — Controls tidy-up: Focus mode out, Theme up, sync pills compacted
 
 **Focus mode removed** entirely — button, the `.lane.dim` rule it existed to
