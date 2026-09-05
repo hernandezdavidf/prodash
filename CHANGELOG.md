@@ -2,6 +2,89 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-06 — Nicknames in the greeting (v3.8)
+
+The heading and the browser tab now read "How's our &lt;you&gt; looking?", where
+&lt;you&gt; is a nickname set at signup or by a Super Admin — and, when nobody has
+set one, a pet name picked fresh on every page load from fourteen: Honey, Hon,
+Sweetheart, Darling, Honeybun, Pumpkin, Cupcake, Goofball, Stinker, Silly Goose,
+Giggles, Butterfingers, Grumpy, Nutty.
+
+**`first_name` is deliberately not in the fallback chain.** Someone who set no
+nickname gets something silly, not their registration form read back at them.
+
+**Schema:** `nickname` at column **V**, `COL_COUNT` 21 → 22. Every range derives
+from `COL_COUNT` via `colLetter()`, so `LAST_COL` follows to "V" on its own —
+which is the whole point of the change that made those ranges derived rather
+than three independent literals. `readUsers()` already pads short rows to full
+width, so index 21 exists as `""` on every pre-existing account without any
+extra handling.
+
+**The clamp lives on the server**, not on the form. `/auth/signup` is public and
+unauthenticated, so a `maxlength` there is decoration — one `curl` bypasses it.
+`cleanNickname()` takes strings only (a JSON body carrying an object would
+otherwise stringify into someone's greeting as "[object Object]"), turns control
+characters into spaces so a nickname cannot smuggle line breaks into the sheet
+or the heading, trims, cuts to 24, and trims again so a cut landing mid-space
+leaves nothing trailing. `/admin/user` uses the same function, so the two entry
+points cannot drift apart. Verified against 16 inputs including newlines, nulls,
+DEL, over-length, emoji and markup: nothing exceeds 24, no control character
+survives, everything comes back trimmed.
+
+**`nick` rides in the session token.** Display-only is exactly why it can:
+nothing keys off it and no permission consults it, so a stale one is a wrong
+word in a heading rather than access. In the token, the greeting renders at boot
+with no network call — which is what `file://` use and the 30-day offline grace
+need. It is in `publicUser()` too, for the same reason `caps` had to be: the
+browser draws from that stored object.
+
+The cost, stated plainly: **a nickname a Super Admin sets lands on that person's
+next sign-in.** Changing it deliberately does *not* bump the session epoch —
+signing someone out of every device because a word in their heading changed is
+the worse trade. The People panel reads the sheet, so the admin sees their own
+edit immediately.
+
+**No self-service profile endpoint yet.** That is new authenticated surface and
+can wait until auth has settled. In the meantime the People panel is not
+disabled on your own row for this field — the Worker's self-guard covers role
+and status only, so it is how a Super Admin sets their own.
+
+### The part most likely to have gone wrong
+
+The pick is made **once per page load**, into a module-level variable that both
+the heading and `document.title` read. A pick inside a render function would
+rename the user every minute: `renderHeader()` runs on a 60-second timer for the
+progress bar and the "1h 5m until 7am" line. It does not touch the heading
+today, and the variable means it still could not cause flicker if anyone moved
+it there. Verified statically: one assignment, one read feeding both, and zero
+references to the heading inside `renderHeader()`.
+
+Not persisted — "a different one every refresh" is what a variable already does.
+Re-picking on sign-in needs no hook: `enter()` and `signOut()` both call
+`location.reload()`, so the script is re-evaluated.
+
+`Math.random` is correct here and commented as such, in both directions: nothing
+is guarded by which name comes up, and this is not a precedent for the
+temporary-password generator, which uses `crypto.getRandomValues` for reasons
+that do not apply to decoration. With 14 names roughly one refresh in 14 repeats
+the previous one; that is left alone rather than coded around. Distribution
+checked over 14,000 draws — 952 to 1034 against an expected 1000.
+
+### Where escaping is a real boundary
+
+The heading uses `textContent`, which never parses the string as markup at all —
+stronger than escaping it. `document.title` is a plain assignment from the same
+variable.
+
+The People panel is the one place one person's nickname renders in *someone
+else's* browser, inside an HTML attribute, so that is where `esc()` matters
+rather than being tidiness. Tested with `"><img src=x onerror=alert(1)>` as a
+nickname: zero elements injected, and the value round-trips through the input
+unchanged.
+
+The auth gate's `.ag-brand` heading stays hardcoded. Nobody is signed in there,
+so it cannot name anyone.
+
 ## 2026-09-06 — Weekly view in the Expense Tracker (v3.7)
 
 "Where it goes" gains a **This week** breakdown alongside month, year and all

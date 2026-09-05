@@ -105,8 +105,9 @@ const F = {
   sessionEpoch: 18,     // S  bump to invalidate every existing session
   perms: 19,            // T  JSON overrides on top of the role defaults, or ""
   activatedAt: 20,      // U  ISO. For a guest this starts the 48-hour clock.
+  nickname: 21,         // V  what the app calls them. Display only; "" is fine.
 };
-const COL_COUNT = 21;
+const COL_COUNT = 22;
 const SHEET_TAB = "Users";
 /* Every range is DERIVED from COL_COUNT rather than written out. The three used
    to be independent literals, and when the schema widened from 19 columns to 21
@@ -128,7 +129,7 @@ const SHEET_HEADERS = [
   "email", "email_key", "password_hash", "secret_question", "secret_answer_hash",
   "role", "status", "failed_attempts", "locked_until", "board_id",
   "created_at", "last_login_at", "password_updated_at", "session_epoch",
-  "perms", "activated_at",
+  "perms", "activated_at", "nickname",
 ];
 
 /* ---------------------------------------------------------------------------
@@ -331,6 +332,7 @@ async function signup(request, env) {
   row[F.sessionEpoch] = "1";
   row[F.perms] = "";                       // no overrides; the role defaults apply
   row[F.activatedAt] = now.toISOString();  // starts the clock if this becomes a guest
+  row[F.nickname] = cleanNickname(body.nickname);
 
   await appendUser(env, row);
   await env.PRODASH_KV.put(reservationKey, userId);
@@ -345,7 +347,7 @@ async function signup(request, env) {
      unnoticed. Caught by reading a signup token during an unrelated probe. */
   const token = await issueSession(env, {
     userId, boardId, role: "user", username, epoch: 1,
-    caps: capsFor(row), gexp: guestExpiry(row),
+    caps: capsFor(row), gexp: guestExpiry(row), nick: row[F.nickname] || "",
   });
   return json({ ok: true, token, user: publicUser(row) }, 201);
 }
@@ -469,6 +471,7 @@ async function login(request, env) {
     epoch,
     caps: capsFor(row),
     gexp: guestExpiry(row),
+    nick: row[F.nickname] || "",
   });
   return json({ ok: true, token, user: publicUser(row) });
 }
@@ -500,6 +503,7 @@ async function me(request, env) {
       username: session.un,
       role: session.role,
       caps: session.caps || [],
+      nickname: session.nick || "",
       guestExpiresAt: session.gexp || null,
       boardId: session.bid,
     },
@@ -702,6 +706,7 @@ async function adminUsers(request, env) {
         userId: r[F.userId],
         username: r[F.username],
         name: ((r[F.firstName] || "") + " " + (r[F.lastName] || "")).trim(),
+        nickname: r[F.nickname] || "",
         email: r[F.email],
         role: normRole(r[F.role]),
         status: r[F.status] || "active",
@@ -773,6 +778,15 @@ async function adminUpdateUser(request, env) {
     if ((row[F.status] || "") === "deactivated") patch[F.status] = "active";
   }
 
+  if (body.nickname !== undefined) {
+    // Same clamp as signup, from one function, so the two entry points cannot
+    // drift into disagreeing about what a nickname may contain.
+    patch[F.nickname] = cleanNickname(body.nickname);
+    // No killSessions: this is a word in a heading. It reaches them when they
+    // next sign in, and the sheet - which is what this screen reads - is
+    // correct immediately.
+  }
+
   if (body.perms !== undefined) {
     // Stored as JSON text. Validated here so a malformed cell can never reach
     // capsFor() and silently collapse someone back to role defaults.
@@ -805,6 +819,7 @@ async function adminUpdateUser(request, env) {
     user: {
       userId: next[F.userId],
       username: next[F.username],
+      nickname: next[F.nickname] || "",
       role: normRole(next[F.role]),
       status: next[F.status],
       caps: capsFor(next),
@@ -892,7 +907,7 @@ function requireCap(session, cap) {
 // path costs no Sheets read at all. Two cheap KV reads then cover the two
 // things a signature cannot express: this device signed out (revocation), and
 // the password changed (epoch).
-async function issueSession(env, { userId, boardId, role, username, epoch, caps, gexp }) {
+async function issueSession(env, { userId, boardId, role, username, epoch, caps, gexp, nick }) {
   await env.PRODASH_KV.put(epochKey(userId), String(epoch));
   /* A guest's token is capped at their 48-hour expiry rather than the usual 30
      days. That makes the clock enforce ITSELF through the ordinary expiry check
@@ -909,6 +924,12 @@ async function issueSession(env, { userId, boardId, role, username, epoch, caps,
     un: username,
     caps: caps || [],
     gexp: gexp || null,
+    /* Display only. In the token so the greeting can render at boot with no
+       network call, which is what file:// use and the 30-day offline grace
+       need. The cost is that an admin's edit lands on their next sign-in
+       rather than immediately - acceptable for a word in a heading, and the
+       alternative is a sheet read on every session check. */
+    nick: nick || "",
     epoch,
     iat: Date.now(),
     exp,
@@ -1162,6 +1183,24 @@ function cellSafe(value) {
 // ===========================================================================
 // Every field is checked here rather than trusted from the client, because the
 // client's checks are a convenience the user can skip with one curl command.
+/* Display-only, and it reaches the sheet from a PUBLIC endpoint, so the clamp
+   belongs here rather than on the form. Control characters (newlines among
+   them) become spaces: a nickname carrying a line break would corrupt the row
+   visually in the sheet and mean nothing useful in a heading. Trimmed on both
+   sides of the cut, so slicing mid-space cannot leave a trailing one.
+   Absent is not an error - most accounts will never set one. */
+function cleanNickname(value) {
+  // Strings only. A JSON body carrying a number or an object would otherwise be
+  // stringified into someone's greeting, and "[object Object]" is not a
+  // nickname. Ignoring it beats a 400 on a field nobody has to fill in.
+  if (typeof value !== "string") return "";
+  return value
+    .replace(/[\x00-\x1F\x7F]/g, " ")
+    .trim()
+    .slice(0, 24)
+    .trim();
+}
+
 function requireText(value, label, min, max) {
   const s = String(value === undefined || value === null ? "" : value)
     .replace(/[\u0000-\u001F\u007F]/g, "")   // strip control characters
@@ -1225,6 +1264,7 @@ function publicUser(row) {
     lastName: row[F.lastName],
     role: normRole(row[F.role]),
     caps: capsFor(row),
+    nickname: row[F.nickname] || "",
     guestExpiresAt: guestExpiry(row),
   };
 }

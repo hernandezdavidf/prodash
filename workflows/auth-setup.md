@@ -44,10 +44,10 @@ Browser  ->  your Worker  ->  Google Sheet   (accounts)
    position, so the order matters — don't insert a column in the middle later.
 
 ```
-user_id	first_name	last_name	username	username_key	email	email_key	password_hash	secret_question	secret_answer_hash	role	status	failed_attempts	locked_until	board_id	created_at	last_login_at	password_updated_at	session_epoch	perms	activated_at
+user_id	first_name	last_name	username	username_key	email	email_key	password_hash	secret_question	secret_answer_hash	role	status	failed_attempts	locked_until	board_id	created_at	last_login_at	password_updated_at	session_epoch	perms	activated_at	nickname
 ```
 
-   Paste it into cell **A1** and Sheets will spread it across A1:U1 by itself,
+   Paste it into cell **A1** and Sheets will spread it across A1:V1 by itself,
    because those are tab characters.
 
 4. Copy the **spreadsheet id** out of the address bar — the long string between
@@ -244,14 +244,24 @@ guest clock.
 ### Upgrading a sheet you already have
 
 If your `Users` tab was created before roles existed, it stops at column S. Add
-two headers and nothing else — appending columns is safe, inserting them in the
-middle is not:
+these headers and nothing else — appending columns is safe, inserting them in
+the middle is not, because the Worker addresses columns by position:
 
 - **T1** → `perms`
 - **U1** → `activated_at`
+- **V1** → `nickname`
 
-Leave the cells beneath them blank. Blank means "no overrides" and "clock never
-started", which is correct for every existing account.
+Leave the cells beneath them blank. Blank means "no overrides", "clock never
+started" and "no nickname", all of which are correct for every existing account.
+
+**Then check the table actually grew.** If the tab is a Google *Table* (the
+header row is coloured and each header has a filter chevron), typing a header
+into the next cell does not always extend the table to cover it. V1 should look
+exactly like `activated_at` does — same green header, same chevron. If it does
+not, drag the table's bottom-right handle out to column V before deploying.
+This matters more than it sounds: a mismatch between `COL_COUNT` in the Worker
+and the real width of the range is what broke every login for a day, because
+reads and appends kept working while every row *update* failed.
 
 ### Making yourself the Super Admin
 

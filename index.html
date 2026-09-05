@@ -899,6 +899,11 @@ body.view-reports .board-only,body.view-history .board-only,body.view-cal .board
           </div>
         </div>
         <div class="ag-f">
+          <label for="agNick">Nickname <span class="ag-optional">optional</span></label>
+          <input id="agNick" name="nickname" autocomplete="nickname" maxlength="24">
+          <div class="ag-hint">What the app calls you in the greeting. Leave it blank and it picks something silly for you, differently every time you open it.</div>
+        </div>
+        <div class="ag-f">
           <label for="agUser">Username</label>
           <input id="agUser" name="username" autocomplete="username" autocapitalize="none" spellcheck="false">
           <div class="ag-hint">3&ndash;32 characters. Letters, numbers, dots, underscores and hyphens. Not case sensitive.</div>
@@ -1178,7 +1183,7 @@ document.getElementById("agSignupForm").addEventListener("submit", function(e){
   busy(f, true); msg("");
   api("/auth/signup", { method:"POST", body:{
     firstName: val("agFirst"), lastName: val("agLast"), username: val("agUser"),
-    email: val("agEmail"), password: val("agPass"),
+    email: val("agEmail"), password: val("agPass"), nickname: val("agNick"),
     secretQuestion: val("agQ"), secretAnswer: val("agA")
   }})
     .then(enter)
@@ -1306,7 +1311,10 @@ return {
   <header>
     <div class="hdr-top">
       <div>
-        <h1>How's our Dave looking?</h1>
+        <!-- Text is replaced at boot with the signed-in person's nickname, or a
+             random pet name. The hardcoded version stays here as what renders
+             before script runs, and as the honest fallback if it never does. -->
+        <h1 id="hdrGreet">How's our Dave looking?</h1>
         <div class="hdr-sub">Productivity Dashboard <span>(ProDash)</span></div>
         <div class="hdr-date" id="hdrDate"></div>
         <div class="hdr-stats">
@@ -2033,6 +2041,8 @@ return {
      panel - which carries the permission descriptions and needs the width -
      gets everything left over. One column under 860px, where two would leave
      neither side readable. */
+  .ag-optional{font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;
+    color:var(--muted);background:var(--ivory);border-radius:999px;padding:1px 7px;margin-left:6px}
   .um-wrap{display:grid;grid-template-columns:minmax(0,290px) minmax(0,1fr);
     gap:16px;align-items:start;margin-top:14px}
   @media(max-width:860px){.um-wrap{grid-template-columns:minmax(0,1fr)}}
@@ -2300,6 +2310,45 @@ return {
    no board is read out of storage, no interval starts, nothing reaches the DOM.
    A signed-out tab holds none of the previous user's data in memory. */
 if(!window.PDAuth || !PDAuth.ready()) return;
+
+/* ---------- who the app calls you ------------------------------------------
+   A nickname if one is set, otherwise one of these, picked fresh each time the
+   page loads. first_name is deliberately NOT in the chain: someone who set no
+   nickname gets a silly one, not their registration form read back to them.
+
+   PICKED ONCE, HERE, INTO A VARIABLE - not inside a render function.
+   renderHeader() runs on a 60-second timer for the progress bar and the
+   "1h 5m until 7am" line. It does not touch the heading today, but a pick made
+   inside a render would rename the user every minute the moment anyone moved
+   it there, and the tab title would disagree with the page. Both read GREETING
+   below, so they cannot drift apart.
+
+   Not persisted, deliberately: "a different one every refresh" is precisely
+   what a variable already does, and localStorage would defeat it.
+
+   Math.random is the right tool here. This is decoration - nothing is guarded
+   by which name comes up, and no one gains anything by predicting it. (The
+   temporary-password generator uses crypto.getRandomValues; that is a
+   credential and this is not. Neither is a precedent for the other.)
+
+   Re-picking on sign-in is free: both enter() and signOut() call
+   location.reload(), so this whole script is evaluated again. */
+var PET_NAMES=["Honey","Hon","Sweetheart","Darling","Honeybun","Pumpkin","Cupcake",
+  "Goofball","Stinker","Silly Goose","Giggles","Butterfingers","Grumpy","Nutty"];
+var GREETING=(function(){
+  var nick=((PDAuth.user()||{}).nickname||"").trim();
+  return nick||PET_NAMES[Math.floor(Math.random()*PET_NAMES.length)];
+})();
+(function(){
+  var line="How's our "+GREETING+" looking?";
+  // textContent, not innerHTML with esc(): a nickname is a user-chosen string
+  // and the strongest guarantee is the one that never parses it as markup at
+  // all. document.title is assigned the same way and from the same variable,
+  // so the tab and the heading always agree.
+  var h=document.getElementById("hdrGreet");
+  if(h)h.textContent=line;
+  document.title=line+" · ProDash";
+})();
 
 /* Per-account storage. Two people on one browser get genuinely separate caches;
    PDAuth.ns() also carries the single-user era's board over to the first
@@ -2688,7 +2737,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="3.7";
+var APP_VERSION="3.8";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -2699,6 +2748,7 @@ var APP_VERSION="3.7";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-06T08:20:00+08:00",text:"The app can call you something other than \"Dave\" now. Set a nickname when you sign up, or have a Super Admin set one for you, and the greeting and the browser tab both use it. Leave it blank and it picks a silly one for you instead -- Pumpkin, Goofball, Silly Goose and eleven others -- fresh every time you open the app. A nickname a Super Admin sets reaches you the next time you sign in."},
   {ts:"2026-09-06T07:30:00+08:00",text:"The Expense Tracker now does weeks. \"Where it goes\" has a This week option alongside the month, year and all-time views, and the row of totals gained a This week card showing the week's spend, the dates it covers, and your average per day so far. Weeks run Sunday to Saturday, the same as the calendar."},
   {ts:"2026-09-06T03:05:00+08:00",text:"Fixed the Super Admin tab not appearing. The app was told your role but never told what that role lets you reach, so it drew the Super Admin badge and then hid the management tab anyway. It now reads that list from the server on every load, which also means a change someone makes to your access shows up the next time you open the app instead of waiting for your sign-in to expire. Guests who had no visible countdown in their profile will see one now, for the same reason."},
   {ts:"2026-09-06T02:10:00+08:00",text:"New User & Role Management tab, for Super Admins only. It lists every account and, for whichever one you pick, shows the account itself, its role, exactly which tabs it can reach, and a password reset -- each in its own section. Roles are Super Admin, User and Guest, and you can now tick individual tabs on or off for one person without moving them to a different role; a small tag marks wherever someone differs from what their role would normally give. Your own row is deliberately read-only, so you cannot lock yourself out. Everything that used to sit in the profile panel moved here."},
@@ -4447,6 +4497,16 @@ function umRenderDetail(){
     '<dl class="um-facts">'+facts.map(function(f){
       return "<dt>"+esc(f[0])+"</dt><dd>"+esc(f[1])+"</dd>";}).join("")+'</dl>'+
     '<div class="um-sec" style="border-top:0;margin-top:11px;padding-top:0">'+
+      '<label class="um-perm-t" for="umNick">Nickname</label>'+
+      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:5px">'+
+        '<input class="um-search" id="umNick" maxlength="24" style="width:auto;min-width:160px;flex:1"'+
+          ' value="'+esc(u.nickname||"")+'" placeholder="none set">'+
+        '<button type="button" class="um-btn" id="umNickSave">Save</button>'+
+      '</div>'+
+      '<div class="um-note">What the app calls them in the greeting. Blank means they get a random silly one on every visit. '+
+        (isMe?'This is the only place to set your own.':'Reaches them the next time they sign in.')+'</div>'+
+    '</div>'+
+    '<div class="um-sec" style="border-top:0;margin-top:11px;padding-top:0">'+
       '<label class="um-perm-t" for="umStatus">Status</label>'+
       '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:5px">'+
         '<select class="um-search" id="umStatus" style="width:auto;min-width:150px"'+
@@ -4514,6 +4574,11 @@ function umRenderDetail(){
   '</div>';
 
   host.innerHTML=h;
+
+  var nb=umEl("umNickSave");
+  if(nb)nb.addEventListener("click",function(){
+    umPatch(u.userId,{nickname:umEl("umNick").value});
+  });
 
   var st=umEl("umStatus");
   if(st&&!isMe)st.addEventListener("change",function(){
