@@ -2,6 +2,52 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-06 — The browser was never told what it could reach (v3.6)
+
+A Super Admin saw the SUPER ADMIN badge and no User & Role Management tab. The
+tab was deployed, the markup was present, and `applyAccess()` was hiding it
+correctly given what it had to work with.
+
+`publicUser()` — the object the browser stores as "who I am" — returned `role`
+but not `caps`. The signed token carried the capabilities all along, so the
+**server was enforcing correctly and nothing was exposed that should not have
+been**. But the client decides what to *draw* from that stored object, and
+`myCaps()` reads an absent list as an old pre-capabilities token and falls back
+to a full-access account **without** `admin`. Hence the right badge, read from
+`role`, above a missing tab, decided by `caps`. A guest's countdown in the
+profile was missing for the same reason — `guestExpiresAt` was not in there
+either.
+
+Worth noting what this means about the earlier work: the People panel inside the
+profile was gated on the same `can("admin")`, so it had never actually been
+reachable in production. It went unnoticed because the account that would have
+used it was locked out by the column-range bug for that whole period.
+
+**Two halves, because they fix different populations.**
+
+- `publicUser()` now returns `caps` and `guestExpiresAt`, shaped exactly like
+  `/auth/me` so the two can never disagree about the same account. Correct at
+  login, from the next Worker deploy onward.
+- The client stops discarding the `/auth/me` reply. It was already fetched on
+  every load purely to confirm the session was still alive, and it already
+  contained the right answer. Merging it heals every session issued before the
+  change above — no re-login — and, more usefully, means a role or permission
+  change made by an admin reaches an already-open browser on its next load
+  rather than waiting out a 30-day token. It widens or narrows only what is
+  **drawn**; every request still has to get past the Worker's signature check,
+  which reads capabilities from the signed token and not from anything stored
+  in the browser.
+
+`applyAccess()` only ever *hid* the Board History sub-views and never restored
+them, so an account that gained the capability kept them hidden. Made symmetric,
+since it can now run more than once.
+
+**Verified by reproducing it.** In a browser against a stubbed Worker, with
+`/auth/me` deliberately delayed so both phases are observable. Phase 1, drawing
+from a stored session with no caps: badge "Super Admin", admin tab hidden, five
+tabs — exactly the reported screenshot. Phase 2, after the merge: caps stored,
+six tabs, the tab opens and loads the account list, own row read-only.
+
 ## 2026-09-06 — User & Role Management tab (v3.5)
 
 A Super Admin screen of its own, replacing the people list that was folded into

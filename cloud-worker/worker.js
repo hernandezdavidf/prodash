@@ -1210,12 +1210,22 @@ function normAnswer(value) {
 function publicUser(row) {
   // Deliberately narrow. Hashes, the secret question, the lockout counters and
   // the email never travel to the browser.
+  //
+  // caps and guestExpiresAt are here because the browser decides what to DRAW
+  // from this object. Leaving them out did not weaken anything - the token
+  // carries both and the server reads them from there - but it left the client
+  // guessing, and its guess for "no caps listed" is a full-access account
+  // WITHOUT admin. That produced a Super Admin badge above a missing Super
+  // Admin tab, and a guest with no visible countdown. Same shape as /auth/me,
+  // deliberately, so the two can never disagree about the same account.
   return {
     userId: row[F.userId],
     username: row[F.username],
     firstName: row[F.firstName],
     lastName: row[F.lastName],
-    role: row[F.role] || "user",
+    role: normRole(row[F.role]),
+    caps: capsFor(row),
+    guestExpiresAt: guestExpiry(row),
   };
 }
 
