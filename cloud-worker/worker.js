@@ -52,8 +52,21 @@
 //   POST /auth/forgot/reset    ticket + new password
 //   GET  /data                 this session's board
 //   PUT  /data                 replace this session's board
-//   POST /admin/bootstrap      one-time creation of the temporary admin
-//   ANY  /admin/*              reserved; 501 until the admin system is built
+//   POST /admin/bootstrap      one-time creation of the first Super Admin
+//   GET  /admin/users          every account, for the admin screen
+//   POST /admin/user           change one account's role / status / permissions
+//
+// ---------------------------------------------------------------------------
+// ROLES
+// ---------------------------------------------------------------------------
+//   superadmin  everything, including managing other accounts
+//   user        board, calendar, expenses, and the app version history only
+//   guest       board, calendar, expenses - and only for 48 hours
+//
+// A guest's TOKEN is capped at their expiry, so the clock enforces itself
+// through the ordinary session check with no per-request sheet read and nothing
+// to bypass in localStorage. Their row is flipped to "deactivated" on the next
+// login attempt, which is what makes the expiry visible in the admin list.
 //
 // CORS is wide open ("*"). That is deliberate, not an oversight: this app is
 // opened from file://, from GitHub Pages, and potentially a custom domain
@@ -80,8 +93,8 @@ const F = {
   passwordHash: 7,      // H  algorithm-tagged, never reversible
   secretQuestion: 8,    // I
   secretAnswerHash: 9,  // J  hashed exactly like a password
-  role: 10,             // K  "user" | "admin"
-  status: 11,           // L  "active" | "disabled"
+  role: 10,             // K  "superadmin" | "user" | "guest"  (legacy "admin" = superadmin)
+  status: 11,           // L  "active" | "inactive" | "deactivated"
   failedAttempts: 12,   // M
   lockedUntil: 13,      // N  ms epoch, or "" when not locked
   boardId: 14,          // O  which board this user owns
@@ -89,16 +102,69 @@ const F = {
   lastLoginAt: 16,      // Q  ISO
   passwordUpdatedAt: 17,// R  ISO
   sessionEpoch: 18,     // S  bump to invalidate every existing session
+  perms: 19,            // T  JSON overrides on top of the role defaults, or ""
+  activatedAt: 20,      // U  ISO. For a guest this starts the 48-hour clock.
 };
-const COL_COUNT = 19;
+const COL_COUNT = 21;
 const SHEET_TAB = "Users";
-const DATA_RANGE = `${SHEET_TAB}!A2:S`;
+const DATA_RANGE = `${SHEET_TAB}!A2:U`;
 const SHEET_HEADERS = [
   "user_id", "first_name", "last_name", "username", "username_key",
   "email", "email_key", "password_hash", "secret_question", "secret_answer_hash",
   "role", "status", "failed_attempts", "locked_until", "board_id",
   "created_at", "last_login_at", "password_updated_at", "session_epoch",
+  "perms", "activated_at",
 ];
+
+/* ---------------------------------------------------------------------------
+   ROLES AND CAPABILITIES
+   ---------------------------------------------------------------------------
+   A capability is a plain string. Roles are just named default SETS of them,
+   and a user row may carry per-capability overrides in its `perms` cell. That
+   is the whole model - adding a tab later means adding one string here and one
+   check in the client, with no schema change and no migration.
+
+   Be clear about what this does and does not protect. Every tab except "admin"
+   renders the signed-in user's OWN board, so hiding one is policy, not
+   security: the data was already theirs. What genuinely needs enforcing, and
+   is enforced here rather than in the browser, is the "admin" capability (the
+   only place another person's data is reachable) and the guest clock. */
+const CAPS = {
+  superadmin: ["board","cal","exp","reports","history","history.appver","admin"],
+  user:       ["board","cal","exp","history.appver"],
+  guest:      ["board","cal","exp"],
+};
+const GUEST_TTL_MS = 48 * 60 * 60 * 1000;
+
+// "admin" is the legacy value the bootstrap endpoint wrote before roles were
+// split three ways. Treat it as superadmin rather than orphaning that account.
+function normRole(r) {
+  r = String(r || "user").toLowerCase();
+  if (r === "admin") return "superadmin";
+  return CAPS[r] ? r : "user";
+}
+/* Effective capabilities = the role's defaults, then the row's own overrides.
+   An override can grant something the role lacks OR take away something it
+   normally has, which is what "grant or restrict specific access" needs. */
+function capsFor(row) {
+  const role = normRole(row[F.role]);
+  const set = {};
+  CAPS[role].forEach((c) => { set[c] = true; });
+  let over = null;
+  try { over = row[F.perms] ? JSON.parse(row[F.perms]) : null; } catch (e) { over = null; }
+  if (over && typeof over === "object") {
+    Object.keys(over).forEach((k) => {
+      if (over[k]) set[k] = true; else delete set[k];
+    });
+  }
+  return Object.keys(set);
+}
+// When a guest's access lapses. Null for anyone who is not a guest.
+function guestExpiry(row) {
+  if (normRole(row[F.role]) !== "guest") return null;
+  const t = Date.parse(row[F.activatedAt] || row[F.createdAt] || "");
+  return isFinite(t) ? t + GUEST_TTL_MS : 0;   // unparseable = already expired
+}
 
 const MAX_FAILED_ATTEMPTS = 3;
 const LOCKOUT_MS = 15 * 60 * 1000;      // 15 minutes
@@ -138,7 +204,16 @@ export default {
       if (path === "/data") return await boardData(request, env);
 
       if (path === "/admin/bootstrap" && request.method === "POST") return await adminBootstrap(request, env);
-      if (path.startsWith("/admin/")) return await adminPlaceholder(request, env);
+      if (path === "/admin/users" && request.method === "GET") return await adminUsers(request, env);
+      if (path === "/admin/user" && request.method === "POST") return await adminUpdateUser(request, env);
+      // Anything else under /admin still has to prove the capability before it
+      // is told it does not exist - a 404 that only admins can see is a worse
+      // leak than a 403 everyone can.
+      if (path.startsWith("/admin/")) {
+        const s = await requireSession(request, env);
+        requireCap(s, "admin");
+        return json({ error: "not found" }, 404);
+      }
 
       return json({ error: "not found" }, 404);
     } catch (err) {
@@ -238,6 +313,8 @@ async function signup(request, env) {
   row[F.lastLoginAt] = "";
   row[F.passwordUpdatedAt] = now.toISOString();
   row[F.sessionEpoch] = "1";
+  row[F.perms] = "";                       // no overrides; the role defaults apply
+  row[F.activatedAt] = now.toISOString();  // starts the clock if this becomes a guest
 
   await appendUser(env, row);
   await env.PRODASH_KV.put(reservationKey, userId);
@@ -286,6 +363,28 @@ async function login(request, env) {
 
   if (row[F.status] !== "active") {
     fail(403, "This account is not active. Please contact the administrator.", "disabled");
+  }
+
+  /* The guest clock, enforced at the door. Checked BEFORE the password so an
+     expired guest gets an honest answer instead of being told their password is
+     wrong; the username has already been matched at this point, so this leaks
+     nothing that the lockout message below does not.
+
+     Flipping the row to "deactivated" as a side effect is what makes the expiry
+     VISIBLE to the Super Admin in the user list, rather than being silently
+     recomputed on every read and never recorded anywhere. */
+  const gexp = guestExpiry(row);
+  if (gexp !== null && Date.now() > gexp) {
+    if (row[F.status] !== "deactivated") {
+      const nextEpoch = Number(row[F.sessionEpoch] || 1) + 1;
+      await updateUserRow(env, rowNumber, row, {
+        [F.status]: "deactivated",
+        [F.sessionEpoch]: String(nextEpoch),
+      });
+      // Bumping the epoch kills any session the guest still has open elsewhere.
+      await env.PRODASH_KV.put(epochKey(row[F.userId]), String(nextEpoch));
+    }
+    fail(403, "This guest access has expired. Ask the administrator to reactivate it.", "guest_expired");
   }
 
   const lockedUntil = Number(row[F.lockedUntil] || 0);
@@ -340,9 +439,11 @@ async function login(request, env) {
   const token = await issueSession(env, {
     userId: row[F.userId],
     boardId: row[F.boardId],
-    role: row[F.role] || "user",
+    role: normRole(row[F.role]),
     username: row[F.username],
     epoch,
+    caps: capsFor(row),
+    gexp: guestExpiry(row),
   });
   return json({ ok: true, token, user: publicUser(row) });
 }
@@ -373,6 +474,8 @@ async function me(request, env) {
       userId: session.uid,
       username: session.un,
       role: session.role,
+      caps: session.caps || [],
+      guestExpiresAt: session.gexp || null,
       boardId: session.bid,
     },
   });
@@ -506,11 +609,12 @@ async function boardData(request, env) {
 }
 
 // ===========================================================================
-// Endpoints — admin (deliberately a placeholder)
+// Endpoints — admin
 // ===========================================================================
-// The seam is here and the role check works; the features are not built yet.
-// A later admin system adds handlers behind this same requireRole gate without
-// touching sessions, hashing, or the sheet layout.
+// The seam the earlier version left is now filled in: adminUsers and
+// adminUpdateUser sit behind the same capability gate the placeholder used, and
+// sessions, hashing and the sheet layout were not disturbed to add them - which
+// was the point of leaving a seam rather than a stub.
 async function adminBootstrap(request, env) {
   if (!env.ADMIN_BOOTSTRAP_TOKEN) fail(404, "not found");
   const provided = request.headers.get("X-Bootstrap-Token") || "";
@@ -523,7 +627,7 @@ async function adminBootstrap(request, env) {
   const usernameKey = normUsername(username);
 
   const rows = await readUsers(env);
-  if (rows.some((r) => r[F.role] === "admin")) fail(409, "An admin account already exists.");
+  if (rows.some((r) => normRole(r[F.role]) === "superadmin")) fail(409, "A Super Admin account already exists.");
   if (rows.some((r) => r[F.usernameKey] === usernameKey)) fail(409, "Username already exists. Please choose a different username.");
 
   const now = new Date().toISOString();
@@ -538,28 +642,159 @@ async function adminBootstrap(request, env) {
   row[F.passwordHash] = await hashSecret(password, env);
   row[F.secretQuestion] = "Set by the administrator";
   row[F.secretAnswerHash] = await hashSecret(normAnswer(randomId("seed")), env);
-  row[F.role] = "admin";
+  row[F.role] = "superadmin";
   row[F.status] = "active";
   row[F.failedAttempts] = "0";
   row[F.boardId] = randomId("brd");   // the admin gets an ordinary board of its own
   row[F.createdAt] = now;
   row[F.passwordUpdatedAt] = now;
   row[F.sessionEpoch] = "1";
+  row[F.perms] = "";
+  row[F.activatedAt] = now;
   await appendUser(env, row);
 
   return json({ ok: true, note: "Temporary admin created. Delete ADMIN_BOOTSTRAP_TOKEN from the Worker's variables now." }, 201);
 }
 
-async function adminPlaceholder(request, env) {
+/* ---------------------------------------------------------------------------
+   ADMIN
+   ---------------------------------------------------------------------------
+   The only endpoints in this Worker that touch somebody ELSE'S row, which is
+   why they are the only place where the permission check is load-bearing rather
+   than cosmetic. Gated on the "admin" capability read out of the signed token,
+   never out of anything the client sends. */
+async function adminUsers(request, env) {
   const session = await requireSession(request, env);
-  requireRole(session, "admin");
-  return json({ error: "The admin system is not built yet.", code: "not_implemented" }, 501);
+  requireCap(session, "admin");
+  const rows = await readUsers(env);
+  return json({
+    ok: true,
+    // Deliberately narrow: no hashes, no secret question, no email keys.
+    // An admin screen needs to identify and triage accounts, not read them.
+    users: rows.map((r) => {
+      const gexp = guestExpiry(r);
+      return {
+        userId: r[F.userId],
+        username: r[F.username],
+        name: ((r[F.firstName] || "") + " " + (r[F.lastName] || "")).trim(),
+        email: r[F.email],
+        role: normRole(r[F.role]),
+        status: r[F.status] || "active",
+        caps: capsFor(r),
+        createdAt: r[F.createdAt],
+        lastLoginAt: r[F.lastLoginAt],
+        activatedAt: r[F.activatedAt],
+        guestExpiresAt: gexp,
+        guestExpired: gexp !== null && Date.now() > gexp,
+        lockedUntil: Number(r[F.lockedUntil] || 0) || null,
+      };
+    }),
+    // So the admin screen can render the same capability list the server uses
+    // rather than keeping its own copy that drifts.
+    roles: Object.keys(CAPS),
+    caps: CAPS,
+  });
 }
 
-function requireRole(session, role) {
-  if (session.role !== role) fail(403, "You do not have access to that.", "forbidden");
+async function adminUpdateUser(request, env) {
+  const session = await requireSession(request, env);
+  requireCap(session, "admin");
+  const body = await readJson(request);
+  const targetId = String(body.userId || "");
+  if (!targetId) fail(400, "Which user?");
+
+  const found = await findUser(env, (r) => r[F.userId] === targetId);
+  if (!found) fail(404, "No such user.");
+  const { row, rowNumber } = found;
+
+  /* Self-protection. An admin who demotes or deactivates their own account
+     locks everyone out of administration permanently, because there is no
+     recovery path short of editing the sheet by hand. Cheaper to refuse. */
+  if (targetId === session.uid) {
+    if (body.role !== undefined && normRole(body.role) !== "superadmin")
+      fail(400, "You cannot remove your own Super Admin role.", "self_demote");
+    if (body.status !== undefined && body.status !== "active")
+      fail(400, "You cannot deactivate your own account.", "self_deactivate");
+  }
+
+  const patch = {};
+  let killSessions = false;
+
+  if (body.role !== undefined) {
+    const r = normRole(body.role);
+    if (!CAPS[r]) fail(400, "Unknown role.");
+    patch[F.role] = r;
+    killSessions = true;
+    // Promoting into "guest" starts a fresh 48 hours - otherwise the clock
+    // would run from whenever the account first existed, which for an account
+    // converted from a user is already long past.
+    if (r === "guest") patch[F.activatedAt] = new Date().toISOString();
+  }
+
+  if (body.status !== undefined) {
+    const s = String(body.status);
+    if (["active", "inactive", "deactivated"].indexOf(s) < 0) fail(400, "Unknown status.");
+    patch[F.status] = s;
+    if (s !== "active") killSessions = true;
+    // Reactivating a guest restarts their clock; without this they would come
+    // back already expired and bounce straight out again.
+    if (s === "active" && normRole(patch[F.role] || row[F.role]) === "guest")
+      patch[F.activatedAt] = new Date().toISOString();
+  }
+
+  // Explicit "give them another 48 hours" without touching role or status.
+  if (body.resetGuestClock) {
+    patch[F.activatedAt] = new Date().toISOString();
+    if ((row[F.status] || "") === "deactivated") patch[F.status] = "active";
+  }
+
+  if (body.perms !== undefined) {
+    // Stored as JSON text. Validated here so a malformed cell can never reach
+    // capsFor() and silently collapse someone back to role defaults.
+    if (body.perms === null || body.perms === "") patch[F.perms] = "";
+    else {
+      let p = body.perms;
+      if (typeof p === "string") { try { p = JSON.parse(p); } catch (e) { fail(400, "Malformed permissions."); } }
+      if (typeof p !== "object" || Array.isArray(p)) fail(400, "Permissions must be an object.");
+      patch[F.perms] = JSON.stringify(p);
+    }
+    killSessions = true;
+  }
+
+  if (!Object.keys(patch).length) fail(400, "Nothing to change.");
+
+  /* Any change to who someone IS has to reach the tokens they are already
+     holding. Bumping the epoch signs them out everywhere, so a demotion or a
+     deactivation takes effect on their next request rather than whenever their
+     30-day token happens to lapse. */
+  if (killSessions) {
+    const nextEpoch = Number(row[F.sessionEpoch] || 1) + 1;
+    patch[F.sessionEpoch] = String(nextEpoch);
+    await env.PRODASH_KV.put(epochKey(targetId), String(nextEpoch));
+  }
+
+  const next = await updateUserRow(env, rowNumber, row, patch);
+  const gexp = guestExpiry(next);
+  return json({
+    ok: true,
+    user: {
+      userId: next[F.userId],
+      username: next[F.username],
+      role: normRole(next[F.role]),
+      status: next[F.status],
+      caps: capsFor(next),
+      activatedAt: next[F.activatedAt],
+      guestExpiresAt: gexp,
+      guestExpired: gexp !== null && Date.now() > gexp,
+    },
+    signedOut: killSessions,
+  });
 }
 
+function requireCap(session, cap) {
+  const caps = session.caps || [];
+  if (caps.indexOf(cap) < 0) fail(403, "You do not have access to that.", "forbidden");
+}
 // ===========================================================================
 // Sessions — stateless signed tokens, with a KV escape hatch
 // ===========================================================================
@@ -567,8 +802,14 @@ function requireRole(session, role) {
 // path costs no Sheets read at all. Two cheap KV reads then cover the two
 // things a signature cannot express: this device signed out (revocation), and
 // the password changed (epoch).
-async function issueSession(env, { userId, boardId, role, username, epoch }) {
+async function issueSession(env, { userId, boardId, role, username, epoch, caps, gexp }) {
   await env.PRODASH_KV.put(epochKey(userId), String(epoch));
+  /* A guest's token is capped at their 48-hour expiry rather than the usual 30
+     days. That makes the clock enforce ITSELF through the ordinary expiry check
+     in requireSession - no per-request sheet read, and nothing to bypass by
+     editing localStorage, because the cap is inside the signature. */
+  const ttl = Date.now() + SESSION_TTL_MS;
+  const exp = (gexp && gexp < ttl) ? gexp : ttl;
   return signPayload(env, {
     p: "session",
     sid: randomId("ses"),
@@ -576,9 +817,11 @@ async function issueSession(env, { userId, boardId, role, username, epoch }) {
     bid: boardId,
     role: role || "user",
     un: username,
+    caps: caps || [],
+    gexp: gexp || null,
     epoch,
     iat: Date.now(),
-    exp: Date.now() + SESSION_TTL_MS,
+    exp,
   });
 }
 

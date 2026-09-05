@@ -44,10 +44,10 @@ Browser  ->  your Worker  ->  Google Sheet   (accounts)
    position, so the order matters — don't insert a column in the middle later.
 
 ```
-user_id	first_name	last_name	username	username_key	email	email_key	password_hash	secret_question	secret_answer_hash	role	status	failed_attempts	locked_until	board_id	created_at	last_login_at	password_updated_at	session_epoch
+user_id	first_name	last_name	username	username_key	email	email_key	password_hash	secret_question	secret_answer_hash	role	status	failed_attempts	locked_until	board_id	created_at	last_login_at	password_updated_at	session_epoch	perms	activated_at
 ```
 
-   Paste it into cell **A1** and Sheets will spread it across A1:S1 by itself,
+   Paste it into cell **A1** and Sheets will spread it across A1:U1 by itself,
    because those are tab characters.
 
 4. Copy the **spreadsheet id** out of the address bar — the long string between
@@ -196,11 +196,12 @@ it) so no later account can trigger the check again.
 **Before starting, export a backup** from the ProDash header. It costs ten
 seconds and it is the only thing that makes any of this reversible.
 
-## 7. The temporary admin (optional, not built yet)
+## 7. The admin bootstrap endpoint (rarely needed now)
 
-The `role` column and an `/admin/*` route exist so the admin system can be added
-later without rearranging any of this. Nothing is built behind it yet — every
-`/admin/*` call returns "not built yet" after checking the role.
+The admin system is built (see **Roles and access** above). This endpoint exists
+only for the case where you have **no Super Admin at all** and would rather not
+edit the sheet by hand — for most situations, changing column K of your own row
+to `superadmin` is quicker and needs no token.
 
 To create the placeholder admin account:
 
@@ -218,6 +219,86 @@ curl -X POST https://YOUR-WORKER-URL/admin/bootstrap -H "X-Bootstrap-Token: YOUR
 The route refuses to run at all if an admin already exists.
 
 ---
+
+
+---
+
+## Roles and access
+
+Three roles. Each is a named set of capabilities; a capability is just a string,
+so adding a tab later means adding one name, not changing the sheet.
+
+| Role | Can reach |
+|---|---|
+| **superadmin** | Everything, plus the People panel for managing other accounts |
+| **user** | Board, Personal Calendar, Expense Tracker, and the app's version history only |
+| **guest** | Board, Personal Calendar, Expense Tracker — **for 48 hours** |
+
+**What this does and does not protect.** Every tab except the People panel shows
+the signed-in person's *own* board. Hiding one is policy, not security — the data
+was already theirs, and a determined person can un-hide a tab from devtools. The
+two things that *are* boundaries are enforced by the Worker and cannot be
+bypassed from the browser: anything that touches another account's row, and the
+guest clock.
+
+### Upgrading a sheet you already have
+
+If your `Users` tab was created before roles existed, it stops at column S. Add
+two headers and nothing else — appending columns is safe, inserting them in the
+middle is not:
+
+- **T1** → `perms`
+- **U1** → `activated_at`
+
+Leave the cells beneath them blank. Blank means "no overrides" and "clock never
+started", which is correct for every existing account.
+
+### Making yourself the Super Admin
+
+Everyone who signed up is a plain `user`, including you. Open the sheet, find
+your row, and change column **K** (`role`) from `user` to `superadmin`. Then sign
+out and back in — a role lives inside the signed session token, so an open
+session keeps whatever role it was issued with until it is replaced.
+
+That is the only manual step. From then on you can change anyone's role from the
+People panel: click your name in the header.
+
+### Guests
+
+Make someone a guest from the People panel and their 48 hours start then. What
+happens at the end:
+
+- Their **session token itself expires** at the 48-hour mark, because the token
+  is issued with that cap baked into its signature. Nothing to bypass in
+  localStorage, and no per-request lookup.
+- Their row flips to **`deactivated`** on the next login attempt, which is what
+  makes the expiry visible to you in the People panel rather than being silently
+  recomputed and never recorded.
+- **Restart 48h** in the People panel gives them another window and reactivates
+  the account in one click.
+
+### Per-account overrides
+
+The `perms` cell holds JSON that layers on top of the role's defaults, so it can
+grant something the role lacks *or* take away something it normally has:
+
+```json
+{"reports": true}
+```
+
+That gives one `user` access to Reports without promoting them. `{"exp": false}`
+would take the Expense Tracker away from someone who would otherwise have it.
+Leave the cell empty for the role's defaults. The Worker validates this on write;
+a malformed value is refused rather than silently collapsing the account back to
+defaults.
+
+### If you lock yourself out
+
+The Worker refuses to let a Super Admin demote or deactivate their own account,
+so the usual way to lose access does not exist. If it happens anyway — say the
+only Super Admin row is edited by hand into something else — fix column **K**
+back to `superadmin` in the sheet and sign in again. The sheet is the source of
+truth; nothing in the Worker or the browser can override it.
 
 ## Day-to-day
 

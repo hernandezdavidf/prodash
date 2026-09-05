@@ -2,6 +2,68 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-05 — Roles, a profile panel, and server-enforced guest access
+
+Three roles — **superadmin**, **user**, **guest** — with the header identity
+block turned into a button that opens a profile panel showing who you are, what
+you can reach, and (for a Super Admin) everyone else.
+
+**The honest boundary, stated because it decides what this code is for.** Every
+tab except the People panel renders the signed-in person's *own* board. Hiding
+one is policy, not security: the data was already theirs, and a determined person
+can un-hide a tab from devtools. What that buys is a simpler screen for someone
+who was never meant to use those tools. The two things that genuinely *are*
+boundaries — anything touching another account's row, and the guest clock — are
+enforced by the Worker, and a forged capability list gets a 403 rather than a
+working admin panel.
+
+**Capabilities are strings; roles are named default sets of them.** A row's
+`perms` cell layers JSON overrides on top, able to grant what the role lacks or
+remove what it normally has. Adding a tab later is one string in `CAPS` and one
+entry in the client's label map — no schema change, no migration. Two new sheet
+columns (`perms`, `activated_at`) appended at T and U, never inserted mid-table,
+because the Worker addresses columns positionally.
+
+**The guest clock enforces itself.** A guest's session token is issued with its
+`exp` capped at the 48-hour mark, so the ordinary expiry check in
+`requireSession` ends the session with no per-request sheet read and nothing to
+edit in localStorage. Their row flips to `deactivated` on the next login attempt
+— a deliberate write, because an expiry that is only ever recomputed on read is
+invisible to the Super Admin who needs to see it.
+
+**Role and status changes bump `session_epoch`**, signing that person out
+everywhere. A demotion that waited for a 30-day token to lapse would not be a
+demotion. The Worker also refuses to let a Super Admin demote or deactivate
+their own account: there is no recovery path short of hand-editing the sheet, so
+it is cheaper to refuse than to explain.
+
+Legacy `admin` rows are read as `superadmin` rather than orphaned, and a session
+token issued before capabilities existed is treated as full access rather than
+locking someone out of their own board — the server decides either way, and it
+will refuse anything the account is not entitled to on the next call.
+
+### Two collisions found by auditing, not by symptoms
+
+Both pre-existing hazards in a 4,400-line file with one namespace:
+
+- **`fmtWhen` was declared twice.** Board History's version returns HTML
+  (`<b>`-wrapped); mine returned a plain date. Function declarations hoist and
+  the last wins, so mine was silently replaced and the profile printed escaped
+  markup where a date should be. Renamed to `pfWhen`.
+- **`laneName` was declared twice** in the same scope, by the calendar module and
+  by an older helper. They happened to agree, so nothing broke — but it was a
+  trap for whoever edited one of them next. The duplicate is gone.
+
+A third apparent duplicate, `save`, is a false positive: the two live in
+different IIFEs (one saves the session, one saves the board).
+
+### Also caught in testing
+
+The profile module was first inserted *after* the header identity block that
+consumes its `ROLE_LABELS`. `var` hoists the declaration but not the assignment,
+so the block threw mid-render — the name appeared, the badge did not, and the
+rest of the boot never ran. Moved above its first use.
+
 ## 2026-09-05 — Board switcher becomes a pair of pennant tabs
 
 The Classic view / Consolidated checklist pills are now banner tabs: rounded

@@ -201,6 +201,20 @@ header:after{content:"";position:absolute;right:-40px;top:-40px;width:220px;heig
 .hdr-user{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--on-brand);flex-shrink:0}
 .hdr-user b{display:block;font-size:13.5px;font-weight:700}
 .hdr-user span{opacity:.85}
+/* The identity block reads as text until you approach it, then as a control.
+   A permanently outlined button here would compete with Theme and Sign out
+   beside it for what is really a quiet affordance. */
+.hdr-id{display:block;text-align:left;font:inherit;color:var(--on-brand);cursor:pointer;
+  padding:4px 8px;margin:-4px -8px;border-radius:9px;border:1px solid transparent;transition:.15s}
+.hdr-id:hover,.hdr-id:focus-visible{background:rgba(255,255,255,.13);border-color:rgba(255,255,255,.3)}
+.hdr-id:focus-visible{outline:none}
+.hdr-role{display:inline-block;margin-top:3px;font-size:9.5px;font-weight:800;letter-spacing:.7px;
+  text-transform:uppercase;padding:2px 7px;border-radius:999px;opacity:1;
+  background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.38)}
+/* Super Admin is the only role that gets a filled badge - it is the one worth
+   noticing on a shared screen. */
+.hdr-role.sa{background:var(--olive);border-color:var(--olive);color:#0B2410}
+.hdr-role.guest{background:var(--terra);border-color:var(--terra);color:var(--on-warm)}
 .hdr-out{font:inherit;font-size:12px;font-weight:600;color:var(--on-brand);cursor:pointer;
   padding:5px 11px;border-radius:999px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35)}
 .hdr-out:hover{background:rgba(255,255,255,.26)}
@@ -1248,6 +1262,10 @@ return {
   token: function(){ return session ? session.token : ""; },
   user: function(){ return session ? session.user : null; },
   uid: function(){ return session && session.user ? session.user.userId : ""; },
+  /* Exposed so the admin panel can reach the Worker through the same helper
+     the gate uses - one place that attaches the token, handles the JSON and
+     tells a transport failure apart from a refusal. */
+  api: api,
   /* Which account inherited this device's pre-accounts data. Used to decide who
      the old un-namespaced OneDrive file handle belongs to - it is the same
      person, and giving it to anyone else is precisely the leak that made a
@@ -1276,10 +1294,15 @@ return {
         </div>
       </div>
       <div class="hdr-user">
-        <div>
+        <!-- The whole identity block is one button: name, handle and role badge
+             all open the same profile panel, because "click your name to see
+             your account" is the expectation and splitting it into two targets
+             would just make each one smaller. -->
+        <button class="hdr-id" id="whoBtn" aria-haspopup="dialog" aria-controls="profModal" title="Profile, settings and access">
           <b id="whoName"></b>
           <span id="whoUser"></span>
-        </div>
+          <span class="hdr-role" id="whoRole" hidden></span>
+        </button>
         <button class="hdr-out" id="themeBtn" title="Light / dark / follow the system">Theme: auto</button>
         <button class="hdr-out" id="signOutBtn">Sign out</button>
       </div>
@@ -1669,9 +1692,9 @@ return {
     padding-bottom:5px;border-bottom:1px solid var(--line)}
 
   /* Activity editor */
-  #actModal{position:fixed;inset:0;z-index:9998;display:flex;align-items:flex-start;justify-content:center;
+  #actModal,#profModal{position:fixed;inset:0;z-index:9998;display:flex;align-items:flex-start;justify-content:center;
     padding:24px 16px;background:rgba(var(--shadow-rgb),.55);overflow-y:auto}
-  #actModal[hidden]{display:none}
+  #actModal[hidden],#profModal[hidden]{display:none}
   .am-card{width:100%;max-width:470px;background:var(--paper);border:1px solid var(--line);
     border-radius:13px;padding:22px;box-shadow:0 14px 50px rgba(var(--shadow-rgb),.34)}
   .am-card h3{margin:0 0 14px;font-family:var(--serif);font-size:19px;color:var(--forest-ink)}
@@ -1922,6 +1945,97 @@ return {
   </div>
 
   </div><!-- /.viewpanel : closes the sheet opened just under the tab strip -->
+
+  <style>
+  /* ---- Profile & access panel --------------------------------------------
+     Shares #actModal's overlay styling (see the grouped selector there) so
+     there is one dialog look in the app rather than two that drift. */
+  .pf-role{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.7px;
+    text-transform:uppercase;padding:3px 9px;border-radius:999px;
+    background:var(--ivory);border:1px solid var(--line);color:var(--muted)}
+  .pf-role.sa{background:var(--olive-lt);border-color:var(--olive);color:var(--forest-dk)}
+  .pf-role.guest{background:var(--terra-lt);border-color:var(--terra);color:var(--terra-ink)}
+  .pf-head{display:flex;align-items:center;gap:11px;margin-bottom:14px}
+  .pf-av{width:42px;height:42px;border-radius:50%;flex:none;display:flex;align-items:center;
+    justify-content:center;font-family:var(--serif);font-size:18px;font-weight:700;
+    background:var(--forest);color:var(--on-brand)}
+  .pf-nm{font-family:var(--serif);font-size:17px;color:var(--ink);line-height:1.2}
+  .pf-un{font-size:12px;color:var(--muted)}
+  .pf-grid{display:grid;grid-template-columns:auto 1fr;gap:5px 14px;font-size:12.5px;margin-bottom:14px}
+  .pf-grid dt{color:var(--muted);font-weight:600}
+  .pf-grid dd{margin:0;color:var(--ink);overflow-wrap:anywhere}
+  .pf-sec{margin-top:16px;padding-top:13px;border-top:1px solid var(--line)}
+  .pf-sec h4{font-size:12px;margin:0 0 3px;color:var(--forest-ink);font-family:var(--sans);
+    font-weight:800;text-transform:uppercase;letter-spacing:.6px}
+  .pf-sec .sub{margin:0 0 10px}
+  .pf-caps{display:flex;flex-wrap:wrap;gap:5px}
+  .pf-cap{font-size:10.5px;font-weight:600;padding:3px 9px;border-radius:999px;
+    background:var(--olive-lt);color:var(--forest-dk);border:1px solid var(--olive)}
+  .pf-cap.off{background:var(--ivory);color:var(--muted);border-color:var(--line);
+    text-decoration:line-through;opacity:.75}
+
+  /* Admin user list */
+  .pf-u{display:flex;align-items:flex-start;gap:10px;padding:9px 0;
+    border-bottom:1px dashed var(--line)}
+  .pf-u:last-child{border-bottom:none}
+  .pf-u-m{flex:1;min-width:0}
+  .pf-u-n{font-size:13px;font-weight:600;color:var(--ink);overflow-wrap:anywhere}
+  .pf-u-s{font-size:11px;color:var(--muted);margin-top:2px;overflow-wrap:anywhere}
+  .pf-u-c{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+  .pf-u-c select,.pf-u-c button{font-size:11px;border:1px solid var(--line);border-radius:7px;
+    padding:3px 8px;background:var(--paper);color:var(--ink)}
+  .pf-u-c button:hover{border-color:var(--olive);color:var(--forest-ink)}
+  .pf-st{font-size:9.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;
+    padding:2px 7px;border-radius:999px;flex:none;margin-top:1px}
+  .pf-st.active{background:var(--olive-lt);color:var(--forest-dk)}
+  .pf-st.inactive{background:var(--ivory);color:var(--muted);border:1px solid var(--line)}
+  .pf-st.deactivated{background:var(--alert-lt);color:var(--alert-ink)}
+  .pf-me{font-size:10px;color:var(--muted);font-weight:700}
+  .pf-msg{display:none;margin:10px 0;padding:9px 11px;border-radius:8px;font-size:12.5px}
+  .pf-msg.on{display:block}
+  .pf-msg.err{background:var(--alert-lt);color:var(--alert-ink);border:1px solid var(--alert)}
+  .pf-msg.ok{background:var(--olive-lt);color:var(--forest-dk);border:1px solid var(--olive)}
+  @media(max-width:620px){ .pf-grid{grid-template-columns:1fr;gap:1px 0}
+    .pf-grid dt{margin-top:7px} }
+  </style>
+
+  <!-- Profile, settings and (for a Super Admin) user management. Everything
+       shown here is decoration over what the WORKER decided: the capability
+       list came out of the signed session token, and every admin action is
+       re-checked server-side. Hiding a control here is a courtesy, not a
+       boundary - see the note at the top of worker.js. -->
+  <div id="profModal" hidden>
+    <div class="am-card" role="dialog" aria-modal="true" aria-labelledby="pfTitle">
+      <h3 id="pfTitle">Your profile</h3>
+      <div class="pf-head">
+        <div class="pf-av" id="pfAv">?</div>
+        <div>
+          <div class="pf-nm" id="pfName"></div>
+          <div class="pf-un" id="pfUser"></div>
+        </div>
+        <span class="pf-role" id="pfRole" style="margin-left:auto"></span>
+      </div>
+
+      <dl class="pf-grid" id="pfFacts"></dl>
+
+      <div class="pf-sec">
+        <h4>What you can reach</h4>
+        <div class="sub">Set by your role. Anything struck through is not available to you.</div>
+        <div class="pf-caps" id="pfCaps"></div>
+      </div>
+
+      <div class="pf-sec" id="pfAdminSec" hidden>
+        <h4>People</h4>
+        <div class="sub">Change a role or status and that person is signed out everywhere, so it takes effect on their next request rather than whenever their token happens to lapse.</div>
+        <div class="pf-msg" id="pfMsg"></div>
+        <div id="pfUsers"></div>
+      </div>
+
+      <div class="am-actions">
+        <button class="ag-btn ghost" id="pfClose">Close</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Activity editor. One dialog creates and edits, so the two can never
        drift apart in what they allow. -->
@@ -2425,7 +2539,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="3.2";
+var APP_VERSION="3.3";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -2436,6 +2550,7 @@ var APP_VERSION="3.2";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-05T07:20:00+08:00",text:"Click your name in the header to open your profile: it shows your role, what you can reach, and -- if you are the Super Admin -- everyone else's accounts, where you can change a role, deactivate someone, or restart a guest's 48 hours. Three roles now exist: Super Admin sees everything, User gets the board, calendar, expenses and the app version history, and Guest gets the board, calendar and expenses for 48 hours before access lapses on its own."},
   {ts:"2026-09-05T06:10:00+08:00",text:"The Classic view / Consolidated checklist switcher is now a pair of pennant tabs -- banner shapes with a downward point, an icon and an uppercase label. The one you are on is brand green, the other sits back in neutral grey. Long links in the Now bar also wrap properly instead of stretching the page."},
   {ts:"2026-09-05T05:30:00+08:00",text:"New Expense Tracker tab. Type an amount and a few words, press Add, done - the date fills itself in and category, payment and notes are optional and folded away. It totals your day, month and year automatically, shows where the money goes by category (uncategorised included), charts the last twelve months, and lets you search, filter and edit anything you have recorded."},
   {ts:"2026-09-05T04:45:00+08:00",text:"Lane names are readable again. The name now gets a row to itself instead of sharing one with six buttons, so long names like \"My Company + Personal\" wrap at the spaces rather than breaking mid-word. The lane's buttons moved to a quiet row underneath."},
@@ -3894,6 +4009,191 @@ document.getElementById("syncBtn").addEventListener("click",function(){
 window.addEventListener("focus",function(){if(fileHandle)readFile();});
 document.addEventListener("visibilitychange",function(){if(!document.hidden&&fileHandle)readFile();});
 
+/* ==================== PROFILE, ROLES AND ACCESS =========================
+   Capabilities arrive inside the signed session token, so this file reads them
+   rather than deciding them. Two honest limits, worth stating because they
+   change what this code is FOR:
+
+   1. Every tab except the admin panel renders the signed-in user's OWN board.
+      Hiding one is policy, not security - the data was already theirs, and a
+      determined person can un-hide a tab from devtools. What that buys is a
+      simpler screen for someone who was never meant to use those tools.
+   2. The parts that ARE a boundary - the guest clock and anything that touches
+      another person's row - are enforced by the Worker. A forged capability
+      list gets a 403 from the server, not a working admin panel.            */
+var CAP_TABS = {
+  board:  "tabBoard",
+  cal:    "tabCal",
+  exp:    "tabExp",
+  reports:"tabReports",
+  history:"tabHistory"
+};
+var CAP_LABELS = {
+  board:"Board", cal:"Personal Calendar", exp:"Expense Tracker",
+  reports:"Reports", history:"Board History",
+  "history.appver":"App version history", admin:"Manage people"
+};
+var ROLE_LABELS = {superadmin:"Super Admin", user:"User", guest:"Guest"};
+
+function myCaps(){
+  var u=PDAuth.user()||{};
+  // An older token, issued before roles existed, carries no caps. Treat it as a
+  // full-access account rather than locking the owner out of their own board -
+  // the server is the thing that actually decides, and it will refuse anything
+  // this account is not entitled to on the next call.
+  return (u.caps&&u.caps.length)?u.caps:["board","cal","exp","reports","history","history.appver"];
+}
+function can(cap){ return myCaps().indexOf(cap)>=0; }
+function myRole(){ var u=PDAuth.user()||{}; return u.role||"user"; }
+
+/* Hide the tabs this account has no business seeing, and make sure we are not
+   standing on one of them. Called once at boot. */
+function applyAccess(){
+  var caps=myCaps(), firstVisible=null;
+  Object.keys(CAP_TABS).forEach(function(cap){
+    var el=document.getElementById(CAP_TABS[cap]);
+    if(!el)return;
+    var ok=caps.indexOf(cap)>=0;
+    // "history.appver" grants the History TAB, but only its version sub-view.
+    if(cap==="history"&&!ok&&caps.indexOf("history.appver")>=0)ok=true;
+    el.hidden=!ok;
+    if(ok&&!firstVisible)firstVisible=cap;
+  });
+  /* Board History's sub-views: someone with only history.appver sees the app's
+     changelog and none of the board's own audit trail. Done here rather than in
+     renderHistory() so there is one place that answers "who can see what". */
+  if(!can("history")&&can("history.appver")){
+    document.querySelectorAll("[data-hview]").forEach(function(b){
+      if(b.dataset.hview!=="appver")b.hidden=true;
+    });
+    curHView="appver";
+  }
+  // If the active tab just got hidden, move somewhere they can actually be.
+  var active=document.querySelector(".tab.on");
+  if(active&&active.hidden&&firstVisible)setView(firstVisible==="board"?"board":firstVisible);
+}
+
+/* ---------------- the profile panel ---------------- */
+function pfEl(id){return document.getElementById(id);}
+function pfMsg(t,kind){var m=pfEl("pfMsg");m.textContent=t||"";m.className="pf-msg"+(t?" on "+(kind||"err"):"");}
+/* Named pfWhen, not fmtWhen: Board History already declares a fmtWhen further
+   down that returns HTML (<b> wrapped). Function declarations hoist and the
+   last one wins, so an identically-named helper here was silently replaced by
+   it - the profile then printed escaped markup instead of a date. Caught in
+   testing; the lesson is that a 4000-line single file has one namespace. */
+function pfWhen(v){
+  if(!v)return "—";
+  var d=(typeof v==="number")?new Date(v):new Date(String(v));
+  return isNaN(d)?String(v):d.toLocaleString();
+}
+function roleClass(r){ return r==="superadmin"?"sa":(r==="guest"?"guest":""); }
+
+function openProfile(){
+  var u=PDAuth.user()||{}, role=myRole();
+  var nm=((u.firstName||"")+" "+(u.lastName||"")).trim()||u.username||"—";
+  pfEl("pfAv").textContent=(nm.charAt(0)||"?").toUpperCase();
+  pfEl("pfName").textContent=nm;
+  pfEl("pfUser").textContent="@"+(u.username||"");
+  var rb=pfEl("pfRole");
+  rb.textContent=ROLE_LABELS[role]||role;
+  rb.className="pf-role "+roleClass(role);
+
+  var facts=[["Role",ROLE_LABELS[role]||role],["Username","@"+(u.username||"")]];
+  if(u.guestExpiresAt){
+    var left=u.guestExpiresAt-Date.now();
+    facts.push(["Access ends",pfWhen(u.guestExpiresAt)+
+      (left>0?" ("+Math.max(1,Math.round(left/36e5))+"h left)":" (expired)")]);
+  }
+  facts.push(["Signed in on","this device"]);
+  pfEl("pfFacts").innerHTML=facts.map(function(f){
+    return "<dt>"+esc(f[0])+"</dt><dd>"+esc(f[1])+"</dd>";}).join("");
+
+  // Show the whole capability vocabulary, with the ones they lack struck
+  // through - "what you cannot reach" is as useful as "what you can".
+  var caps=myCaps();
+  pfEl("pfCaps").innerHTML=Object.keys(CAP_LABELS).map(function(c){
+    var on=caps.indexOf(c)>=0;
+    return '<span class="pf-cap'+(on?"":" off")+'">'+esc(CAP_LABELS[c])+'</span>';
+  }).join("");
+
+  var admin=can("admin");
+  pfEl("pfAdminSec").hidden=!admin;
+  pfEl("profModal").hidden=false;
+  pfMsg("");
+  if(admin)loadAdminUsers();
+}
+function closeProfile(){ pfEl("profModal").hidden=true; }
+
+function loadAdminUsers(){
+  pfEl("pfUsers").innerHTML='<div class="sub">Loading…</div>';
+  PDAuth.api("/admin/users").then(function(res){
+    renderAdminUsers(res.users||[]);
+  }).catch(function(err){
+    pfEl("pfUsers").innerHTML="";
+    pfMsg(err.offline?"Can't reach the server — the people list needs a connection.":err.message);
+  });
+}
+
+function renderAdminUsers(users){
+  var meId=(PDAuth.user()||{}).userId;
+  pfEl("pfUsers").innerHTML=users.map(function(u){
+    var isMe=u.userId===meId;
+    var bits=["@"+u.username];
+    if(u.email)bits.push(u.email);
+    if(u.lastLoginAt)bits.push("last in "+pfWhen(u.lastLoginAt));
+    if(u.guestExpiresAt)bits.push(u.guestExpired?"guest access expired":"guest until "+pfWhen(u.guestExpiresAt));
+    return '<div class="pf-u" data-uid="'+esc(u.userId)+'">'+
+      '<div class="pf-u-m">'+
+        '<div class="pf-u-n">'+esc(u.name||u.username)+
+          (isMe?' <span class="pf-me">YOU</span>':'')+'</div>'+
+        '<div class="pf-u-s">'+esc(bits.join(" · "))+'</div>'+
+        '<div class="pf-u-c">'+
+          '<select data-arole'+(isMe?' disabled title="You cannot change your own role"':'')+'>'+
+            ["superadmin","user","guest"].map(function(r){
+              return '<option value="'+r+'"'+(u.role===r?" selected":"")+'>'+ROLE_LABELS[r]+'</option>';
+            }).join("")+
+          '</select>'+
+          '<select data-astatus'+(isMe?' disabled title="You cannot change your own status"':'')+'>'+
+            ["active","inactive","deactivated"].map(function(s){
+              return '<option value="'+s+'"'+(u.status===s?" selected":"")+'>'+s.charAt(0).toUpperCase()+s.slice(1)+'</option>';
+            }).join("")+
+          '</select>'+
+          (u.role==="guest"?'<button data-areset>Restart 48h</button>':'')+
+        '</div>'+
+      '</div>'+
+      '<span class="pf-st '+esc(u.status)+'">'+esc(u.status)+'</span>'+
+    '</div>';
+  }).join("")||'<div class="sub">No accounts found.</div>';
+
+  pfEl("pfUsers").querySelectorAll(".pf-u").forEach(function(row){
+    var uid=row.dataset.uid;
+    var rs=row.querySelector("[data-arole]"), ss=row.querySelector("[data-astatus]");
+    if(rs)rs.addEventListener("change",function(){ adminPatch(uid,{role:rs.value}); });
+    if(ss)ss.addEventListener("change",function(){ adminPatch(uid,{status:ss.value}); });
+    var rb=row.querySelector("[data-areset]");
+    if(rb)rb.addEventListener("click",function(){ adminPatch(uid,{resetGuestClock:true}); });
+  });
+}
+
+function adminPatch(userId,patch){
+  patch.userId=userId;
+  pfMsg("Saving…","ok");
+  PDAuth.api("/admin/user",{method:"POST",body:patch}).then(function(res){
+    pfMsg((res.user.username||"Account")+" updated"+(res.signedOut?" · signed out everywhere":""),"ok");
+    loadAdminUsers();
+  }).catch(function(err){
+    pfMsg(err.message);
+    loadAdminUsers();   // put the selects back to the truth
+  });
+}
+
+document.getElementById("whoBtn").addEventListener("click",openProfile);
+document.getElementById("pfClose").addEventListener("click",closeProfile);
+document.getElementById("profModal").addEventListener("click",function(ev){
+  if(ev.target===this)closeProfile();});
+document.addEventListener("keydown",function(ev){
+  if(ev.key==="Escape"&&!document.getElementById("profModal").hidden)closeProfile();});
+
 /* ---------- signed-in identity ---------- */
 // textContent, never innerHTML: these strings came from a registration form,
 // so treating them as markup would let a chosen first name run script in every
@@ -3901,7 +4201,14 @@ document.addEventListener("visibilitychange",function(){if(!document.hidden&&fil
 (function(){
   var u=PDAuth.user()||{};
   document.getElementById("whoName").textContent=((u.firstName||"")+" "+(u.lastName||"")).trim()||u.username||"";
-  document.getElementById("whoUser").textContent="@"+(u.username||"")+(u.role==="admin"?" · admin":"");
+  document.getElementById("whoUser").textContent="@"+(u.username||"");
+  // The role is its own badge rather than a suffix on the handle: on a shared
+  // screen "who am I signed in as" and "what am I allowed to do" are two
+  // different questions and deserve two different marks.
+  var rb=document.getElementById("whoRole"), role=u.role||"user";
+  rb.textContent=ROLE_LABELS[role]||role;
+  rb.className="hdr-role "+roleClass(role);
+  rb.hidden=false;
   document.getElementById("signOutBtn").addEventListener("click",function(){
     // Unsynced work is the one thing sign-out can genuinely destroy, so say so
     // by number rather than asking a vague "are you sure?".
@@ -3940,6 +4247,10 @@ setCloud("local");
 // tab was the expected, if confusing, default. Pull once immediately, the
 // same way the OneDrive path's restore() already reconnects on boot.
 if(cloudUrl)cloudPull();
+// Tabs this account cannot use are hidden once, after the first render. The
+// server has already decided; this only stops the UI offering what it would
+// refuse anyway.
+applyAccess();
 
 /* ============================================================
    Reports — a read-only view over S.tasks, grouped by lane.
@@ -4396,10 +4707,10 @@ function calDayHTML(){
   });
   return out;
 }
-function laneName(id){
-  var L=(S.lanes||[]).filter(function(x){return x.id===id;})[0];
-  return L?L.name:id;
-}
+/* laneName() is NOT redefined here. An identical one already exists further up
+   (it returns the lane's name, or the id when the lane is gone), and declaring
+   a second in the same scope meant whichever came last silently won. Harmless
+   while the two agreed; a trap the moment someone edited one of them. */
 
 function calYearHTML(){
   var y=dparts(calCursor).y,tk=today(),out='<div class="cal-year">';
