@@ -2,6 +2,39 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-06 — Admin-issued temporary passwords (v3.4)
+
+Role and status management already shipped with the profile panel; this adds the
+piece that was missing for "they cannot get in, and Forgot password is not
+working for them either" — a Super Admin can hand someone a password directly.
+
+**The plaintext exists for exactly one response and is never stored.** It is
+hashed with the same PBKDF2 + pepper as any other password before it reaches the
+sheet, so there is nothing to look up afterwards and losing it means issuing
+another. That is the property worth having, not a limitation to work around.
+
+**Issuing one signs the account out everywhere**, by bumping `session_epoch`. If
+the reason someone needs a temp password is that their account was compromised,
+leaving their old sessions alive defeats the point of resetting it. Any lockout
+is cleared in the same write — otherwise the password just handed over would be
+refused by an account still serving out its fifteen minutes.
+
+**The generated password is meant to be read aloud.** The alphabet excludes
+`O`/`0` and `I`/`l`/`1`, and it is grouped `xxxx-xxxx-xxxx`. A guaranteed
+upper/lower/digit trio is appended rather than rejecting and redrawing: the
+entropy of the twelve random characters is what matters, and appending only makes
+the result longer. Verified across 200 samples — all satisfy the same complexity
+rules the signup form enforces, none contain an ambiguous character, all unique.
+
+It renders into the row rather than an `alert()`, which cannot be copied from on
+a phone and will usually be pasted into a message. Shown in terracotta rather
+than red: handing out a credential is consequential, not an error, and red stays
+reserved for things that have actually gone wrong.
+
+**Not yet: forced change on next login.** That needs another sheet column, and
+the schema is still settling. It is written up in the workflow as the natural
+next step rather than bolted on now.
+
 ## 2026-09-05 — Roles, a profile panel, and server-enforced guest access
 
 Three roles — **superadmin**, **user**, **guest** — with the header identity

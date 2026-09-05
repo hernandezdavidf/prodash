@@ -2555,7 +2555,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="3.3";
+var APP_VERSION="3.4";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -2566,6 +2566,7 @@ var APP_VERSION="3.3";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-06T00:35:00+08:00",text:"A Super Admin can now issue someone a temporary password. If a person cannot get in and Forgot password is not working for them, open your profile, find them in the people list and press Temp password. You are shown a password once, to pass on to them however you like -- it is not stored anywhere and cannot be looked up again, so if you lose it just issue another. Their old password stops working straight away, they are signed out on every device, and any lockout on their account is cleared so the new password actually works."},
   {ts:"2026-09-05T07:20:00+08:00",text:"Click your name in the header to open your profile: it shows your role, what you can reach, and -- if you are the Super Admin -- everyone else's accounts, where you can change a role, deactivate someone, or restart a guest's 48 hours. Three roles now exist: Super Admin sees everything, User gets the board, calendar, expenses and the app version history, and Guest gets the board, calendar and expenses for 48 hours before access lapses on its own."},
   {ts:"2026-09-05T06:10:00+08:00",text:"The Classic view / Consolidated checklist switcher is now a pair of pennant tabs -- banner shapes with a downward point, an icon and an uppercase label. The one you are on is brand green, the other sits back in neutral grey. Long links in the Now bar also wrap properly instead of stretching the page."},
   {ts:"2026-09-05T05:30:00+08:00",text:"New Expense Tracker tab. Type an amount and a few words, press Add, done - the date fills itself in and category, payment and notes are optional and folded away. It totals your day, month and year automatically, shows where the money goes by category (uncategorised included), charts the last twelve months, and lets you search, filter and edit anything you have recorded."},
