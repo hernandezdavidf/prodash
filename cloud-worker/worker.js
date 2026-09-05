@@ -321,7 +321,16 @@ async function signup(request, env) {
 
   await maybeClaimLegacyBoard(env, boardId);
 
-  const token = await issueSession(env, { userId, boardId, role: "user", username, epoch: 1 });
+  /* capsFor(row) rather than nothing: signup used to issue a token with an
+     empty capability list, so a brand-new account's FIRST session carried no
+     permissions at all and only got them on its next login. The client's
+     fallback treats an empty list as full access (deliberately - see myCaps),
+     so it never locked anyone out, which is exactly why it would have gone
+     unnoticed. Caught by reading a signup token during an unrelated probe. */
+  const token = await issueSession(env, {
+    userId, boardId, role: "user", username, epoch: 1,
+    caps: capsFor(row), gexp: guestExpiry(row),
+  });
   return json({ ok: true, token, user: publicUser(row) }, 201);
 }
 
