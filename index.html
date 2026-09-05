@@ -597,6 +597,7 @@ header h1{font-size:26px;letter-spacing:.3px}
 .tabbar .tab:nth-child(3){z-index:3}
 .tabbar .tab:nth-child(4){z-index:2}
 .tabbar .tab:nth-child(5){z-index:1}
+.tabbar .tab:nth-child(6){z-index:0}
 .tab:not(.on):hover{background:var(--panel);color:var(--ink)}
 /* Qualified as .tabbar .tab.on so it matches the nth-child rules above at
    (0,3,0) and wins on source order - as plain .tab.on it lost, and the active
@@ -655,7 +656,7 @@ header h1{font-size:26px;letter-spacing:.3px}
 }
 
 
-body.view-reports .board-only,body.view-history .board-only,body.view-cal .board-only,body.view-exp .board-only{display:none}
+body.view-reports .board-only,body.view-history .board-only,body.view-cal .board-only,body.view-exp .board-only,body.view-admin .board-only{display:none}
 /* #view-reports itself is shown/hidden by toggling its `hidden` attribute in
    setView() - a CSS rule here can't win against the UA [hidden]{display:none}
    without matching or exceeding its specificity, so don't add one. */
@@ -828,7 +829,7 @@ body.view-reports .board-only,body.view-history .board-only,body.view-cal .board
 .ag-msg{display:none;margin-bottom:14px;padding:10px 12px;border-radius:8px;font-size:12.5px;line-height:1.5}
 .ag-msg.on{display:block}
 .ag-msg.err{background:var(--alert-lt);color:var(--alert-ink);border:1px solid var(--alert)}
-.ag-msg.ok{background:var(--olive-lt);color:var(--forest-dk);border:1px solid var(--olive)}
+.ag-msg.ok{background:var(--olive-lt);color:var(--forest-ink);border:1px solid var(--olive)}
 .ag-q{font-weight:600;color:var(--ink);font-size:13.5px;margin:0 0 14px;padding:10px 12px;
   background:var(--ivory);border-radius:8px;border:1px solid var(--line)}
 /* Signed-in identity in the header, so "whose board is this?" is answerable
@@ -1326,6 +1327,9 @@ return {
     <button class="tab" id="tabExp" role="tab" aria-selected="false" aria-controls="viewPanel" tabindex="-1"><span class="tab-lg">Expense Tracker</span><span class="tab-sm">Expenses</span></button>
     <button class="tab" id="tabReports" role="tab" aria-selected="false" aria-controls="viewPanel" tabindex="-1">Reports</button>
     <button class="tab" id="tabHistory" role="tab" aria-selected="false" aria-controls="viewPanel" tabindex="-1"><span class="tab-lg">Board </span>History</button>
+    <!-- Super Admin only. Starts hidden and applyAccess() reveals it, so the
+         default for every account that has not proved otherwise is "absent". -->
+    <button class="tab" id="tabAdmin" role="tab" aria-selected="false" aria-controls="viewPanel" tabindex="-1" hidden><span class="tab-lg">User &amp; Role Management</span><span class="tab-sm">Users</span></button>
   </nav>
 
   <div class="viewpanel" id="viewPanel" role="tabpanel" aria-labelledby="tabBoard" tabindex="-1">
@@ -1668,7 +1672,7 @@ return {
   .cal-rd{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.5;white-space:pre-wrap}
   .cal-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
   .cal-tag{font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:999px;background:var(--ivory);color:var(--muted)}
-  .cal-tag.rep{background:var(--olive-lt);color:var(--forest-dk)}
+  .cal-tag.rep{background:var(--olive-lt);color:var(--forest-ink)}
   .cal-tag.must{background:var(--alert-lt);color:var(--alert-ink)}
   .cal-actions{margin-left:auto;display:flex;gap:6px;flex-shrink:0}
   .cal-tick{width:22px;height:22px;flex-shrink:0;cursor:pointer;margin-top:1px}
@@ -1679,7 +1683,7 @@ return {
   .cal-mini h4{font-size:12.5px;margin:0 0 7px;color:var(--forest-ink);font-weight:700;cursor:pointer}
   .cal-mgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
   .cal-md{font-size:9.5px;text-align:center;padding:3px 0;border-radius:3px;color:var(--muted);cursor:pointer;position:relative}
-  .cal-md.has{background:var(--olive-lt);color:var(--forest-dk);font-weight:700}
+  .cal-md.has{background:var(--olive-lt);color:var(--forest-ink);font-weight:700}
   .cal-md.busy{background:var(--forest);color:var(--on-brand);font-weight:700}
   .cal-md.today{outline:2px solid var(--terra)}
   .cal-md.pad{visibility:hidden}
@@ -1801,7 +1805,7 @@ return {
   .xq-extra{margin-top:9px;padding-top:10px;border-top:1px dashed var(--olive)}
   .xq-row{display:flex;gap:10px}
   .xq-row>.ag-f{flex:1;min-width:0}
-  .xq-extra .ag-f label{color:var(--forest-dk)}
+  .xq-extra .ag-f label{color:var(--forest-ink)}
 
   /* Three totals, biggest first. Serif numerals to match the header stats. */
   .xsum{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
@@ -1944,6 +1948,34 @@ return {
     </div>
   </div>
 
+
+  <!-- ================= USER & ROLE MANAGEMENT =================================
+       Super Admin only. The tab is hidden without the `admin` capability and
+       setView() refuses the view outright, but neither of those is the actual
+       boundary: every route behind this screen calls requireCap(session,"admin")
+       on the Worker, which reads the role out of a signed token rather than out
+       of anything the browser sends. Forging a capability list in devtools gets
+       you an empty panel and a 403, not an admin screen.
+
+       Master-detail rather than a row of inline controls: "select a user and
+       immediately see and modify their access" needs one place showing that
+       person's whole picture, and permissions in particular need room to say
+       what each one grants. Collapses to a single column under 860px.      -->
+  <div id="view-admin" hidden>
+    <div class="card">
+      <h2>User &amp; Role Management <span class="cnt" id="umCnt">0</span></h2>
+      <div class="sub">Accounts live in the Google Sheet; this reads and writes them through the Worker. Any change to a role, a status or a permission signs that person out everywhere, so it lands on their next request instead of whenever their token happens to lapse.</div>
+      <div class="pf-msg" id="umMsg"></div>
+
+      <div class="um-wrap">
+        <div>
+          <input id="umSearch" class="um-search" placeholder="Search name, username or email" aria-label="Search accounts" autocomplete="off">
+          <div class="um-list" id="umList" role="listbox" aria-label="Accounts"></div>
+        </div>
+        <div class="um-detail" id="umDetail"></div>
+      </div>
+    </div>
+  </div>
   </div><!-- /.viewpanel : closes the sheet opened just under the tab strip -->
 
   <style>
@@ -1953,7 +1985,7 @@ return {
   .pf-role{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.7px;
     text-transform:uppercase;padding:3px 9px;border-radius:999px;
     background:var(--ivory);border:1px solid var(--line);color:var(--muted)}
-  .pf-role.sa{background:var(--olive-lt);border-color:var(--olive);color:var(--forest-dk)}
+  .pf-role.sa{background:var(--olive-lt);border-color:var(--olive);color:var(--forest-ink)}
   .pf-role.guest{background:var(--terra-lt);border-color:var(--terra);color:var(--terra-ink)}
   .pf-head{display:flex;align-items:center;gap:11px;margin-bottom:14px}
   .pf-av{width:42px;height:42px;border-radius:50%;flex:none;display:flex;align-items:center;
@@ -1970,47 +2002,125 @@ return {
   .pf-sec .sub{margin:0 0 10px}
   .pf-caps{display:flex;flex-wrap:wrap;gap:5px}
   .pf-cap{font-size:10.5px;font-weight:600;padding:3px 9px;border-radius:999px;
-    background:var(--olive-lt);color:var(--forest-dk);border:1px solid var(--olive)}
+    background:var(--olive-lt);color:var(--forest-ink);border:1px solid var(--olive)}
   .pf-cap.off{background:var(--ivory);color:var(--muted);border-color:var(--line);
     text-decoration:line-through;opacity:.75}
 
-  /* Admin user list */
-  .pf-u{display:flex;align-items:flex-start;gap:10px;padding:9px 0;
+  /* ---- User & Role Management (the tab; see #view-admin) -----------------
+     Master-detail. The list column is capped rather than fluid so the detail
+     panel - which carries the permission descriptions and needs the width -
+     gets everything left over. One column under 860px, where two would leave
+     neither side readable. */
+  .um-wrap{display:grid;grid-template-columns:minmax(0,290px) minmax(0,1fr);
+    gap:16px;align-items:start;margin-top:14px}
+  @media(max-width:860px){.um-wrap{grid-template-columns:minmax(0,1fr)}}
+  .um-search{width:100%;box-sizing:border-box;font-size:12.5px;padding:8px 11px;
+    border:1px solid var(--line);border-radius:9px;background:var(--paper);color:var(--ink)}
+  .um-search:focus{outline:2px solid var(--forest-ink);outline-offset:-1px}
+  .um-list{margin-top:9px;border:1px solid var(--line);border-radius:11px;
+    background:var(--paper);overflow:hidden}
+  .um-row{display:flex;align-items:center;gap:9px;width:100%;box-sizing:border-box;
+    text-align:left;padding:9px 11px;border:0;border-bottom:1px solid var(--line);
+    background:transparent;color:var(--ink);font:inherit;cursor:pointer}
+  .um-row:last-child{border-bottom:0}
+  .um-row:hover{background:var(--ivory)}
+  /* inset shadow rather than a border-left: a border would shift the text by
+     3px on selection and make the whole list twitch as you move down it. */
+  .um-row.on{background:var(--olive-lt);box-shadow:inset 3px 0 0 var(--forest)}
+  .um-row:focus-visible{outline:2px solid var(--forest-ink);outline-offset:-2px}
+  .um-av{flex:none;width:28px;height:28px;border-radius:9px;display:grid;place-items:center;
+    font-size:12px;font-weight:800;background:var(--ivory);color:var(--muted)}
+  .um-row.on .um-av{background:var(--forest);color:var(--on-brand)}
+  .um-rt{flex:1;min-width:0}
+  /* Both are spans, because a <button> may not contain a <div>. Without an
+     explicit display they stay inline and the name runs into the subtitle. */
+  .um-rn{display:block;font-size:12.5px;font-weight:700;overflow-wrap:anywhere;line-height:1.3}
+  .um-rs{display:block;font-size:11px;color:var(--muted);overflow-wrap:anywhere;
+    line-height:1.35;margin-top:1px}
+  .um-dot{flex:none;width:8px;height:8px;border-radius:50%;background:var(--olive)}
+  .um-dot.inactive{background:var(--sage)}
+  .um-dot.deactivated{background:var(--alert)}
+  .um-empty{padding:14px;font-size:12px;color:var(--muted)}
+
+  .um-detail{border:1px solid var(--line);border-radius:11px;background:var(--paper);
+    padding:15px 17px;min-width:0}
+  .um-none{font-size:12.5px;color:var(--muted);padding:18px 2px;line-height:1.6}
+  .um-hd{display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+  .um-hd-av{flex:none;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;
+    font-size:17px;font-weight:800;background:var(--forest);color:var(--on-brand)}
+  .um-hd-n{font-size:16px;font-weight:800;overflow-wrap:anywhere;line-height:1.25}
+  .um-hd-u{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+  .um-sec{border-top:1px solid var(--line);margin-top:15px;padding-top:14px}
+  .um-sec h4{margin:0 0 3px;font-size:10.5px;font-weight:800;letter-spacing:.9px;
+    text-transform:uppercase;color:var(--muted)}
+  .um-sec .sub{margin:0 0 9px}
+  .um-facts{display:grid;grid-template-columns:auto minmax(0,1fr);gap:3px 14px;
+    margin:0;font-size:12px}
+  .um-facts dt{color:var(--muted)}
+  .um-facts dd{margin:0;overflow-wrap:anywhere}
+  .um-roles{display:flex;gap:7px;flex-wrap:wrap}
+  /* Three cards rather than a dropdown: three roles is few enough to show at
+     once, and what each one means should not need a click to find out. */
+  .um-role{flex:1;min-width:112px;border:1px solid var(--line);border-radius:10px;
+    background:var(--paper);padding:9px 10px;text-align:left;cursor:pointer;font:inherit}
+  .um-role:hover:not(:disabled){border-color:var(--olive)}
+  .um-role:disabled{opacity:.55;cursor:not-allowed}
+  .um-role.on{border-color:var(--forest);background:var(--olive-lt);
+    box-shadow:inset 0 0 0 1px var(--forest)}
+  .um-role-t{font-size:12.5px;font-weight:700;color:var(--ink)}
+  .um-role.on .um-role-t{color:var(--forest-ink)}
+  .um-role-d{font-size:10.5px;color:var(--muted);line-height:1.4;margin-top:2px}
+  .um-perm{display:flex;align-items:flex-start;gap:10px;padding:9px 0;
     border-bottom:1px dashed var(--line)}
-  .pf-u:last-child{border-bottom:none}
-  .pf-u-m{flex:1;min-width:0}
-  .pf-u-n{font-size:13px;font-weight:600;color:var(--ink);overflow-wrap:anywhere}
-  .pf-u-s{font-size:11px;color:var(--muted);margin-top:2px;overflow-wrap:anywhere}
-  .pf-u-c{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
-  .pf-u-c select,.pf-u-c button{font-size:11px;border:1px solid var(--line);border-radius:7px;
-    padding:3px 8px;background:var(--paper);color:var(--ink)}
-  .pf-u-c button:hover{border-color:var(--olive);color:var(--forest-ink)}
-  .pf-st{font-size:9.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;
-    padding:2px 7px;border-radius:999px;flex:none;margin-top:1px}
-  .pf-st.active{background:var(--olive-lt);color:var(--forest-dk)}
-  .pf-st.inactive{background:var(--ivory);color:var(--muted);border:1px solid var(--line)}
-  .pf-st.deactivated{background:var(--alert-lt);color:var(--alert-ink)}
-  .pf-me{font-size:10px;color:var(--muted);font-weight:700}
+  .um-perm:last-child{border-bottom:0}
+  .um-perm input{flex:none;margin:2px 0 0;width:16px;height:16px;accent-color:var(--forest)}
+  .um-perm-b{flex:1;min-width:0;cursor:pointer}
+  .um-perm-t{display:block;font-size:12.5px;font-weight:600;overflow-wrap:anywhere}
+  .um-perm-d{display:block;font-size:11px;color:var(--muted);line-height:1.45;
+    overflow-wrap:anywhere;margin-top:1px}
+  /* Green marks a grant, orange a revoke - the same meanings they carry
+     everywhere else here. An unmarked row is simply what the role gives. */
+  .um-tag{font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;
+    padding:1px 6px;border-radius:999px;margin-left:6px;white-space:nowrap;
+    vertical-align:1px}
+  .um-tag.add{background:var(--olive-lt);color:var(--forest-ink)}
+  .um-tag.rm{background:var(--terra-lt);color:var(--terra-ink)}
+  .um-acts{display:flex;gap:7px;flex-wrap:wrap}
+  .um-btn{font-size:12px;font-weight:600;border:1px solid var(--line);border-radius:9px;
+    padding:6px 12px;background:var(--paper);color:var(--ink);cursor:pointer}
+  .um-btn:hover:not(:disabled){border-color:var(--olive);color:var(--forest-ink)}
+  .um-btn:disabled{opacity:.5;cursor:not-allowed}
+  .um-btn.warn{border-color:var(--terra);color:var(--terra-ink)}
+  .um-btn.warn:hover:not(:disabled){background:var(--terra);color:var(--on-warm);
+    border-color:var(--terra)}
+  .um-note{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.5}
+  .um-self{font-size:9.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;
+    background:var(--ivory);color:var(--muted);padding:2px 7px;border-radius:999px}
+  .um-st{font-size:9.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;
+    padding:2px 7px;border-radius:999px}
+  .um-st.active{background:var(--olive-lt);color:var(--forest-ink)}
+  .um-st.inactive{background:var(--ivory);color:var(--muted);border:1px solid var(--line)}
+  .um-st.deactivated{background:var(--alert-lt);color:var(--alert-ink)}
   /* Terracotta, not red: handing out a credential is a consequential action to
      be read carefully, not an error. Red stays reserved for things that have
      gone wrong. */
-  .pf-temp{margin-top:9px;padding:9px 11px;border-radius:9px;
+  .um-temp{margin-top:11px;padding:10px 12px;border-radius:9px;
     background:var(--terra-lt);border:1px solid var(--terra)}
-  .pf-temp-l{font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;
-    color:var(--terra-ink);margin-bottom:6px}
-  .pf-temp-v{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-  .pf-temp-v code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:15px;
+  .um-temp-l{font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;
+    color:var(--terra-ink);margin-bottom:7px}
+  .um-temp-v{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .um-temp-v code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:16px;
     font-weight:700;letter-spacing:1px;color:var(--ink);background:var(--paper);
     border:1px solid var(--terra);border-radius:7px;padding:5px 10px;user-select:all;
     overflow-wrap:anywhere}
-  .pf-temp-c{font-size:11px;border:1px solid var(--terra);border-radius:7px;padding:4px 10px;
-    background:var(--paper);color:var(--terra-ink);font-weight:600}
-  .pf-temp-c:hover{background:var(--terra);color:var(--on-warm)}
-  .pf-temp-n{font-size:11px;color:var(--terra-ink);margin-top:6px;line-height:1.45}
+  .um-temp-c{font-size:11px;border:1px solid var(--terra);border-radius:7px;padding:4px 10px;
+    background:var(--paper);color:var(--terra-ink);font-weight:600;cursor:pointer}
+  .um-temp-c:hover{background:var(--terra);color:var(--on-warm)}
+  .um-temp-n{font-size:11px;color:var(--terra-ink);margin-top:7px;line-height:1.45}
   .pf-msg{display:none;margin:10px 0;padding:9px 11px;border-radius:8px;font-size:12.5px}
   .pf-msg.on{display:block}
   .pf-msg.err{background:var(--alert-lt);color:var(--alert-ink);border:1px solid var(--alert)}
-  .pf-msg.ok{background:var(--olive-lt);color:var(--forest-dk);border:1px solid var(--olive)}
+  .pf-msg.ok{background:var(--olive-lt);color:var(--forest-ink);border:1px solid var(--olive)}
   @media(max-width:620px){ .pf-grid{grid-template-columns:1fr;gap:1px 0}
     .pf-grid dt{margin-top:7px} }
   </style>
@@ -2041,10 +2151,11 @@ return {
       </div>
 
       <div class="pf-sec" id="pfAdminSec" hidden>
-        <h4>People</h4>
-        <div class="sub">Change a role or status and that person is signed out everywhere, so it takes effect on their next request rather than whenever their token happens to lapse.</div>
-        <div class="pf-msg" id="pfMsg"></div>
-        <div id="pfUsers"></div>
+        <h4>Managing people</h4>
+        <div class="sub">Roles, permissions and password resets have their own tab, so there is one place that answers who can reach what.</div>
+        <div class="um-acts" style="margin-top:9px">
+          <button type="button" class="um-btn" id="pfGoAdmin">Open User &amp; Role Management</button>
+        </div>
       </div>
 
       <div class="am-actions">
@@ -2555,7 +2666,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="3.4";
+var APP_VERSION="3.5";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -2566,6 +2677,7 @@ var APP_VERSION="3.4";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-06T02:10:00+08:00",text:"New User & Role Management tab, for Super Admins only. It lists every account and, for whichever one you pick, shows the account itself, its role, exactly which tabs it can reach, and a password reset -- each in its own section. Roles are Super Admin, User and Guest, and you can now tick individual tabs on or off for one person without moving them to a different role; a small tag marks wherever someone differs from what their role would normally give. Your own row is deliberately read-only, so you cannot lock yourself out. Everything that used to sit in the profile panel moved here."},
   {ts:"2026-09-06T00:35:00+08:00",text:"A Super Admin can now issue someone a temporary password. If a person cannot get in and Forgot password is not working for them, open your profile, find them in the people list and press Temp password. You are shown a password once, to pass on to them however you like -- it is not stored anywhere and cannot be looked up again, so if you lose it just issue another. Their old password stops working straight away, they are signed out on every device, and any lockout on their account is cleared so the new password actually works."},
   {ts:"2026-09-05T07:20:00+08:00",text:"Click your name in the header to open your profile: it shows your role, what you can reach, and -- if you are the Super Admin -- everyone else's accounts, where you can change a role, deactivate someone, or restart a guest's 48 hours. Three roles now exist: Super Admin sees everything, User gets the board, calendar, expenses and the app version history, and Guest gets the board, calendar and expenses for 48 hours before access lapses on its own."},
   {ts:"2026-09-05T06:10:00+08:00",text:"The Classic view / Consolidated checklist switcher is now a pair of pennant tabs -- banner shapes with a downward point, an icon and an uppercase label. The one you are on is brand green, the other sits back in neutral grey. Long links in the Now bar also wrap properly instead of stretching the page."},
@@ -4043,12 +4155,13 @@ var CAP_TABS = {
   cal:    "tabCal",
   exp:    "tabExp",
   reports:"tabReports",
-  history:"tabHistory"
+  history:"tabHistory",
+  admin:  "tabAdmin"
 };
 var CAP_LABELS = {
   board:"Board", cal:"Personal Calendar", exp:"Expense Tracker",
   reports:"Reports", history:"Board History",
-  "history.appver":"App version history", admin:"Manage people"
+  "history.appver":"App version history", admin:"User & Role Management"
 };
 var ROLE_LABELS = {superadmin:"Super Admin", user:"User", guest:"Guest"};
 
@@ -4092,7 +4205,6 @@ function applyAccess(){
 
 /* ---------------- the profile panel ---------------- */
 function pfEl(id){return document.getElementById(id);}
-function pfMsg(t,kind){var m=pfEl("pfMsg");m.textContent=t||"";m.className="pf-msg"+(t?" on "+(kind||"err"):"");}
 /* Named pfWhen, not fmtWhen: Board History already declares a fmtWhen further
    down that returns HTML (<b> wrapped). Function declarations hoist and the
    last one wins, so an identically-named helper here was silently replaced by
@@ -4133,101 +4245,345 @@ function openProfile(){
     return '<span class="pf-cap'+(on?"":" off")+'">'+esc(CAP_LABELS[c])+'</span>';
   }).join("");
 
-  var admin=can("admin");
-  pfEl("pfAdminSec").hidden=!admin;
+  pfEl("pfAdminSec").hidden=!can("admin");
   pfEl("profModal").hidden=false;
-  pfMsg("");
-  if(admin)loadAdminUsers();
 }
 function closeProfile(){ pfEl("profModal").hidden=true; }
 
-function loadAdminUsers(){
-  pfEl("pfUsers").innerHTML='<div class="sub">Loading…</div>';
+/* ==================== USER & ROLE MANAGEMENT ==============================
+   The Super Admin screen. Three things are being managed and they are kept
+   visually separate because they fail differently: an account (who this is and
+   whether they may sign in at all), a role (the default bundle of access), and
+   permissions (per-person departures from that bundle).
+
+   WHAT IS AND IS NOT A BOUNDARY, because it decides what this code is for.
+   Every tab except this one renders the signed-in person's OWN board. Turning
+   one off is policy: it simplifies their screen, it does not protect data that
+   was already theirs, and a determined person can un-hide a tab from devtools.
+   The two things that genuinely are boundaries - reaching another account's row,
+   and the guest clock - are enforced by the Worker against a signed token, so
+   a forged capability list gets a 403 rather than an admin panel.
+
+   Nothing here keeps its own copy of the rules. The role defaults arrive from
+   the Worker with the user list (res.caps) so this screen cannot drift out of
+   step with the server's CAPS table the first time a capability is added. */
+
+/* The capabilities offered as toggles, in tab order, each with what it
+   actually grants. `admin` is deliberately absent: it is what the Super Admin
+   role means, so granting it to a "User" would produce an account whose badge
+   contradicts what it can do. Overrides on it made by hand in the sheet are
+   still preserved - see umOverrides. */
+var UM_PERMS=[
+  ["board","Board","Lanes, tasks, the shift timeline and the daily reminders."],
+  ["cal","My Personal Calendar","Month, week, day, year and agenda views, and recurring activities."],
+  ["exp","Expense Tracker","Recording expenses, and every total and breakdown built from them."],
+  ["reports","Reports","Completion reports, lane breakdowns and the spreadsheet export."],
+  ["history","Board History","The full audit trail of every change made to the board."],
+  ["history.appver","App version history","The plain-English changelog of the app itself. Grants the Board History tab on its own, showing only this section and none of the audit trail."]
+];
+var UM_ROLE_DESC={
+  superadmin:"Everything, including this screen.",
+  user:"Whatever the permissions below allow.",
+  guest:"Same, but access lapses 48 hours after activation."
+};
+var UM_STATUS_DESC={
+  active:"Can sign in normally.",
+  inactive:"Kept on the books, cannot sign in.",
+  deactivated:"Cannot sign in. Guests land here automatically when their 48 hours run out."
+};
+
+// users: last list from the server. roleCaps: the server's CAPS table.
+// sel: selected userId. q: the search box.
+var UM={users:null,roleCaps:null,sel:null,q:"",busy:false};
+
+function umEl(id){return document.getElementById(id);}
+function umMsg(t,kind){var m=umEl("umMsg");if(!m)return;
+  m.textContent=t||"";m.className="pf-msg"+(t?" on "+(kind||"err"):"");}
+
+function umLoad(){
+  umEl("umList").innerHTML='<div class="um-empty">Loading&hellip;</div>';
   PDAuth.api("/admin/users").then(function(res){
-    renderAdminUsers(res.users||[]);
+    UM.users=res.users||[];
+    UM.roleCaps=res.caps||{};
+    umRender();
   }).catch(function(err){
-    pfEl("pfUsers").innerHTML="";
-    pfMsg(err.offline?"Can't reach the server — the people list needs a connection.":err.message);
+    UM.users=null;
+    umEl("umList").innerHTML='<div class="um-empty">&mdash;</div>';
+    umEl("umDetail").innerHTML='<div class="um-none">Could not load the account list.</div>';
+    umMsg(err.offline?"Can't reach the server — this screen needs a connection.":err.message);
   });
 }
 
-function renderAdminUsers(users){
-  var meId=(PDAuth.user()||{}).userId;
-  pfEl("pfUsers").innerHTML=users.map(function(u){
-    var isMe=u.userId===meId;
-    var bits=["@"+u.username];
-    if(u.email)bits.push(u.email);
-    if(u.lastLoginAt)bits.push("last in "+pfWhen(u.lastLoginAt));
-    if(u.guestExpiresAt)bits.push(u.guestExpired?"guest access expired":"guest until "+pfWhen(u.guestExpiresAt));
-    return '<div class="pf-u" data-uid="'+esc(u.userId)+'">'+
-      '<div class="pf-u-m">'+
-        '<div class="pf-u-n">'+esc(u.name||u.username)+
-          (isMe?' <span class="pf-me">YOU</span>':'')+'</div>'+
-        '<div class="pf-u-s">'+esc(bits.join(" · "))+'</div>'+
-        '<div class="pf-u-c">'+
-          '<select data-arole'+(isMe?' disabled title="You cannot change your own role"':'')+'>'+
-            ["superadmin","user","guest"].map(function(r){
-              return '<option value="'+r+'"'+(u.role===r?" selected":"")+'>'+ROLE_LABELS[r]+'</option>';
-            }).join("")+
-          '</select>'+
-          '<select data-astatus'+(isMe?' disabled title="You cannot change your own status"':'')+'>'+
-            ["active","inactive","deactivated"].map(function(s){
-              return '<option value="'+s+'"'+(u.status===s?" selected":"")+'>'+s.charAt(0).toUpperCase()+s.slice(1)+'</option>';
-            }).join("")+
-          '</select>'+
-          (u.role==="guest"?'<button data-areset>Restart 48h</button>':'')+
-          '<button data-atemp>Temp password</button>'+
-        '</div>'+
-      '</div>'+
-      '<span class="pf-st '+esc(u.status)+'">'+esc(u.status)+'</span>'+
-    '</div>';
-  }).join("")||'<div class="sub">No accounts found.</div>';
+function umFind(id){
+  var us=UM.users||[];
+  for(var i=0;i<us.length;i++)if(us[i].userId===id)return us[i];
+  return null;
+}
+function umInitial(u){
+  var n=(u.name||u.username||"?").trim();
+  return (n.charAt(0)||"?").toUpperCase();
+}
 
-  pfEl("pfUsers").querySelectorAll(".pf-u").forEach(function(row){
-    var uid=row.dataset.uid;
-    var rs=row.querySelector("[data-arole]"), ss=row.querySelector("[data-astatus]");
-    if(rs)rs.addEventListener("change",function(){ adminPatch(uid,{role:rs.value}); });
-    if(ss)ss.addEventListener("change",function(){ adminPatch(uid,{status:ss.value}); });
-    var rb=row.querySelector("[data-areset]");
-    if(rb)rb.addEventListener("click",function(){ adminPatch(uid,{resetGuestClock:true}); });
-    var tb=row.querySelector("[data-atemp]");
-    if(tb)tb.addEventListener("click",function(){ issueTempPassword(uid,row); });
+/* Rebuild a row's stored `perms` overrides from the difference between its
+   effective capabilities and its role's defaults, because the server sends the
+   result rather than the override object. Lossless for anything that changes
+   behaviour: an override that merely restates a role default is indistinguish-
+   able from no override AND behaves identically, so dropping it is a tidy-up
+   rather than a loss. Derived over the union of both sets, which is what keeps
+   an `admin` override set by hand in the sheet from being silently discarded
+   the next time someone ticks an unrelated box. */
+function umOverrides(u){
+  var def={},eff={},all={},out={};
+  ((UM.roleCaps||{})[u.role]||[]).forEach(function(c){def[c]=1;all[c]=1;});
+  (u.caps||[]).forEach(function(c){eff[c]=1;all[c]=1;});
+  Object.keys(all).forEach(function(c){
+    if(eff[c]&&!def[c])out[c]=true;
+    else if(!eff[c]&&def[c])out[c]=false;
+  });
+  return out;
+}
+function umRoleGrants(u,cap){
+  return ((UM.roleCaps||{})[u.role]||[]).indexOf(cap)>=0;
+}
+
+function umMatches(u,q){
+  if(!q)return true;
+  return ((u.name||"")+" "+(u.username||"")+" "+(u.email||"")+" "+(u.role||""))
+    .toLowerCase().indexOf(q)>=0;
+}
+
+function umRender(){
+  var us=UM.users||[];
+  umEl("umCnt").textContent=us.length;
+  var q=UM.q.trim().toLowerCase();
+  var shown=us.filter(function(u){return umMatches(u,q);});
+  // Keep a selection only while it is still on screen, so the detail panel can
+  // never describe someone the list is no longer showing.
+  if(UM.sel&&!shown.some(function(u){return u.userId===UM.sel;}))UM.sel=null;
+  if(!UM.sel&&shown.length)UM.sel=shown[0].userId;
+  umRenderList(shown);
+  umRenderDetail();
+}
+
+function umRenderList(shown){
+  var meId=(PDAuth.user()||{}).userId;
+  umEl("umList").innerHTML=shown.map(function(u){
+    var sub=["@"+u.username];
+    if(u.email)sub.push(u.email);
+    return '<button type="button" class="um-row'+(u.userId===UM.sel?" on":"")+'" '+
+      'data-uid="'+esc(u.userId)+'" role="option" aria-selected="'+(u.userId===UM.sel)+'">'+
+      '<span class="um-av">'+esc(umInitial(u))+'</span>'+
+      '<span class="um-rt">'+
+        '<span class="um-rn">'+esc(u.name||u.username)+
+          (u.userId===meId?' <span class="um-self">You</span>':'')+'</span>'+
+        '<span class="um-rs">'+esc(ROLE_LABELS[u.role]||u.role)+' &middot; '+esc(sub.join(" · "))+'</span>'+
+      '</span>'+
+      '<span class="um-dot '+esc(u.status)+'" title="'+esc(u.status)+'"></span>'+
+    '</button>';
+  }).join("")||'<div class="um-empty">No accounts match that search.</div>';
+
+  umEl("umList").querySelectorAll(".um-row").forEach(function(b){
+    b.addEventListener("click",function(){ UM.sel=b.dataset.uid; umRender(); });
+  });
+}
+
+function umRenderDetail(){
+  var host=umEl("umDetail");
+  var u=UM.sel?umFind(UM.sel):null;
+  if(!u){
+    host.innerHTML='<div class="um-none">Select an account on the left to see and change what it can reach.</div>';
+    return;
+  }
+  var isMe=u.userId===(PDAuth.user()||{}).userId;
+  var ov=umOverrides(u);
+
+  var facts=[["Username","@"+u.username]];
+  if(u.email)facts.push(["Email",u.email]);
+  facts.push(["Account id",u.userId]);
+  facts.push(["Created",pfWhen(u.createdAt)]);
+  facts.push(["Last signed in",u.lastLoginAt?pfWhen(u.lastLoginAt):"never"]);
+  if(u.lockedUntil&&u.lockedUntil>Date.now())
+    facts.push(["Locked until",pfWhen(u.lockedUntil)]);
+  if(u.guestExpiresAt)
+    facts.push(["Guest access",(u.guestExpired?"expired ":"ends ")+pfWhen(u.guestExpiresAt)]);
+
+  var h='<div class="um-hd">'+
+      '<div class="um-hd-av">'+esc(umInitial(u))+'</div>'+
+      '<div style="min-width:0">'+
+        '<div class="um-hd-n">'+esc(u.name||u.username)+'</div>'+
+        '<div class="um-hd-u">@'+esc(u.username)+'</div>'+
+      '</div>'+
+      '<div style="margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap">'+
+        (isMe?'<span class="um-self">Your account</span>':'')+
+        '<span class="um-st '+esc(u.status)+'">'+esc(u.status)+'</span>'+
+      '</div>'+
+    '</div>';
+
+  /* ---- Account ---- */
+  h+='<div class="um-sec"><h4>Account</h4>'+
+    '<dl class="um-facts">'+facts.map(function(f){
+      return "<dt>"+esc(f[0])+"</dt><dd>"+esc(f[1])+"</dd>";}).join("")+'</dl>'+
+    '<div class="um-sec" style="border-top:0;margin-top:11px;padding-top:0">'+
+      '<label class="um-perm-t" for="umStatus">Status</label>'+
+      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:5px">'+
+        '<select class="um-search" id="umStatus" style="width:auto;min-width:150px"'+
+          (isMe?' disabled title="You cannot change your own status"':'')+'>'+
+          ["active","inactive","deactivated"].map(function(s){
+            return '<option value="'+s+'"'+(u.status===s?" selected":"")+'>'+
+              s.charAt(0).toUpperCase()+s.slice(1)+'</option>';}).join("")+
+        '</select>'+
+        (u.role==="guest"?'<button type="button" class="um-btn" id="umGuest">Restart 48 hours</button>':'')+
+      '</div>'+
+      '<div class="um-note">'+esc(UM_STATUS_DESC[u.status]||"")+
+        (isMe?" You cannot deactivate your own account — there is no way back in short of editing the sheet by hand.":"")+'</div>'+
+    '</div>'+
+  '</div>';
+
+  /* ---- Role ---- */
+  h+='<div class="um-sec"><h4>Role</h4>'+
+    '<div class="sub">The starting set of access. Permissions below adjust it for this person without moving them to a different role.</div>'+
+    '<div class="um-roles">'+
+      ["superadmin","user","guest"].map(function(r){
+        return '<button type="button" class="um-role'+(u.role===r?" on":"")+'" data-role="'+r+'"'+
+          (isMe?' disabled title="You cannot change your own role"':'')+
+          ' aria-pressed="'+(u.role===r)+'">'+
+          '<div class="um-role-t">'+esc(ROLE_LABELS[r])+'</div>'+
+          '<div class="um-role-d">'+esc(UM_ROLE_DESC[r])+'</div>'+
+        '</button>';
+      }).join("")+
+    '</div>'+
+    (isMe?'<div class="um-note">You cannot remove your own Super Admin role. Promote a second account first if you want to step down.</div>':'')+
+  '</div>';
+
+  /* ---- Permissions ---- */
+  var anyOv=Object.keys(ov).length>0;
+  h+='<div class="um-sec"><h4>Tab &amp; feature permissions</h4>'+
+    '<div class="sub">Ticked means they can reach it. A tag shows where this account departs from what its role would normally give. Managing people is not listed: that is what the Super Admin role means, so it is changed by role rather than by tick.</div>';
+  h+=UM_PERMS.map(function(p){
+    var cap=p[0],on=(u.caps||[]).indexOf(cap)>=0,def=umRoleGrants(u,cap);
+    var tag=(on&&!def)?'<span class="um-tag add">added</span>':
+            ((!on&&def)?'<span class="um-tag rm">removed</span>':"");
+    var id="umP_"+cap.replace(/\W/g,"_");
+    return '<div class="um-perm">'+
+      '<input type="checkbox" id="'+id+'" data-cap="'+esc(cap)+'"'+(on?" checked":"")+
+        (isMe?' disabled':'')+'>'+
+      '<label class="um-perm-b" for="'+id+'">'+
+        '<span class="um-perm-t">'+esc(p[1])+tag+'</span>'+
+        '<span class="um-perm-d">'+esc(p[2])+'</span>'+
+      '</label>'+
+    '</div>';
+  }).join("");
+  h+='<div class="um-acts" style="margin-top:11px">'+
+      '<button type="button" class="um-btn" id="umReset"'+(anyOv&&!isMe?"":" disabled")+'>'+
+      'Reset to '+esc(ROLE_LABELS[u.role]||u.role)+' defaults</button></div>'+
+    '<div class="um-note">'+(isMe?
+      "Your own permissions are not editable here, for the same reason your role is not.":
+      "Changing a permission signs this person out everywhere, so it takes effect on their next request.")+'</div>'+
+  '</div>';
+
+  /* ---- Password ---- */
+  h+='<div class="um-sec"><h4>Password</h4>'+
+    '<div class="sub">For someone who cannot get in and cannot use Forgot password either.</div>'+
+    '<div class="um-acts"><button type="button" class="um-btn warn" id="umTemp">Reset password</button></div>'+
+    '<div class="um-note">Generates a password, shows it to you once, and never stores it. Their current password stops working immediately and they are signed out everywhere; any lockout is cleared so the new one works.'+
+      (isMe?" On your own account that includes this session — you will be signed out.":"")+'</div>'+
+    '<div id="umTempHost"></div>'+
+  '</div>';
+
+  host.innerHTML=h;
+
+  var st=umEl("umStatus");
+  if(st&&!isMe)st.addEventListener("change",function(){
+    umPatch(u.userId,{status:st.value});});
+  var gb=umEl("umGuest");
+  if(gb)gb.addEventListener("click",function(){
+    umPatch(u.userId,{resetGuestClock:true});});
+
+  host.querySelectorAll("[data-role]").forEach(function(b){
+    if(isMe)return;
+    b.addEventListener("click",function(){
+      var r=b.dataset.role;
+      if(r===u.role)return;
+      if(r==="superadmin"&&!confirm("Make "+(u.name||u.username)+" a Super Admin?\n\n"+
+        "They will be able to change roles, permissions and passwords for every account, including yours."))return;
+      umPatch(u.userId,{role:r});
+    });
+  });
+
+  host.querySelectorAll("[data-cap]").forEach(function(cb){
+    if(isMe)return;
+    cb.addEventListener("change",function(){
+      var cap=cb.dataset.cap,want=cb.checked,next=umOverrides(u);
+      // An override is only stored where it disagrees with the role. Ticking a
+      // box back to what the role already says removes the override rather
+      // than pinning it, so a later role change still moves this person.
+      if(want===umRoleGrants(u,cap))delete next[cap]; else next[cap]=want;
+      umPatch(u.userId,{perms:next});
+    });
+  });
+
+  var rb=umEl("umReset");
+  if(rb&&!rb.disabled)rb.addEventListener("click",function(){
+    if(!confirm("Clear every permission override for "+(u.name||u.username)+
+      "?\n\nThey go back to exactly what the "+(ROLE_LABELS[u.role]||u.role)+" role gives."))return;
+    umPatch(u.userId,{perms:null});
+  });
+
+  var tb=umEl("umTemp");
+  if(tb)tb.addEventListener("click",function(){ umTempPassword(u); });
+}
+
+function umPatch(userId,patch){
+  if(UM.busy)return;
+  UM.busy=true;
+  patch.userId=userId;
+  umMsg("Saving…","ok");
+  PDAuth.api("/admin/user",{method:"POST",body:patch}).then(function(res){
+    UM.busy=false;
+    umMsg("@"+(res.user.username||"account")+" updated"+
+      (res.signedOut?" · signed out everywhere":""),"ok");
+    UM.sel=userId;
+    umLoad();   // re-read rather than patching in place: the server may have
+                // changed more than we asked for (a guest clock, a status).
+  }).catch(function(err){
+    UM.busy=false;
+    umMsg(err.message);
+    umLoad();   // put every control back to the truth
   });
 }
 
 /* The temp password comes back exactly once and is never stored, so the UI has
    to treat it as something to be copied NOW rather than looked up later. It is
-   rendered into the row itself instead of an alert(), because an alert cannot
-   be copied from on a phone and this will usually be read out or pasted into a
+   rendered into the panel instead of an alert(), because an alert cannot be
+   copied from on a phone and this will usually be read out or pasted into a
    message. */
-function issueTempPassword(userId,rowEl){
-  var name=(rowEl.querySelector(".pf-u-n")||{}).textContent||"this account";
-  if(!confirm('Issue a temporary password for '+name.replace(/\s*YOU$/,"").trim()+"?\n\n"+
+function umTempPassword(u){
+  var who=u.name||u.username;
+  if(!confirm("Reset the password for "+who+"?\n\n"+
     "Their current password stops working immediately and they are signed out everywhere. "+
     "You will see the new password once and it cannot be shown again."))return;
-  pfMsg("Generating…","ok");
-  PDAuth.api("/admin/reset-password",{method:"POST",body:{userId:userId}}).then(function(res){
-    pfMsg("");
-    var box=document.createElement("div");
-    box.className="pf-temp";
-    box.innerHTML='<div class="pf-temp-l">Temporary password for @'+esc(res.username)+
-        ' — shown once</div>'+
-      '<div class="pf-temp-v"><code>'+esc(res.tempPassword)+'</code>'+
-      '<button class="pf-temp-c" type="button">Copy</button></div>'+
-      '<div class="pf-temp-n">Give this to them directly. They should sign in with it and then '+
-      'set their own password from Forgot password.</div>';
-    var old=rowEl.querySelector(".pf-temp"); if(old)old.remove();
-    rowEl.querySelector(".pf-u-m").appendChild(box);
-    box.querySelector(".pf-temp-c").addEventListener("click",function(){
-      var t=res.tempPassword;
+  umMsg("Generating…","ok");
+  PDAuth.api("/admin/reset-password",{method:"POST",body:{userId:u.userId}}).then(function(res){
+    umMsg("");
+    var host=umEl("umTempHost"); if(!host)return;
+    host.innerHTML='<div class="um-temp">'+
+      '<div class="um-temp-l">Temporary password for @'+esc(res.username)+' — shown once</div>'+
+      '<div class="um-temp-v"><code>'+esc(res.tempPassword)+'</code>'+
+      '<button class="um-temp-c" type="button">Copy</button></div>'+
+      '<div class="um-temp-n">Give this to them directly. They should sign in with it and then set their own password from Forgot password.</div>'+
+    '</div>';
+    var code=host.querySelector("code");
+    host.querySelector(".um-temp-c").addEventListener("click",function(){
       if(navigator.clipboard&&navigator.clipboard.writeText){
-        navigator.clipboard.writeText(t).then(function(){ pfMsg("Copied","ok"); },
-          function(){ selectText(box.querySelector("code")); });
-      }else selectText(box.querySelector("code"));
+        navigator.clipboard.writeText(res.tempPassword).then(
+          function(){ umMsg("Copied","ok"); },
+          function(){ selectText(code); });
+      }else selectText(code);
     });
-    selectText(box.querySelector("code"));
-  }).catch(function(err){ pfMsg(err.message); });
+    selectText(code);
+  }).catch(function(err){ umMsg(err.message); });
 }
+
 // Fallback for the browsers and contexts where the clipboard API is unavailable
 // (file:// among them): select it so one keystroke copies.
 function selectText(el){
@@ -4235,19 +4591,13 @@ function selectText(el){
     var s=window.getSelection();s.removeAllRanges();s.addRange(r); }catch(e){}
 }
 
-function adminPatch(userId,patch){
-  patch.userId=userId;
-  pfMsg("Saving…","ok");
-  PDAuth.api("/admin/user",{method:"POST",body:patch}).then(function(res){
-    pfMsg((res.user.username||"Account")+" updated"+(res.signedOut?" · signed out everywhere":""),"ok");
-    loadAdminUsers();
-  }).catch(function(err){
-    pfMsg(err.message);
-    loadAdminUsers();   // put the selects back to the truth
-  });
-}
+umEl("umSearch").addEventListener("input",function(){
+  UM.q=this.value; umRender();});
 
 document.getElementById("whoBtn").addEventListener("click",openProfile);
+document.getElementById("pfGoAdmin").addEventListener("click",function(){
+  closeProfile(); setView("admin");
+});
 document.getElementById("pfClose").addEventListener("click",closeProfile);
 document.getElementById("profModal").addEventListener("click",function(ev){
   if(ev.target===this)closeProfile();});
@@ -4593,11 +4943,9 @@ function applyImport(d,label){
   renderHistory();
 }
 
-document.getElementById("tabBoard").addEventListener("click",function(){setView("board");});
-document.getElementById("tabCal").addEventListener("click",function(){setView("cal");});
-document.getElementById("tabExp").addEventListener("click",function(){setView("exp");});
-document.getElementById("tabReports").addEventListener("click",function(){setView("reports");});
-document.getElementById("tabHistory").addEventListener("click",function(){setView("history");});
+/* Tab clicks are bound from MAIN_TABS, next to its declaration. Five
+   hand-written bindings used to live here, which is exactly how the sixth tab
+   came to render, reveal itself to a Super Admin, and do nothing on click. */
 /* Scoped to [data-hview]. This used to bind EVERY .sub-tab - all 13 across
    three unrelated groups - so a Board or Calendar sub-tab click stripped .on
    off the other two groups and ran renderHistory() with curHView undefined.
@@ -4621,8 +4969,9 @@ document.querySelectorAll("[data-hview]").forEach(function(b){
    synchronously from local state, nothing is fetched, so there is no cost to
    landing on one. */
 document.querySelector(".tabbar").addEventListener("keydown",function(e){
-  var tabs=[].slice.call(document.querySelectorAll('.tabbar [role="tab"]'));
-  var views=["board","cal","exp","reports","history"];   // must match MAIN_TABS order
+  var views=Object.keys(MAIN_TABS).filter(function(k){
+    return !document.getElementById(MAIN_TABS[k]).hidden; });
+  var tabs=views.map(function(k){ return document.getElementById(MAIN_TABS[k]); });
   var i=tabs.indexOf(document.activeElement); if(i<0)return;
   var n;
   if(e.key==="ArrowRight")     n=(i+1)%tabs.length;
@@ -5368,12 +5717,22 @@ document.getElementById("xClearF").addEventListener("click",function(){
 
 // One place naming the main tabs, so setView and the keyboard handler
 // agree on both the order and the element ids.
-var MAIN_TABS={board:"tabBoard",cal:"tabCal",exp:"tabExp",reports:"tabReports",history:"tabHistory"};
+var MAIN_TABS={board:"tabBoard",cal:"tabCal",exp:"tabExp",reports:"tabReports",
+  history:"tabHistory",admin:"tabAdmin"};
+Object.keys(MAIN_TABS).forEach(function(k){
+  document.getElementById(MAIN_TABS[k]).addEventListener("click",function(){setView(k);});
+});
 function setView(v){
+  /* Hiding the tab is not the boundary; this is not either. The Worker refuses
+     every route behind this view without the admin capability, checked against
+     a signed token. Both exist so the app never renders a screen it would then
+     have to fill with 403s. */
+  if(v==="admin"&&!can("admin"))v="board";
   document.body.classList.toggle("view-reports",v==="reports");
   document.body.classList.toggle("view-history",v==="history");
   document.body.classList.toggle("view-cal",v==="cal");
   document.body.classList.toggle("view-exp",v==="exp");
+  document.body.classList.toggle("view-admin",v==="admin");
   // the CSS class alone can't win: the static `hidden` attribute in the markup
   // forces display:none via the UA stylesheet no matter what a class-based
   // rule says, so the attribute itself has to be flipped here.
@@ -5381,6 +5740,7 @@ function setView(v){
   document.getElementById("view-history").hidden=(v!=="history");
   document.getElementById("view-cal").hidden=(v!=="cal");
   document.getElementById("view-exp").hidden=(v!=="exp");
+  document.getElementById("view-admin").hidden=(v!=="admin");
   /* Driven from one map rather than four repeated lines, so the class, the
      aria state and the roving tabindex cannot fall out of step - which they
      would the first time someone added a fifth tab and updated only the
@@ -5395,6 +5755,9 @@ function setView(v){
   document.getElementById("viewPanel").setAttribute("aria-labelledby",MAIN_TABS[v]||"tabBoard");
   if(v==="cal")renderCalendar();
   if(v==="exp")renderExpenses();
+  // Re-read on every visit rather than caching: roles and statuses are edited
+  // from other sessions, and a stale list here is a list you act on.
+  if(v==="admin")umLoad();
   if(v==="reports")renderReportsView();
   if(v==="history"){ curHView=curHView||"log"; flushHistory(); renderHistory(); }
   else curHView=null;

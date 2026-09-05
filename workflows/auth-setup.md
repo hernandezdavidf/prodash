@@ -277,6 +277,41 @@ happens at the end:
 - **Restart 48h** in the People panel gives them another window and reactivates
   the account in one click.
 
+### The User & Role Management tab
+
+Everything below is done from that tab, which only a Super Admin can see. Pick
+an account on the left and its whole picture appears on the right, in three
+sections:
+
+- **Account** — who this is, when they were created, when they last signed in,
+  and whether they may sign in at all (Active / Inactive / Deactivated).
+- **Role** — Super Admin, User or Guest. This is the *starting* set of access.
+- **Tab & feature permissions** — tick boxes for the individual tabs. Use these
+  to give one person something their role does not normally include, or take
+  something away, without moving them to a different role. A small tag marks
+  every place an account differs from its role, so overrides are visible rather
+  than hidden in a spreadsheet cell.
+
+"Reset to X defaults" clears every override at once.
+
+**Your own row is read-only.** You cannot change your own role, status or
+permissions, and the Worker refuses it independently even if the screen is
+tampered with. There is no recovery path from a Super Admin who demotes
+themselves short of editing the sheet by hand, so it is cheaper to refuse.
+
+**Every change signs that person out everywhere.** A demotion that waited for a
+30-day token to lapse would not be a demotion, so role, status and permission
+changes all bump `session_epoch`. They come back with the new access on their
+next sign-in.
+
+**What a permission tick actually buys.** Every tab except this one shows the
+signed-in person's *own* board, so hiding one simplifies their screen rather
+than protecting anything — the data was already theirs, and someone determined
+can un-hide a tab from browser devtools. The two things that genuinely are
+enforced are the Super Admin tab itself and the guest clock, and both are
+checked by the Worker against a signed token rather than by the browser. Use the
+ticks to make the app simpler for someone, not to keep a secret from them.
+
 ### Temporary passwords
 
 When someone cannot get in and Forgot password is not working for them, open the

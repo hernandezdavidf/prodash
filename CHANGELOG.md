@@ -2,6 +2,83 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-06 — User & Role Management tab (v3.5)
+
+A Super Admin screen of its own, replacing the people list that was folded into
+the profile panel. Account, Role and Permissions are three separate sections
+because they fail differently: whether someone may sign in at all, what bundle
+of access they start from, and where this particular person departs from it.
+
+**No Worker changes.** `adminUpdateUser` already accepted, validated and stored
+a `perms` object and already bumped the session epoch for it — the column was
+being read by `capsFor()` and written by nothing. This is the UI that was
+missing, not new machinery.
+
+**The client never keeps its own copy of the rules.** Role defaults arrive with
+the user list (`res.caps`, the Worker's own `CAPS` table), so the screen cannot
+drift out of step with the server the first time a capability is added.
+
+**Overrides are derived, not stored twice.** The Worker returns effective
+capabilities rather than the override object, so the screen reconstructs the
+overrides by differencing effective against role defaults. Lossless for anything
+that changes behaviour: an override that merely restates a role default is both
+indistinguishable from no override and identical in effect, so dropping it is a
+tidy-up. Ticking a box back to what the role already says therefore *removes* the
+override rather than pinning it — which matters, because a pinned value would
+silently stop a later role change from moving that person. Derivation runs over
+the union of both sets, so an `admin` override typed into the sheet by hand
+survives an unrelated tick; verified.
+
+**`admin` is not offered as a tick.** It is what the Super Admin role means, and
+granting it to a "User" would produce an account whose badge contradicts what it
+can do. Role is the way to grant it.
+
+### What is and is not a boundary
+
+Every tab except this one renders the signed-in person's **own** board. Turning
+one off is policy — it simplifies their screen; it does not protect data that was
+already theirs, and a determined person can un-hide a tab from devtools. The two
+things that genuinely are boundaries — reaching another account's row, and the
+guest clock — are enforced by the Worker against a signed token, so a forged
+capability list gets a 403 rather than an admin panel.
+
+The client-side guards exist so the app never renders a screen it would then have
+to fill with 403s: the tab is hidden without the capability, and `setView`
+refuses `admin` outright, which covers the arrow keys and the console alike.
+A Super Admin's own row is read-only throughout, matching the Worker's refusal to
+let one demote or deactivate themselves.
+
+### Three bugs found by testing, not by reading
+
+- **Tab clicks were bound by five hand-written lines.** The sixth tab rendered,
+  revealed itself correctly to a Super Admin, and did nothing when clicked. The
+  bindings now come from `MAIN_TABS`, the same map `setView` and the keyboard
+  handler already read, so a seventh tab cannot arrive half-wired.
+- **Arrow-key navigation walked hidden tabs.** It queried every `[role="tab"]`
+  in the markup against a hard-coded parallel array of view names. A Guest could
+  arrow onto Reports. Now derived from the tabs actually visible. Pre-existing;
+  this feature only made it easier to notice.
+- **List rows ran together on one line.** `.um-rn` and `.um-rs` are spans,
+  because a `<button>` may not contain a `<div>`, and without an explicit
+  `display` they stayed inline.
+
+### A contrast bug this uncovered, and its eight older siblings
+
+`--forest-dk` is a *fill* token: it stays `#1B5E20` in both themes. `--olive-lt`
+is a *surface* token: it flips to `#1B3A20` in dark. Nine rules paired them as
+text-on-background, which measures **1.60:1 in dark** — effectively invisible.
+Two were mine; seven were already there, including the "saved" confirmation
+message, the calendar's repeat tags and month-day markers, the Super Admin badge
+in the profile, and the Expense Tracker's optional-field labels.
+
+All nine now use `--forest-ink`, which *is* theme-aware: **4.56:1 light,
+6.24:1 dark**. Fill uses of `--forest-dk` (button hovers, the header gradient)
+are untouched — the lookbehind in the sweep excludes `border-color:` and
+`background-color:`, and they were verified individually afterwards.
+
+Every text pair on the new screen was then measured in both themes: lowest is
+4.56:1, nothing fails AA.
+
 ## 2026-09-06 — Admin-issued temporary passwords (v3.4)
 
 Role and status management already shipped with the profile panel; this adds the
