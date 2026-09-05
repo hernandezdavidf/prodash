@@ -277,6 +277,39 @@ happens at the end:
 - **Restart 48h** in the People panel gives them another window and reactivates
   the account in one click.
 
+### Temporary passwords
+
+When someone cannot get in and Forgot password is not working for them, open the
+People panel and click **Temp password** on their row.
+
+- The password is shown **once**, in a copyable box. It is hashed before it
+  reaches the sheet, so there is no way to look it up again — if you lose it,
+  issue another.
+- Their old password stops working immediately and they are **signed out
+  everywhere**. If the reason they need one is that their account was
+  compromised, leaving their old sessions alive would defeat the point.
+- Any lockout on the account is cleared at the same time, so the password you
+  just handed over actually works.
+- Tell them to sign in with it and then set their own via Forgot password. There
+  is no forced-change screen yet — that would need another sheet column, and it
+  is a sensible next addition rather than something to bolt on now.
+
+### Adding a second Super Admin
+
+Two ways, neither needing new code:
+
+1. **Promote an existing account** — People panel, change their Role dropdown to
+   Super Admin. They are signed out and come back with the new role.
+2. **From the sheet** — change column **K** of their row to `superadmin`. Useful
+   when nobody can get in to use the panel.
+
+Either way that person must sign out and back in: the role is baked into the
+signed token at login.
+
+Two Super Admins is worth having. The Worker refuses to let one demote or
+deactivate *themselves*, so a second account is the recovery path if the first
+is ever lost — otherwise the only way back is editing the sheet by hand.
+
 ### Per-account overrides
 
 The `perms` cell holds JSON that layers on top of the role's defaults, so it can

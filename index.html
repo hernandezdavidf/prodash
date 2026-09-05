@@ -1991,6 +1991,22 @@ return {
   .pf-st.inactive{background:var(--ivory);color:var(--muted);border:1px solid var(--line)}
   .pf-st.deactivated{background:var(--alert-lt);color:var(--alert-ink)}
   .pf-me{font-size:10px;color:var(--muted);font-weight:700}
+  /* Terracotta, not red: handing out a credential is a consequential action to
+     be read carefully, not an error. Red stays reserved for things that have
+     gone wrong. */
+  .pf-temp{margin-top:9px;padding:9px 11px;border-radius:9px;
+    background:var(--terra-lt);border:1px solid var(--terra)}
+  .pf-temp-l{font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;
+    color:var(--terra-ink);margin-bottom:6px}
+  .pf-temp-v{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .pf-temp-v code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:15px;
+    font-weight:700;letter-spacing:1px;color:var(--ink);background:var(--paper);
+    border:1px solid var(--terra);border-radius:7px;padding:5px 10px;user-select:all;
+    overflow-wrap:anywhere}
+  .pf-temp-c{font-size:11px;border:1px solid var(--terra);border-radius:7px;padding:4px 10px;
+    background:var(--paper);color:var(--terra-ink);font-weight:600}
+  .pf-temp-c:hover{background:var(--terra);color:var(--on-warm)}
+  .pf-temp-n{font-size:11px;color:var(--terra-ink);margin-top:6px;line-height:1.45}
   .pf-msg{display:none;margin:10px 0;padding:9px 11px;border-radius:8px;font-size:12.5px}
   .pf-msg.on{display:block}
   .pf-msg.err{background:var(--alert-lt);color:var(--alert-ink);border:1px solid var(--alert)}
@@ -4159,6 +4175,7 @@ function renderAdminUsers(users){
             }).join("")+
           '</select>'+
           (u.role==="guest"?'<button data-areset>Restart 48h</button>':'')+
+          '<button data-atemp>Temp password</button>'+
         '</div>'+
       '</div>'+
       '<span class="pf-st '+esc(u.status)+'">'+esc(u.status)+'</span>'+
@@ -4172,7 +4189,49 @@ function renderAdminUsers(users){
     if(ss)ss.addEventListener("change",function(){ adminPatch(uid,{status:ss.value}); });
     var rb=row.querySelector("[data-areset]");
     if(rb)rb.addEventListener("click",function(){ adminPatch(uid,{resetGuestClock:true}); });
+    var tb=row.querySelector("[data-atemp]");
+    if(tb)tb.addEventListener("click",function(){ issueTempPassword(uid,row); });
   });
+}
+
+/* The temp password comes back exactly once and is never stored, so the UI has
+   to treat it as something to be copied NOW rather than looked up later. It is
+   rendered into the row itself instead of an alert(), because an alert cannot
+   be copied from on a phone and this will usually be read out or pasted into a
+   message. */
+function issueTempPassword(userId,rowEl){
+  var name=(rowEl.querySelector(".pf-u-n")||{}).textContent||"this account";
+  if(!confirm('Issue a temporary password for '+name.replace(/\s*YOU$/,"").trim()+"?\n\n"+
+    "Their current password stops working immediately and they are signed out everywhere. "+
+    "You will see the new password once and it cannot be shown again."))return;
+  pfMsg("Generating…","ok");
+  PDAuth.api("/admin/reset-password",{method:"POST",body:{userId:userId}}).then(function(res){
+    pfMsg("");
+    var box=document.createElement("div");
+    box.className="pf-temp";
+    box.innerHTML='<div class="pf-temp-l">Temporary password for @'+esc(res.username)+
+        ' — shown once</div>'+
+      '<div class="pf-temp-v"><code>'+esc(res.tempPassword)+'</code>'+
+      '<button class="pf-temp-c" type="button">Copy</button></div>'+
+      '<div class="pf-temp-n">Give this to them directly. They should sign in with it and then '+
+      'set their own password from Forgot password.</div>';
+    var old=rowEl.querySelector(".pf-temp"); if(old)old.remove();
+    rowEl.querySelector(".pf-u-m").appendChild(box);
+    box.querySelector(".pf-temp-c").addEventListener("click",function(){
+      var t=res.tempPassword;
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        navigator.clipboard.writeText(t).then(function(){ pfMsg("Copied","ok"); },
+          function(){ selectText(box.querySelector("code")); });
+      }else selectText(box.querySelector("code"));
+    });
+    selectText(box.querySelector("code"));
+  }).catch(function(err){ pfMsg(err.message); });
+}
+// Fallback for the browsers and contexts where the clipboard API is unavailable
+// (file:// among them): select it so one keystroke copies.
+function selectText(el){
+  try{ var r=document.createRange();r.selectNodeContents(el);
+    var s=window.getSelection();s.removeAllRanges();s.addRange(r); }catch(e){}
 }
 
 function adminPatch(userId,patch){

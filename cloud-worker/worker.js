@@ -55,6 +55,7 @@
 //   POST /admin/bootstrap      one-time creation of the first Super Admin
 //   GET  /admin/users          every account, for the admin screen
 //   POST /admin/user           change one account's role / status / permissions
+//   POST /admin/reset-password issue a one-time temporary password for an account
 //
 // ---------------------------------------------------------------------------
 // ROLES
@@ -220,6 +221,7 @@ export default {
       if (path === "/admin/bootstrap" && request.method === "POST") return await adminBootstrap(request, env);
       if (path === "/admin/users" && request.method === "GET") return await adminUsers(request, env);
       if (path === "/admin/user" && request.method === "POST") return await adminUpdateUser(request, env);
+      if (path === "/admin/reset-password" && request.method === "POST") return await adminResetPassword(request, env);
       // Anything else under /admin still has to prove the capability before it
       // is told it does not exist - a 404 that only admins can see is a worse
       // leak than a 403 everyone can.
@@ -811,6 +813,71 @@ async function adminUpdateUser(request, env) {
       guestExpired: gexp !== null && Date.now() > gexp,
     },
     signedOut: killSessions,
+  });
+}
+
+/* Admin-issued temporary password, for "I cannot get in and Forgot password is
+   not working for me".
+
+   The plaintext exists for exactly one response and is never stored: it is
+   hashed with the same PBKDF2 + pepper as any other password before it touches
+   the sheet. If the admin loses it, there is no way to recover it - they issue
+   another one. That is the property worth having.
+
+   Issuing one also signs the account out everywhere. If the reason someone
+   needs a temp password is that their account was compromised, leaving their
+   old sessions alive would defeat the point. */
+const TEMP_PW_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+
+function makeTempPassword() {
+  // Grouped as xxxx-xxxx-xxxx so it can be read aloud over a phone without
+  // ambiguity. The alphabet already excludes O/0 and I/l/1 for the same reason.
+  const bytes = crypto.getRandomValues(new Uint8Array(12));
+  let out = "";
+  for (let i = 0; i < 12; i++) {
+    if (i && i % 4 === 0) out += "-";
+    out += TEMP_PW_ALPHABET[bytes[i] % TEMP_PW_ALPHABET.length];
+  }
+  /* requirePassword insists on an upper, a lower and a digit, and a random draw
+     can miss one. Rather than reject and retry, append a guaranteed set - the
+     entropy of the 12 random characters is what matters, and this only makes
+     the result longer. */
+  const pick = (s) => s[crypto.getRandomValues(new Uint8Array(1))[0] % s.length];
+  return out + "-" + pick("ABCDEFGHJKLMNPQRSTUVWXYZ") + pick("abcdefghijkmnpqrstuvwxyz") + pick("23456789");
+}
+
+async function adminResetPassword(request, env) {
+  const session = await requireSession(request, env);
+  requireCap(session, "admin");
+  const body = await readJson(request);
+  const targetId = String(body.userId || "");
+  if (!targetId) fail(400, "Which user?");
+
+  const found = await findUser(env, (r) => r[F.userId] === targetId);
+  if (!found) fail(404, "No such user.");
+  const { row, rowNumber } = found;
+
+  const temp = makeTempPassword();
+  const nextEpoch = Number(row[F.sessionEpoch] || 1) + 1;
+
+  await updateUserRow(env, rowNumber, row, {
+    [F.passwordHash]: await hashSecret(temp, env),
+    // Stamped as an admin action, not a user one. The value still answers
+    // "when did this password last change", which is what it is for.
+    [F.passwordUpdatedAt]: new Date().toISOString(),
+    // Whatever lockout put them here is cleared, otherwise the temp password
+    // would be handed over to an account that still refuses to accept it.
+    [F.failedAttempts]: "0",
+    [F.lockedUntil]: "",
+    [F.sessionEpoch]: String(nextEpoch),
+  });
+  await env.PRODASH_KV.put(epochKey(targetId), String(nextEpoch));
+
+  return json({
+    ok: true,
+    username: row[F.username],
+    // The only time this string exists anywhere. Not logged, not stored.
+    tempPassword: temp,
   });
 }
 
