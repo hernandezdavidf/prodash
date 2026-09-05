@@ -107,7 +107,21 @@ const F = {
 };
 const COL_COUNT = 21;
 const SHEET_TAB = "Users";
-const DATA_RANGE = `${SHEET_TAB}!A2:U`;
+/* Every range is DERIVED from COL_COUNT rather than written out. The three used
+   to be independent literals, and when the schema widened from 19 columns to 21
+   only two of them were updated - so updateUserRow kept asking Sheets to write
+   21 values into an A:S range and got a 400 on every attempt. Reads and appends
+   still worked (append negotiates its own width), which made it look like an
+   intermittent "could not reach the account database" rather than what it was:
+   every row update failing, every time. Deriving them makes that drift
+   impossible. */
+function colLetter(n) {
+  let s = "";
+  while (n > 0) { const r = (n - 1) % 26; s = String.fromCharCode(65 + r) + s; n = Math.floor((n - 1) / 26); }
+  return s;
+}
+const LAST_COL = colLetter(COL_COUNT);
+const DATA_RANGE = `${SHEET_TAB}!A2:${LAST_COL}`;
 const SHEET_HEADERS = [
   "user_id", "first_name", "last_name", "username", "username_key",
   "email", "email_key", "password_hash", "secret_question", "secret_answer_hash",
@@ -1048,7 +1062,7 @@ async function findUser(env, predicate) {
 async function appendUser(env, row) {
   await sheetsFetch(
     env,
-    `/values/${encodeURIComponent(`${SHEET_TAB}!A:S`)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
+    `/values/${encodeURIComponent(`${SHEET_TAB}!A:${LAST_COL}`)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
     { method: "POST", body: JSON.stringify({ values: [row.map(cellSafe)] }) },
   );
 }
@@ -1058,7 +1072,7 @@ async function updateUserRow(env, rowNumber, currentRow, patch) {
   for (const [idx, value] of Object.entries(patch)) next[Number(idx)] = value;
   await sheetsFetch(
     env,
-    `/values/${encodeURIComponent(`${SHEET_TAB}!A${rowNumber}:S${rowNumber}`)}?valueInputOption=RAW`,
+    `/values/${encodeURIComponent(`${SHEET_TAB}!A${rowNumber}:${LAST_COL}${rowNumber}`)}?valueInputOption=RAW`,
     { method: "PUT", body: JSON.stringify({ values: [next.map(cellSafe)] }) },
   );
   return next;
