@@ -2,6 +2,30 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-06 — Weekly view in the Expense Tracker (v3.7)
+
+"Where it goes" gains a **This week** breakdown alongside month, year and all
+time, and the totals strip gains a matching **This week** card.
+
+The card is the part that was actually missing. A filter with no total would
+have left the week the one period whose number appears nowhere on screen —
+every other tab has a card above it. It shows the week's spend, the dates it
+covers ("Sep 6–12", and "Dec 27–Jan 2" when the week crosses a year), and the
+average per day *so far*, dividing by days elapsed rather than by seven, the
+same reasoning the month card already used.
+
+**Weeks run Sunday to Saturday**, borrowed from the calendar's `weekStartOf()`
+rather than defined again here. A second convention would mean the same Sunday
+fell in different weeks on two tabs of one app.
+
+Verified against every day of 2026 — 365 windows checked for starting on a
+Sunday, ending on a Saturday, being seven days long, containing their own date,
+and excluding the days either side — plus year-crossing weeks and a leap day.
+Zero failures.
+
+One consequence worth expecting rather than reporting as a bug: on a Sunday the
+"This week" and "Today" cards show the same figure, because one day has elapsed.
+
 ## 2026-09-06 — The browser was never told what it could reach (v3.6)
 
 A Super Admin saw the SUPER ADMIN badge and no User & Role Management tab. The

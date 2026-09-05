@@ -1949,6 +1949,7 @@ return {
       <h2>Where it goes</h2>
       <div class="sub">Biggest first. Anything you never categorised still counts toward every total &mdash; it just shows as unsorted.</div>
       <div class="sub-tabs">
+        <button class="sub-tab" data-xview="week">This week</button>
         <button class="sub-tab on" data-xview="month">This month</button>
         <button class="sub-tab" data-xview="year">This year</button>
         <button class="sub-tab" data-xview="all">All time</button>
@@ -2687,7 +2688,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="3.6";
+var APP_VERSION="3.7";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -2698,6 +2699,7 @@ var APP_VERSION="3.6";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-06T07:30:00+08:00",text:"The Expense Tracker now does weeks. \"Where it goes\" has a This week option alongside the month, year and all-time views, and the row of totals gained a This week card showing the week's spend, the dates it covers, and your average per day so far. Weeks run Sunday to Saturday, the same as the calendar."},
   {ts:"2026-09-06T03:05:00+08:00",text:"Fixed the Super Admin tab not appearing. The app was told your role but never told what that role lets you reach, so it drew the Super Admin badge and then hid the management tab anyway. It now reads that list from the server on every load, which also means a change someone makes to your access shows up the next time you open the app instead of waiting for your sign-in to expire. Guests who had no visible countdown in their profile will see one now, for the same reason."},
   {ts:"2026-09-06T02:10:00+08:00",text:"New User & Role Management tab, for Super Admins only. It lists every account and, for whichever one you pick, shows the account itself, its role, exactly which tabs it can reach, and a password reset -- each in its own section. Roles are Super Admin, User and Guest, and you can now tick individual tabs on or off for one person without moving them to a different role; a small tag marks wherever someone differs from what their role would normally give. Your own row is deliberately read-only, so you cannot lock yourself out. Everything that used to sit in the profile panel moved here."},
   {ts:"2026-09-06T00:35:00+08:00",text:"A Super Admin can now issue someone a temporary password. If a person cannot get in and Forgot password is not working for them, open your profile, find them in the people list and press Temp password. You are shown a password once, to pass on to them however you like -- it is not stored anywhere and cannot be looked up again, so if you lose it just issue another. Their old password stops working straight away, they are signed out on every device, and any lockout on their account is cleared so the new password actually works."},
@@ -5473,6 +5475,17 @@ function expSorted(){
 }
 function expSum(list){ var t=0; for(var i=0;i<list.length;i++) t+=(+list[i].a||0); return t; }
 
+/* The current week as a pair of date keys, borrowing the calendar's
+   weekStartOf() rather than defining a second week here. That helper starts
+   the week on Sunday, matching DOW and the month grid; if the Expense Tracker
+   disagreed, the same Sunday would fall in different weeks on two tabs of one
+   app. Keys are YYYY-MM-DD, so a plain string compare is a date compare. */
+function expWeek(){
+  var a=weekStartOf(calToday());
+  return {from:a, to:addDays(a,6)};
+}
+function expInWeek(e,w){ var d=e.d||""; return d>=w.from&&d<=w.to; }
+
 function renderExpenses(){
   var host=document.getElementById("view-exp");
   if(!host)return;
@@ -5508,10 +5521,18 @@ function renderExpenses(){
 
 function renderExpSummary(all){
   var tk=calToday(), mk=tk.slice(0,7), yk=tk.slice(0,4);
+  var w=expWeek();
   var day=all.filter(function(e){return e.d===tk;});
+  var wk =all.filter(function(e){return expInWeek(e,w);});
   var mon=all.filter(function(e){return (e.d||"").slice(0,7)===mk;});
   var yr =all.filter(function(e){return (e.d||"").slice(0,4)===yk;});
-  var dayT=expSum(day), monT=expSum(mon), yrT=expSum(yr);
+  var dayT=expSum(day), wkT=expSum(wk), monT=expSum(mon), yrT=expSum(yr);
+  // Days elapsed this week, same reasoning as the month average below: divide
+  // by the days you have actually lived, not the seven the week will have.
+  var wkAvg=wkT/(dowOf(tk)+1);
+  var wa=dparts(w.from), wb=dparts(w.to);
+  var wkRange=MONTHS[wa.m].slice(0,3)+" "+wa.d+"–"+
+    (wa.m===wb.m?"":MONTHS[wb.m].slice(0,3)+" ")+wb.d;
   // Days elapsed this month, so the average is "per day so far" rather than
   // per day of a month that has not finished.
   // NOT named dnum - that is the calendar's date-to-day-number helper, and
@@ -5521,6 +5542,7 @@ function renderExpSummary(all){
   var p=dparts(tk);
   document.getElementById("xSum").innerHTML=
     card(money(dayT),"Today",day.length+(day.length===1?" entry":" entries"))+
+    card(money(wkT),"This week",wkRange+" · "+money(wkAvg)+"/day")+
     card(money(monT),MONTHS[p.m],mon.length+" so far · "+money(avg)+"/day")+
     card(money(yrT),yk,yr.length+" this year")+
     card(money(expSum(all)),"All time",all.length+" total");
@@ -5531,7 +5553,9 @@ function renderExpSummary(all){
 
 function renderExpBreakdown(all){
   var tk=calToday(), scope;
-  if(xBreakView==="month")      scope=all.filter(function(e){return (e.d||"").slice(0,7)===tk.slice(0,7);});
+  if(xBreakView==="week"){ var w=expWeek();
+                                scope=all.filter(function(e){return expInWeek(e,w);}); }
+  else if(xBreakView==="month") scope=all.filter(function(e){return (e.d||"").slice(0,7)===tk.slice(0,7);});
   else if(xBreakView==="year")  scope=all.filter(function(e){return (e.d||"").slice(0,4)===tk.slice(0,4);});
   else                          scope=all.slice();
   var host=document.getElementById("xBreak");
