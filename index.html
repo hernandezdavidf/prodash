@@ -592,12 +592,13 @@ header h1{font-size:26px;letter-spacing:.3px}
    left-to-right like a fanned stack. Default paint order would do the
    opposite. A 5th tab added later gets z-index:auto, already behind the 4th -
    the direction degrades correctly rather than inverting. */
-.tabbar .tab:nth-child(1){z-index:5}
-.tabbar .tab:nth-child(2){z-index:4}
-.tabbar .tab:nth-child(3){z-index:3}
-.tabbar .tab:nth-child(4){z-index:2}
-.tabbar .tab:nth-child(5){z-index:1}
-.tabbar .tab:nth-child(6){z-index:0}
+.tabbar .tab:nth-child(1){z-index:7}
+.tabbar .tab:nth-child(2){z-index:6}
+.tabbar .tab:nth-child(3){z-index:5}
+.tabbar .tab:nth-child(4){z-index:4}
+.tabbar .tab:nth-child(5){z-index:3}
+.tabbar .tab:nth-child(6){z-index:2}
+.tabbar .tab:nth-child(7){z-index:1}
 .tab:not(.on):hover{background:var(--panel);color:var(--ink)}
 /* Qualified as .tabbar .tab.on so it matches the nth-child rules above at
    (0,3,0) and wins on source order - as plain .tab.on it lost, and the active
@@ -656,7 +657,7 @@ header h1{font-size:26px;letter-spacing:.3px}
 }
 
 
-body.view-reports .board-only,body.view-history .board-only,body.view-cal .board-only,body.view-exp .board-only,body.view-admin .board-only{display:none}
+body.view-reports .board-only,body.view-history .board-only,body.view-cal .board-only,body.view-exp .board-only,body.view-admin .board-only,body.view-subs .board-only{display:none}
 /* #view-reports itself is shown/hidden by toggling its `hidden` attribute in
    setView() - a CSS rule here can't win against the UA [hidden]{display:none}
    without matching or exceeding its specificity, so don't add one. */
@@ -1354,6 +1355,7 @@ return {
     <button class="tab on" id="tabBoard" role="tab" aria-selected="true" aria-controls="viewPanel" tabindex="0">Board</button>
     <button class="tab" id="tabCal" role="tab" aria-selected="false" aria-controls="viewPanel" tabindex="-1"><span class="tab-lg">My Personal </span>Calendar</button>
     <button class="tab" id="tabExp" role="tab" aria-selected="false" aria-controls="viewPanel" tabindex="-1"><span class="tab-lg">Expense Tracker</span><span class="tab-sm">Expenses</span></button>
+    <button class="tab" id="tabSubs" role="tab" aria-selected="false" aria-controls="viewPanel" tabindex="-1"><span class="tab-lg">Subscriptions</span><span class="tab-sm">Subs</span></button>
     <button class="tab" id="tabReports" role="tab" aria-selected="false" aria-controls="viewPanel" tabindex="-1">Reports</button>
     <button class="tab" id="tabHistory" role="tab" aria-selected="false" aria-controls="viewPanel" tabindex="-1"><span class="tab-lg">Board </span>History</button>
     <!-- Super Admin only. Starts hidden and applyAccess() reveals it, so the
@@ -2006,6 +2008,80 @@ return {
       </div>
     </div>
   </div>
+
+  <!-- ================= RECURRING SUBSCRIPTIONS ===============================
+       A subscription is a RULE, not a transaction. The transactions it produces
+       are ordinary Expense Tracker rows - same array, same shape, same id
+       space - which is why every existing total, breakdown, trend, search and
+       filter picks them up without one line of those functions changing. The
+       only thing marking them out is a `sub` field carrying the rule's id.
+
+       Kept on its own tab rather than folded into the Expense Tracker because
+       the two are used at completely different rhythms: expenses are captured
+       many times a day, subscriptions are set up once and then left alone. It
+       rides on the SAME `exp` capability though - if you can see the Expense
+       Tracker you can see what feeds it.                                    -->
+  <div id="view-subs" hidden>
+    <div class="card">
+      <h2>Recurring Subscriptions <span class="cnt" id="sbCnt">0</span></h2>
+      <div class="sub">Everything you pay for on a schedule. Each one files its own expense on its billing date, so subscriptions turn up in your weekly, monthly and yearly totals without you ever typing them in.</div>
+      <div class="xsum" id="sbSum"></div>
+      <div id="sbUpcoming"></div>
+    </div>
+
+    <div class="card">
+      <h2 id="sbFormTitle">Add a subscription</h2>
+      <div class="sub" id="sbFormSub">Charges are recorded from the billing date onward. Set a date in the past and the charges since then are filed too &mdash; useful when you are catching up, surprising if you did not mean it.</div>
+      <form class="sbf" id="sbForm" autocomplete="off">
+        <div class="sbf-row">
+          <div class="ag-f sbf-grow">
+            <label for="sbName">Service</label>
+            <input id="sbName" maxlength="60" placeholder="Netflix, Spotify, iCloud&hellip;">
+          </div>
+          <div class="ag-f">
+            <label for="sbAmt">Amount</label>
+            <input id="sbAmt" type="text" inputmode="decimal" placeholder="0.00">
+          </div>
+        </div>
+        <div class="sbf-row">
+          <div class="ag-f">
+            <label for="sbFreq">Billing</label>
+            <select id="sbFreq">
+              <option value="monthly">Monthly</option>
+              <option value="yearly">Yearly</option>
+            </select>
+          </div>
+          <div class="ag-f">
+            <label for="sbDate">Billing date</label>
+            <input id="sbDate" type="date">
+          </div>
+          <div class="ag-f">
+            <label for="sbCat">Category</label>
+            <select id="sbCat"></select>
+          </div>
+        </div>
+        <div class="ag-f">
+          <label for="sbNote">Notes</label>
+          <input id="sbNote" maxlength="200" placeholder="Optional &mdash; which card it is on, who else uses it&hellip;">
+        </div>
+        <label class="am-check"><input type="checkbox" id="sbActive" checked> Active &mdash; keep filing expenses for this one</label>
+        <div class="sbf-act">
+          <button class="ag-btn" type="submit" id="sbSave">Add subscription</button>
+          <button class="ag-btn ghost" type="button" id="sbCancel" hidden>Cancel</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Your subscriptions</h2>
+      <div class="sub-tabs">
+        <button class="sub-tab on" data-sbview="active">Active</button>
+        <button class="sub-tab" data-sbview="inactive">Paused</button>
+        <button class="sub-tab" data-sbview="all">All</button>
+      </div>
+      <div id="sbList"></div>
+    </div>
+  </div>
   </div><!-- /.viewpanel : closes the sheet opened just under the tab strip -->
 
   <style>
@@ -2036,6 +2112,58 @@ return {
   .pf-cap.off{background:var(--ivory);color:var(--muted);border-color:var(--line);
     text-decoration:line-through;opacity:.75}
 
+  /* ---- Recurring Subscriptions ------------------------------------------
+     Reuses .xsum / .xsum-c for the overview and .xdot for the category dot, so
+     the two tabs read as one system rather than two apps that happen to be
+     next to each other. */
+  .sbf{margin-top:12px}
+  .sbf-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:9px}
+  .sbf-row .ag-f{flex:1;min-width:130px;margin:0}
+  .sbf-row .ag-f.sbf-grow{flex:2;min-width:190px}
+  .sbf-act{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .sb-none{font-size:12px;color:var(--muted);margin-top:12px}
+  .sb-up-h{display:flex;align-items:baseline;gap:8px;margin:16px 0 7px;
+    font-size:10.5px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;
+    color:var(--muted)}
+  .sb-up-h span{margin-left:auto;font-size:13px;letter-spacing:0;
+    text-transform:none;color:var(--terra-ink)}
+  .sb-up{border:1px solid var(--line);border-radius:11px;overflow:hidden;
+    background:var(--paper)}
+  .sb-up-r{display:flex;align-items:center;gap:10px;padding:8px 11px;
+    border-bottom:1px solid var(--line)}
+  .sb-up-r:last-child{border-bottom:0}
+  .sb-up-d{flex:none;min-width:96px;font-size:12px;font-weight:700}
+  .sb-up-d em{display:block;font-style:normal;font-size:10.5px;font-weight:500;
+    color:var(--muted)}
+  .sb-up-n{flex:1;min-width:0;font-size:12.5px;overflow-wrap:anywhere}
+  .sb-up-a{flex:none;font-size:12.5px;font-weight:700;font-variant-numeric:tabular-nums}
+
+  .sb-r{display:flex;align-items:flex-start;gap:10px;padding:11px 0;
+    border-bottom:1px dashed var(--line)}
+  .sb-r:last-child{border-bottom:0}
+  /* Paused reads as quieter, not as broken - it is a choice, not an error, so
+     no red anywhere near it. */
+  .sb-r.off{opacity:.62}
+  .sb-r .xdot{margin-top:5px}
+  .sb-r-m{flex:1;min-width:0}
+  .sb-r-n{font-size:13.5px;font-weight:700;overflow-wrap:anywhere;line-height:1.3}
+  .sb-r-s{font-size:11px;color:var(--muted);margin-top:2px;overflow-wrap:anywhere;
+    line-height:1.45}
+  .sb-r-c{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}
+  .sb-r-c button{font-size:11px;border:1px solid var(--line);border-radius:7px;
+    padding:3px 9px;background:var(--paper);color:var(--ink);cursor:pointer}
+  .sb-r-c button:hover{border-color:var(--olive);color:var(--forest-ink)}
+  .sb-r-r{flex:none;text-align:right}
+  .sb-r-a{font-size:14px;font-weight:800;font-variant-numeric:tabular-nums}
+  .sb-r-nx{font-size:10.5px;color:var(--muted);margin-top:2px;white-space:nowrap}
+  .sb-tag{font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;
+    background:var(--ivory);color:var(--muted);border-radius:999px;padding:1px 6px;
+    vertical-align:1px}
+  /* The marker on a generated transaction in the Expense Tracker list. Green,
+     because it is a fact about where the row came from, not a warning. */
+  .xrow-sub{font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;
+    background:var(--olive-lt);color:var(--forest-ink);border-radius:999px;
+    padding:1px 6px;margin-left:6px;vertical-align:1px;white-space:nowrap}
   /* ---- User & Role Management (the tab; see #view-admin) -----------------
      Master-detail. The list column is capped rather than fluid so the detail
      panel - which carries the permission descriptions and needs the width -
@@ -2468,6 +2596,8 @@ function norm(s){
      while offline keep BOTH on merge rather than one overwriting the other -
      which for money is the difference between a record and a guess. */
   if(!Array.isArray(s.expenses))s.expenses=[];
+  if(!Array.isArray(s.subs))s.subs=[];
+  if(!Array.isArray(s.subSkip))s.subSkip=[];
   if(typeof s.cur!=="string"||!s.cur)s.cur="\u20B1";
   if(typeof s.updatedAt!=="number")s.updatedAt=0;
   // Board History. Both are MERGED across devices rather than last-write-wins
@@ -2737,7 +2867,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="3.8";
+var APP_VERSION="3.9";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -2748,6 +2878,7 @@ var APP_VERSION="3.8";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-06T09:40:00+08:00",text:"New Subscriptions tab for everything you pay for on a schedule -- Netflix, iCloud, the gym. Add a service with its amount, whether it bills monthly or yearly, and the billing date, and from then on it files its own expense every time it comes due. Those charges are ordinary transactions, so they turn up in your weekly, monthly and yearly totals, the category breakdown and the twelve-month trend without you typing anything. Pause one and it stops filing but keeps its history; delete a charge by hand and it stays deleted. The tab also shows what your subscriptions cost per month and per year, and what is due in the next 30 days."},
   {ts:"2026-09-06T08:20:00+08:00",text:"The app can call you something other than \"Dave\" now. Set a nickname when you sign up, or have a Super Admin set one for you, and the greeting and the browser tab both use it. Leave it blank and it picks a silly one for you instead -- Pumpkin, Goofball, Silly Goose and eleven others -- fresh every time you open the app. A nickname a Super Admin sets reaches you the next time you sign in."},
   {ts:"2026-09-06T07:30:00+08:00",text:"The Expense Tracker now does weeks. \"Where it goes\" has a This week option alongside the month, year and all-time views, and the row of totals gained a This week card showing the week's spend, the dates it covers, and your average per day so far. Weeks run Sunday to Saturday, the same as the calendar."},
   {ts:"2026-09-06T03:05:00+08:00",text:"Fixed the Super Admin tab not appearing. The app was told your role but never told what that role lets you reach, so it drew the Super Admin badge and then hid the management tab anyway. It now reads that list from the server on every load, which also means a change someone makes to your access shows up the next time you open the app instead of waiting for your sign-in to expire. Guests who had no visible countdown in their profile will see one now, for the same reason."},
@@ -2791,14 +2922,17 @@ var APP_VERSION_HISTORY=[
    pushed" is per-account, though - it tracks a specific board's revisions. */
 var DEV_KEY="prodash.deviceId", DEV_NAME_KEY="prodash.deviceName", PUSHED_KEY=PDAuth.ns("prodash.pushedUpTo");
 var HIST_CAP=400, CKPT_EVERY=25, BATCH_MS=2500;
-var BOARD_KEYS=["tasks","log","days","events","lanes","rituals","theme","hiddenBlocks","plans","roll","boardView","expenses","cur"];
-var KEYED=["tasks","events","lanes","rituals","expenses"], MAPS=["log","days","plans"], SCALARS=["theme","roll","boardView","cur"];
+var BOARD_KEYS=["tasks","log","days","events","lanes","rituals","theme","hiddenBlocks","plans","roll","boardView","expenses","cur","subs","subSkip"];
+var KEYED=["tasks","events","lanes","rituals","expenses","subs"], MAPS=["log","days","plans"], SCALARS=["theme","roll","boardView","cur"];
 // Plain arrays of primitive ids (not objects with their own .id, so KEYED's
 // per-item union doesn't apply) compared by CONTENT, not reference - a
 // cloned snapshot never shares object identity with the live array even
 // when nothing in it changed, so a reference check here would falsely
 // flag "changed" on every single revision.
-var ARRAYS=["hiddenBlocks"];
+/* subSkip: ids of subscription charges the user deleted by hand. A union is the
+   right merge - a deletion made on one device must not be undone by a device
+   that never saw it, and re-adding an id is harmless. */
+var ARRAYS=["hiddenBlocks","subSkip"];
 
 function clone(o){return JSON.parse(JSON.stringify(o));}
 function boardOnly(s){var o={};BOARD_KEYS.forEach(function(k){if(s[k]!==undefined)o[k]=clone(s[k]);});return o;}
@@ -4224,16 +4358,20 @@ document.addEventListener("visibilitychange",function(){if(!document.hidden&&fil
    2. The parts that ARE a boundary - the guest clock and anything that touches
       another person's row - are enforced by the Worker. A forged capability
       list gets a 403 from the server, not a working admin panel.            */
+/* One capability can own more than one tab: Subscriptions is part of expense
+   tracking, not a separate permission, so it rides on `exp`. Giving it a
+   capability of its own would have meant a Worker deploy to add one string to
+   three role defaults, for a screen nobody would ever want separately. */
 var CAP_TABS = {
-  board:  "tabBoard",
-  cal:    "tabCal",
-  exp:    "tabExp",
-  reports:"tabReports",
-  history:"tabHistory",
-  admin:  "tabAdmin"
+  board:  ["tabBoard"],
+  cal:    ["tabCal"],
+  exp:    ["tabExp","tabSubs"],
+  reports:["tabReports"],
+  history:["tabHistory"],
+  admin:  ["tabAdmin"]
 };
 var CAP_LABELS = {
-  board:"Board", cal:"Personal Calendar", exp:"Expense Tracker",
+  board:"Board", cal:"Personal Calendar", exp:"Expense Tracker & Subscriptions",
   reports:"Reports", history:"Board History",
   "history.appver":"App version history", admin:"User & Role Management"
 };
@@ -4255,12 +4393,13 @@ function myRole(){ var u=PDAuth.user()||{}; return u.role||"user"; }
 function applyAccess(){
   var caps=myCaps(), firstVisible=null;
   Object.keys(CAP_TABS).forEach(function(cap){
-    var el=document.getElementById(CAP_TABS[cap]);
-    if(!el)return;
     var ok=caps.indexOf(cap)>=0;
     // "history.appver" grants the History TAB, but only its version sub-view.
     if(cap==="history"&&!ok&&caps.indexOf("history.appver")>=0)ok=true;
-    el.hidden=!ok;
+    CAP_TABS[cap].forEach(function(id){
+      var el=document.getElementById(id);
+      if(el)el.hidden=!ok;
+    });
     if(ok&&!firstVisible)firstVisible=cap;
   });
   /* Board History's sub-views: someone with only history.appver sees the app's
@@ -4349,7 +4488,7 @@ function closeProfile(){ pfEl("profModal").hidden=true; }
 var UM_PERMS=[
   ["board","Board","Lanes, tasks, the shift timeline and the daily reminders."],
   ["cal","My Personal Calendar","Month, week, day, year and agenda views, and recurring activities."],
-  ["exp","Expense Tracker","Recording expenses, and every total and breakdown built from them."],
+  ["exp","Expense Tracker","Recording expenses, the recurring Subscriptions that file them, and every total and breakdown built from both."],
   ["reports","Reports","Completion reports, lane breakdowns and the spreadsheet export."],
   ["history","Board History","The full audit trail of every change made to the board."],
   ["history.appver","App version history","The plain-English changelog of the app itself. Grants the Board History tab on its own, showing only this section and none of the audit trail."]
@@ -4748,6 +4887,10 @@ if(cloudUrl)cloudPull();
 // Tabs this account cannot use are hidden once, after the first render. The
 // server has already decided; this only stops the UI offering what it would
 // refuse anyway.
+/* Anything that fell due while the app was closed is filed here, before the
+   first render, so the header stats and every total are right on the first
+   paint rather than correcting themselves a moment later. */
+subCatchUp();
 applyAccess();
 /* PDAuth confirms the session with the Worker just after boot and may come
    back with a fuller capability list than the one stored on this device. Two
@@ -5711,7 +5854,8 @@ function renderExpList(all){
     out+='<div class="xrow" data-xid="'+esc(e.id)+'">'+
       '<div class="xdot'+(c?'':' none')+'"'+(c?' style="background:'+c.c+'"':'')+'></div>'+
       '<div class="xrow-m" data-xedit="'+esc(e.id)+'" title="Click to edit">'+
-        '<div class="xrow-n">'+esc(e.n||"(no description)")+'</div>'+
+        '<div class="xrow-n">'+esc(e.n||"(no description)")+
+          (e.sub?'<span class="xrow-sub">subscription</span>':'')+'</div>'+
         (meta.length?'<div class="xrow-s">'+esc(meta.join(" · "))+'</div>':'')+
       '</div>'+
       '<div class="xrow-a">'+esc(money(+e.a||0))+'</div>'+
@@ -5723,7 +5867,15 @@ function renderExpList(all){
     b.addEventListener("click",function(){
       var e=(S.expenses||[]).filter(function(x){return x.id===b.dataset.xdel;})[0];
       if(!e)return;
-      if(!confirm("Delete "+money(+e.a||0)+(e.n?' for "'+e.n+'"':"")+"?"))return;
+      if(!confirm("Delete "+money(+e.a||0)+(e.n?' for "'+e.n+'"':"")+"?"+
+        (e.sub?"\n\nThis one was filed by a subscription. Deleting it here keeps it deleted — the subscription will not file it again.":"")))return;
+      /* A generated charge has a DERIVED id, so simply removing it would let
+         the next catch-up recreate it. Remembering the id is what makes a
+         deletion stick. */
+      if(e.sub){
+        if(!Array.isArray(S.subSkip))S.subSkip=[];
+        if(S.subSkip.indexOf(e.id)<0)S.subSkip.push(e.id);
+      }
       S.expenses=S.expenses.filter(function(x){return x.id!==e.id;});
       save();renderExpenses();stamp("Transaction deleted");
     });
@@ -5830,10 +5982,352 @@ document.getElementById("xClearF").addEventListener("click",function(){
   renderExpList(S.expenses||[]);
 });
 
+/* ==================== RECURRING SUBSCRIPTIONS ==============================
+   A subscription is a RULE. What it produces are ordinary Expense Tracker
+   transactions - same S.expenses array, same shape, same id space - so every
+   existing total, breakdown, trend, search and filter counts them with no
+   change to any of those functions. That is the whole integration: there is no
+   second set of numbers to keep in step, because there is no second set.
+
+   Two properties do the real work here.
+
+   1. THE EXPENSE ID IS DERIVED, NOT RANDOM: "exps_<subId>_<period>". Two
+      devices that both notice September's Netflix charge is due generate the
+      SAME id, and the KEYED union-by-id merge collapses them into one row.
+      A "have I already added this?" scan would pass on both devices while
+      offline and produce two charges the moment they synced. Deriving the id
+      makes the duplicate impossible rather than unlikely.
+
+   2. GENERATION IS A PURE CATCH-UP: every billing date from the anchor up to
+      today that is not already on the books. Nothing tracks "last run", so
+      opening the app after three months away files the three charges that
+      happened, and opening it twice in one minute files nothing the second
+      time. There is no state to get out of step.                            */
+
+/* The loop guard is a literal in each loop rather than a module-level var.
+   subCatchUp() is called at boot, ABOVE where this module sits in the file: a
+   `var` would hoist as undefined, every `guard++ < undefined` would be false,
+   and the boot catch-up would silently file nothing at all. Function
+   declarations hoist with their bodies; assignments do not. The number is 600,
+   about fifty years of monthlies - it exists only to stop a wild anchor date
+   spinning, never to limit normal use.
+   sbView and sbEditing are safe as vars: nothing reads them before a tab is
+   opened, which cannot happen during boot. */
+var sbView = "active", sbEditing = null;
+
+function subActive(s){ return s.active!==false; }
+
+/* Clamp to the last day of the month. A subscription anchored on the 31st still
+   bills in February, and a 29 February anchor bills on the 28th in ordinary
+   years. Without this those charges would silently never fire - the failure
+   mode is a missing expense, which nobody notices. */
+function subDateIn(y,m,day){
+  var last=new Date(y,m+1,0).getDate();
+  return key(new Date(y,m,Math.min(day,last)));
+}
+
+/* Every billing date from the anchor up to `upto`, each with the period key
+   that identifies it: "2026-09" for a monthly, "2026" for a yearly. That key is
+   half the expense id, so it is what makes one charge one charge. */
+function subOccurrences(s,upto){
+  if(!s.d)return [];
+  var p=dparts(s.d),y=p.y,m=p.m,day=p.d,yearly=(s.freq==="yearly");
+  var out=[],guard=0;
+  while(guard++<600){
+    var k=subDateIn(y,m,day);
+    if(k>upto)break;
+    out.push({date:k,per:yearly?String(y):y+"-"+String(m+1).padStart(2,"0")});
+    if(yearly)y++; else { m++; if(m>11){m=0;y++;} }
+  }
+  return out;
+}
+
+// The next billing date strictly after `after`, so a charge filed today shows
+// next month rather than today.
+function subNext(s,after){
+  if(!s.d)return "";
+  var p=dparts(s.d),y=p.y,m=p.m,day=p.d,yearly=(s.freq==="yearly"),guard=0;
+  while(guard++<600){
+    var k=subDateIn(y,m,day);
+    if(k>after)return k;
+    if(yearly)y++; else { m++; if(m>11){m=0;y++;} }
+  }
+  return "";
+}
+
+function subExpId(subId,per){ return "exps_"+subId+"_"+per; }
+
+/* Files every charge that has come due and is not already on the books.
+   Returns whether anything changed, so the CALLER decides when to save - doing
+   it in here would mean saving from inside a render and re-entering it. */
+function subRun(){
+  if(!Array.isArray(S.subs)||!S.subs.length)return false;
+  var today=calToday(),changed=false,have={},skip={};
+  (S.expenses||[]).forEach(function(e){ have[e.id]=1; });
+  (S.subSkip||[]).forEach(function(id){ skip[id]=1; });
+  S.subs.forEach(function(s){
+    if(!subActive(s))return;              // paused: stop filing, keep the history
+    var amt=+s.a||0;
+    if(amt<=0||!s.d)return;
+    subOccurrences(s,today).forEach(function(o){
+      var id=subExpId(s.id,o.per);
+      /* skip holds charges the user deleted by hand. Without it, deleting a
+         generated expense would simply bring it back on the next run, which
+         reads as the app arguing with you. */
+      if(have[id]||skip[id])return;
+      S.expenses.push({id:id,n:s.n||"Subscription",a:amt,d:o.date,
+        cat:s.cat||"",pay:"",note:s.note||"",sub:s.id,per:o.per,ts:Date.now()});
+      have[id]=1; changed=true;
+    });
+  });
+  return changed;
+}
+
+// Run it, and persist only if it actually filed something. Every entry point
+// into the subscription or expense views goes through this.
+function subCatchUp(){ if(subRun()){ save(); return true; } return false; }
+
+function subById(id){
+  var l=(S.subs||[]);
+  for(var i=0;i<l.length;i++) if(l[i].id===id) return l[i];
+  return null;
+}
+// What a subscription has actually cost so far, and how many charges it filed.
+function subFiled(id){
+  var n=0,t=0;
+  (S.expenses||[]).forEach(function(e){ if(e.sub===id){ n++; t+=(+e.a||0); } });
+  return {n:n,total:t};
+}
+function subPerMonth(s){ var a=+s.a||0; return s.freq==="yearly"?a/12:a; }
+function subPerYear(s){ var a=+s.a||0; return s.freq==="yearly"?a:a*12; }
+
+/* ---- rendering ---- */
+function renderSubs(){
+  var host=document.getElementById("view-subs");
+  if(!host)return;
+  var all=S.subs||[];
+  document.getElementById("sbCnt").textContent=
+    all.length+(all.length===1?" subscription":" subscriptions");
+
+  // Category select, same list the Expense Tracker uses.
+  var catOpts='<option value="">Uncategorised</option>'+EXP_CATS.map(function(c){
+    return '<option value="'+c.id+'">'+esc(c.n)+'</option>';}).join("");
+  var sc=document.getElementById("sbCat");
+  if(sc.innerHTML!==catOpts){ var keep=sc.value; sc.innerHTML=catOpts; sc.value=keep||""; }
+  if(!document.getElementById("sbDate").value)
+    document.getElementById("sbDate").value=calToday();
+
+  renderSubSummary(all);
+  renderSubUpcoming(all);
+  renderSubList(all);
+}
+
+function renderSubSummary(all){
+  var act=all.filter(subActive);
+  var perMonth=0,perYear=0;
+  act.forEach(function(s){ perMonth+=subPerMonth(s); perYear+=subPerYear(s); });
+  // What subscriptions have actually cost this month, as opposed to what they
+  // are scheduled to cost - the two differ whenever a yearly bill lands.
+  var mk=calToday().slice(0,7),billed=0;
+  (S.expenses||[]).forEach(function(e){
+    if(e.sub&&(e.d||"").slice(0,7)===mk)billed+=(+e.a||0);
+  });
+  function card(v,l,sub){
+    return '<div class="xsum-c"><span>'+esc(l)+'</span><b>'+esc(v)+'</b><em>'+esc(sub)+'</em></div>';
+  }
+  document.getElementById("sbSum").innerHTML=
+    card(String(act.length),"Active",
+      (all.length-act.length)?(all.length-act.length)+" paused":"none paused")+
+    card(money(perMonth),"Per month","what they average out to")+
+    card(money(perYear),"Per year","monthly × 12, plus the yearly ones")+
+    card(money(billed),"Billed this month","already in your totals");
+}
+
+function renderSubUpcoming(all){
+  var today=calToday(),until=addDays(today,30),rows=[];
+  all.filter(subActive).forEach(function(s){
+    var d=subNext(s,today);
+    if(d&&d<=until)rows.push({s:s,d:d});
+  });
+  rows.sort(function(a,b){ return a.d<b.d?-1:(a.d>b.d?1:0); });
+  var host=document.getElementById("sbUpcoming");
+  if(!rows.length){
+    host.innerHTML=all.filter(subActive).length
+      ? '<div class="sb-none">Nothing due in the next 30 days.</div>'
+      : "";
+    return;
+  }
+  var total=0; rows.forEach(function(r){ total+=(+r.s.a||0); });
+  host.innerHTML='<div class="sb-up-h">Due in the next 30 days'+
+      '<span>'+esc(money(total))+'</span></div>'+
+    '<div class="sb-up">'+rows.map(function(r){
+      var p=dparts(r.d),days=Math.round((new Date(p.y,p.m,p.d)-new Date(dparts(today).y,dparts(today).m,dparts(today).d))/86400000);
+      return '<div class="sb-up-r">'+
+        '<span class="sb-up-d">'+esc(MONTHS[p.m].slice(0,3)+" "+p.d)+
+          '<em>'+esc(days<=0?"today":(days===1?"tomorrow":"in "+days+" days"))+'</em></span>'+
+        '<span class="sb-up-n">'+esc(r.s.n||"Subscription")+'</span>'+
+        '<span class="sb-up-a">'+esc(money(+r.s.a||0))+'</span>'+
+      '</div>';
+    }).join("")+'</div>';
+}
+
+function renderSubList(all){
+  var list=all.filter(function(s){
+    if(sbView==="active")return subActive(s);
+    if(sbView==="inactive")return !subActive(s);
+    return true;
+  }).sort(function(a,b){
+    // Soonest charge first; paused ones sink to the bottom.
+    var aa=subActive(a),ba=subActive(b);
+    if(aa!==ba)return aa?-1:1;
+    var an=subNext(a,calToday())||"9999", bn=subNext(b,calToday())||"9999";
+    return an<bn?-1:(an>bn?1:0);
+  });
+  var host=document.getElementById("sbList");
+  if(!list.length){
+    host.innerHTML='<div class="xempty">'+(all.length
+      ? "Nothing in this list."
+      : "No subscriptions yet. Add one above and it will file its own expenses from its billing date onward.")+'</div>';
+    return;
+  }
+  var today=calToday();
+  host.innerHTML=list.map(function(s){
+    var c=expCat(s.cat), f=subFiled(s.id), nx=subNext(s,today);
+    var meta=[];
+    meta.push(s.freq==="yearly"?"Yearly":"Monthly");
+    if(c)meta.push(c.n);
+    if(f.n)meta.push(f.n+(f.n===1?" charge":" charges")+" filed · "+money(f.total));
+    var np=nx?dparts(nx):null;
+    return '<div class="sb-r'+(subActive(s)?"":" off")+'" data-sid="'+esc(s.id)+'">'+
+      '<div class="xdot'+(c?'':' none')+'"'+(c?' style="background:'+c.c+'"':'')+'></div>'+
+      '<div class="sb-r-m">'+
+        '<div class="sb-r-n">'+esc(s.n||"(unnamed)")+
+          (subActive(s)?'':' <span class="sb-tag">paused</span>')+'</div>'+
+        '<div class="sb-r-s">'+esc(meta.join(" · "))+'</div>'+
+        (s.note?'<div class="sb-r-s">'+esc(s.note)+'</div>':'')+
+        '<div class="sb-r-c">'+
+          '<button type="button" data-sbedit="'+esc(s.id)+'">Edit</button>'+
+          '<button type="button" data-sbtog="'+esc(s.id)+'">'+(subActive(s)?"Pause":"Resume")+'</button>'+
+          '<button type="button" data-sbdel="'+esc(s.id)+'">Delete</button>'+
+        '</div>'+
+      '</div>'+
+      '<div class="sb-r-r">'+
+        '<div class="sb-r-a">'+esc(money(+s.a||0))+'</div>'+
+        '<div class="sb-r-nx">'+esc(subActive(s)
+          ? (np?"next "+MONTHS[np.m].slice(0,3)+" "+np.d:"no date set")
+          : "not billing")+'</div>'+
+      '</div>'+
+    '</div>';
+  }).join("");
+
+  host.querySelectorAll("[data-sbedit]").forEach(function(b){
+    b.addEventListener("click",function(){ subEdit(b.dataset.sbedit); });
+  });
+  host.querySelectorAll("[data-sbtog]").forEach(function(b){
+    b.addEventListener("click",function(){
+      var s=subById(b.dataset.sbtog); if(!s)return;
+      s.active=!subActive(s);
+      // Resuming catches up anything missed while it was paused, which is the
+      // behaviour that matches "this bill kept arriving".
+      subRun(); save(); renderSubs(); renderExpenses();
+      stamp(subActive(s)?"Resumed "+(s.n||"subscription"):"Paused "+(s.n||"subscription"));
+    });
+  });
+  host.querySelectorAll("[data-sbdel]").forEach(function(b){
+    b.addEventListener("click",function(){
+      var s=subById(b.dataset.sbdel); if(!s)return;
+      var f=subFiled(s.id);
+      if(!confirm('Delete "'+(s.n||"this subscription")+'"?\n\n'+
+        (f.n?"The "+f.n+" expense"+(f.n===1?"":"s")+" it has already filed ("+money(f.total)+
+             ") stay in your Expense Tracker — that money was really spent. It just stops filing new ones."
+           :"It has not filed any expenses yet.")))return;
+      S.subs=S.subs.filter(function(x){ return x.id!==s.id; });
+      if(sbEditing===s.id)subResetForm();
+      save(); renderSubs(); stamp("Subscription deleted");
+    });
+  });
+}
+
+/* ---- the form ---- */
+function subEdit(id){
+  var s=subById(id); if(!s)return;
+  sbEditing=id;
+  document.getElementById("sbName").value=s.n||"";
+  document.getElementById("sbAmt").value=(+s.a||0)?String(+s.a):"";
+  document.getElementById("sbFreq").value=s.freq==="yearly"?"yearly":"monthly";
+  document.getElementById("sbDate").value=s.d||calToday();
+  document.getElementById("sbCat").value=s.cat||"";
+  document.getElementById("sbNote").value=s.note||"";
+  document.getElementById("sbActive").checked=subActive(s);
+  document.getElementById("sbFormTitle").textContent="Edit subscription";
+  document.getElementById("sbFormSub").textContent=
+    "Changing the amount does not rewrite charges already filed — those are what you actually paid.";
+  document.getElementById("sbSave").textContent="Save changes";
+  document.getElementById("sbCancel").hidden=false;
+  document.getElementById("view-subs").scrollIntoView({block:"start"});
+  document.getElementById("sbName").focus();
+}
+function subResetForm(){
+  sbEditing=null;
+  ["sbName","sbAmt","sbNote"].forEach(function(id){ document.getElementById(id).value=""; });
+  document.getElementById("sbFreq").value="monthly";
+  document.getElementById("sbDate").value=calToday();
+  document.getElementById("sbCat").value="";
+  document.getElementById("sbActive").checked=true;
+  document.getElementById("sbFormTitle").textContent="Add a subscription";
+  document.getElementById("sbFormSub").textContent=
+    "Charges are recorded from the billing date onward. Set a date in the past and the charges since then are filed too — useful when you are catching up, surprising if you did not mean it.";
+  document.getElementById("sbSave").textContent="Add subscription";
+  document.getElementById("sbCancel").hidden=true;
+}
+
+document.getElementById("sbForm").addEventListener("submit",function(e){
+  e.preventDefault();
+  var n=document.getElementById("sbName").value.trim();
+  var a=parseAmt(document.getElementById("sbAmt").value);
+  var d=document.getElementById("sbDate").value;
+  if(!n){ stamp("Give it a name"); document.getElementById("sbName").focus(); return; }
+  if(a===null){ stamp("Enter an amount"); document.getElementById("sbAmt").focus(); return; }
+  if(!d){ stamp("Pick a billing date"); document.getElementById("sbDate").focus(); return; }
+  var rec={ n:n, a:a, freq:document.getElementById("sbFreq").value==="yearly"?"yearly":"monthly",
+    d:d, cat:document.getElementById("sbCat").value||"",
+    note:document.getElementById("sbNote").value.trim(),
+    active:document.getElementById("sbActive").checked };
+
+  if(sbEditing){
+    var s=subById(sbEditing);
+    if(s){ s.n=rec.n; s.a=rec.a; s.freq=rec.freq; s.d=rec.d; s.cat=rec.cat;
+           s.note=rec.note; s.active=rec.active; }
+    stamp("Subscription updated");
+  }else{
+    rec.id="sub_"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+    rec.ts=Date.now();
+    if(!Array.isArray(S.subs))S.subs=[];
+    S.subs.push(rec);
+    // Tell them what just happened rather than letting expenses appear silently.
+    var due=subOccurrences(rec,calToday()).length;
+    stamp(due?("Added — "+due+" charge"+(due===1?"":"s")+" filed"):"Subscription added");
+  }
+  subRun(); save(); subResetForm(); renderSubs(); renderExpenses();
+});
+
+document.getElementById("sbCancel").addEventListener("click",function(){
+  subResetForm();
+});
+document.querySelectorAll("[data-sbview]").forEach(function(b){
+  b.addEventListener("click",function(){
+    sbView=b.dataset.sbview;
+    document.querySelectorAll("[data-sbview]").forEach(function(x){
+      x.classList.toggle("on",x===b);});
+    renderSubList(S.subs||[]);
+  });
+});
+
 // One place naming the main tabs, so setView and the keyboard handler
 // agree on both the order and the element ids.
-var MAIN_TABS={board:"tabBoard",cal:"tabCal",exp:"tabExp",reports:"tabReports",
-  history:"tabHistory",admin:"tabAdmin"};
+// Order must match the DOM: the keyboard handler walks this map.
+var MAIN_TABS={board:"tabBoard",cal:"tabCal",exp:"tabExp",subs:"tabSubs",
+  reports:"tabReports",history:"tabHistory",admin:"tabAdmin"};
 Object.keys(MAIN_TABS).forEach(function(k){
   document.getElementById(MAIN_TABS[k]).addEventListener("click",function(){setView(k);});
 });
@@ -5848,6 +6342,7 @@ function setView(v){
   document.body.classList.toggle("view-cal",v==="cal");
   document.body.classList.toggle("view-exp",v==="exp");
   document.body.classList.toggle("view-admin",v==="admin");
+  document.body.classList.toggle("view-subs",v==="subs");
   // the CSS class alone can't win: the static `hidden` attribute in the markup
   // forces display:none via the UA stylesheet no matter what a class-based
   // rule says, so the attribute itself has to be flipped here.
@@ -5856,6 +6351,7 @@ function setView(v){
   document.getElementById("view-cal").hidden=(v!=="cal");
   document.getElementById("view-exp").hidden=(v!=="exp");
   document.getElementById("view-admin").hidden=(v!=="admin");
+  document.getElementById("view-subs").hidden=(v!=="subs");
   /* Driven from one map rather than four repeated lines, so the class, the
      aria state and the roving tabindex cannot fall out of step - which they
      would the first time someone added a fifth tab and updated only the
@@ -5869,7 +6365,8 @@ function setView(v){
   });
   document.getElementById("viewPanel").setAttribute("aria-labelledby",MAIN_TABS[v]||"tabBoard");
   if(v==="cal")renderCalendar();
-  if(v==="exp")renderExpenses();
+  if(v==="exp"){ subCatchUp(); renderExpenses(); }
+  if(v==="subs"){ subCatchUp(); renderSubs(); renderExpenses(); }
   // Re-read on every visit rather than caching: roles and statuses are edited
   // from other sessions, and a stale list here is a list you act on.
   if(v==="admin")umLoad();

@@ -2,6 +2,86 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-06 — Recurring Subscriptions (v3.9)
+
+A new tab for things billed on a schedule. Add a service with an amount, a
+frequency and a billing date; from then on it files its own expense each time it
+comes due.
+
+**A subscription is a rule; what it produces are ordinary transactions.** They
+go into the same `S.expenses` array with the same shape and the same id space,
+so every existing total, breakdown, trend, search, filter and CSV export counts
+them with **no change to any of those functions**. That is the whole
+integration: there is no second set of numbers to keep in step, because there is
+no second set. The only thing marking a generated row is a `sub` field carrying
+the rule's id, which the transaction list shows as a small green tag.
+
+### Two properties do the real work
+
+**The expense id is derived, not random:** `exps_<subId>_<period>`, where the
+period is `2026-09` for a monthly and `2026` for a yearly. Two devices that both
+notice September's charge is due generate the *same* id, and the existing
+union-by-id merge collapses them into one row. A "have I already added this?"
+scan would pass on both devices while they were offline and produce two charges
+the moment they synced. Deriving the id makes the duplicate impossible rather
+than unlikely — which is what "count each charge once only" has to mean in an
+app that syncs.
+
+**Generation is a pure catch-up**, not a scheduled job: every billing date from
+the anchor up to today that is not already on the books. Nothing records "last
+run", so opening the app after three months away files the three charges that
+happened, and opening it twice in a minute files nothing the second time. There
+is no state that can drift.
+
+### Details that would have been bugs
+
+- **Month-end clamping.** A subscription anchored on the 31st still bills in
+  February, and a 29 February yearly bills on the 28th in ordinary years. Without
+  it those charges would silently never fire, and a *missing* expense is the
+  failure nobody notices.
+- **Deleting a generated charge sticks.** Because the id is derived, simply
+  removing the row would let the next catch-up recreate it — the app arguing
+  with you. Deleted ids go into a `subSkip` list, merged as a union so a deletion
+  made on one device is not undone by a device that never saw it.
+- **Editing the amount does not rewrite history.** Charges already filed are what
+  you actually paid; the new price applies from the next one.
+- **Pausing keeps the history** and stops future filing. Resuming catches up what
+  was missed, which matches what actually happened to the bill.
+
+### Access
+
+Subscriptions rides on the existing `exp` capability rather than getting one of
+its own — if you can see the Expense Tracker you can see what feeds it. That
+made `CAP_TABS` values lists instead of single ids, and avoided a Worker deploy
+to add one string to three role defaults for a screen nobody would want
+separately.
+
+### Verified
+
+Date maths: 31st-anchor clamping across six months, leap-day yearlies across
+2024–2028, unique period keys over 80 monthly occurrences, every occurrence date
+inside the month its key names, future anchors filing nothing, an anchor of today
+filing exactly one.
+
+End to end in a browser against the real UI: a monthly anchored two months back
+filed exactly three charges and a yearly filed one; overview showed ₱649/month
+and ₱7,788/year from ₱549 monthly plus ₱1,200 yearly; the Expense Tracker's
+Today, This week, September, 2026 and All time totals and all four breakdown
+scopes picked them up with correct categories. Ten tab switches filed nothing
+extra. Pausing kept four rows and stopped filing. A deleted charge survived three
+further catch-ups and a resume without returning. Editing ₱549 to ₱699 left both
+filed charges at ₱549.
+
+Contrast measured on every new text pair in both themes: lowest 4.56:1, nothing
+fails AA. No horizontal overflow at 375px.
+
+### One thing to know
+
+Backdating is real. Setting a billing date years in the past files every charge
+since — a 2020 monthly anchor produces 80 transactions and changes historical
+totals. The form says so above the fields. The date defaults to today, so the
+ordinary path creates nothing retroactive.
+
 ## 2026-09-06 — Nicknames in the greeting (v3.8)
 
 The heading and the browser tab now read "How's our &lt;you&gt; looking?", where
