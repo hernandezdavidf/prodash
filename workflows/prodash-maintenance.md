@@ -58,3 +58,47 @@ Match the same bar `CHANGELOG.md` already uses.
 | Tone | Technical, detailed, reasoning included | Plain English, one sentence |
 | Where it's read | The repo | Board History → PRODASH Version History tab |
 | Editable at runtime? | N/A (source file) | No — read-only in the UI, hand-maintained in source |
+
+---
+
+## Shipping: a commit is not a deploy
+
+*Added 2026-09-07, after finishing v4.2 and reporting it done while the app in
+David's browser still said 4.0. Everything below had been correct in the working
+tree and wrong everywhere he could see.*
+
+ProDash is served by **GitHub Pages from `origin/main`**. There is no build and
+no deploy job: whatever is on that branch IS the live app. So a local commit
+changes nothing David can see, and "committed" must never be reported as
+"shipped".
+
+**Every change to `index.html` or `sw.js` ends with all four of these:**
+
+1. **Bump `APP_VERSION`** (near `APP_VERSION_HISTORY`). This is the number the
+   PRODASH Version History sub-view prints as "Current version", and it is how
+   David checks whether an update actually reached him. v4.1 shipped without a
+   bump, so the live app reported 4.0 for two releases and there was no way to
+   tell the old build from the new one.
+2. **Bump `CACHE_VERSION` in `sw.js`.** `index.html` is network-first, so an
+   online device gets the new file on its next load regardless — the bump is
+   what evicts the OFFLINE fallback copy on the service worker's next
+   `activate`. For an app used at 3am on a dead connection, that copy is the
+   one that matters.
+3. **`git push origin main`.** Check `git status -sb` says `## main...origin/main`
+   with no `[ahead N]` afterwards.
+4. **Verify the live origin, not the working tree:**
+   ```bash
+   curl -s "https://hernandezdavidf.github.io/prodash/index.html?cb=$RANDOM" | grep -o 'var APP_VERSION="[0-9.]*"'
+   ```
+   Pages takes roughly 30–60 seconds to rebuild, so poll a few times rather
+   than concluding from one stale read. Do the same for `sw.js` and
+   `prodash-v*`.
+
+**Then tell David to reload.** An installed PWA can need two loads: the first
+fetches the new `sw.js` and installs it, the second activates it and drops the
+old cache. `Ctrl+Shift+R` on the desktop covers both.
+
+**Testing locally proves the code, not the deploy.** The PowerShell
+`HttpListener` harness (see project memory) serves the working tree, so it is
+green the moment the file is saved — which is exactly why it cannot tell you
+whether anything shipped. Step 4 is the only check that can.
