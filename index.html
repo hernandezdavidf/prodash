@@ -236,10 +236,6 @@ header h1{font-size:26px;letter-spacing:.3px}
 .hdr-stats{display:flex;gap:22px;text-align:left;margin-top:12px}
 .stat b{display:block;font-family:var(--serif);font-size:21px;line-height:1.1}
 .stat span{font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:var(--on-brand)}
-.daybar{margin-top:16px;position:relative;z-index:1}
-.daybar-track{height:6px;background:rgba(236,239,241,.22);border-radius:3px;overflow:hidden}
-.daybar-fill{height:100%;background:var(--olive);border-radius:3px;transition:width .4s}
-.daybar-lbl{display:flex;justify-content:space-between;font-size:11px;color:var(--on-brand);margin-top:6px}
 
 .nowbar{display:flex;align-items:center;gap:14px;background:var(--paper);border:1px solid var(--line);border-left:5px solid var(--terra);border-radius:12px;padding:14px 18px;margin-bottom:14px;flex-wrap:wrap}
 .nowbar.sleep{border-left-color:var(--night-ink)}
@@ -363,12 +359,6 @@ header h1{font-size:26px;letter-spacing:.3px}
 .rit-add input.rit-tagin{flex:0 0 112px}
 .rit-add button{background:var(--forest);color:var(--on-brand);border-radius:7px;padding:6px 11px;font-weight:700}
 
-/* The shift-window chip is a button now, but must still read as the quiet
-   count-chip it replaced - editable, not shouty. */
-.roll-edit{font:inherit;cursor:pointer;border:1px dashed transparent;transition:border-color .15s}
-.roll-edit:hover{border-color:var(--forest)}
-.roll-edit input{font:inherit;font-size:inherit;color:inherit;background:var(--paper);
-  border:1px solid var(--forest);border-radius:6px;padding:1px 4px;width:105px}
 /* Goal row extras. Pips reuse .wk-p from the old Weekly targets block, which
    is why that rule survives the removal of the card it was written for. */
 .rit-goal{display:flex;align-items:center;gap:7px;flex-shrink:0}
@@ -1479,10 +1469,6 @@ return {
       </div>
     </div>
     <div id="nudges" class="board-only"></div>
-    <div class="daybar">
-      <div class="daybar-track"><div class="daybar-fill" id="dayFill" style="width:0%"></div></div>
-      <div class="daybar-lbl"><span id="dayLeft"></span><span id="dayPct"></span></div>
-    </div>
   </header>
 
   <!-- Layered document tabs. role="tablist" on the <nav> costs the navigation
@@ -1760,7 +1746,7 @@ return {
   <div class="cols board-only" id="boardCols" role="tabpanel" aria-labelledby="bvClassic" tabindex="-1">
     <div>
       <div class="card timelinecard">
-        <h2>Shift timeline <button class="cnt roll-edit" id="rollBtn" title="Click to change when your day starts">7:00am → 7:00am</button></h2>
+        <h2>Shift timeline</h2>
         <div class="sub" id="rollSub"></div>
         <div id="timeline"></div>
         <div id="hiddenList"></div>
@@ -3393,7 +3379,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="4.2";
+var APP_VERSION="4.3";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -3404,6 +3390,7 @@ var APP_VERSION="4.2";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-07T15:30:00+08:00",text:"Two things left the app. The green progress bar across the bottom of the header is gone -- the one counting how far through the shift you were and how long until 7am. It measured the clock, not you, and a bar sitting at 95% at 5am was only ever telling you the day was nearly over. The shift start time is also no longer editable: the 7:00am chip on the Shift timeline and its time picker have been removed. Your day still rolls over at 7:00am exactly as before, and the line under the timeline still says so -- it just cannot be changed from the app any more."},
   {ts:"2026-09-07T09:15:00+08:00",text:"Seven tabs across the top became four. Reports moved down into the Board, where it now sits beside Classic view and Consolidated checklist -- three ways of looking at the same lanes, in one switcher, instead of a report living a tab away from the thing it reports on. Subscriptions moved into the Expense Tracker in the same way, as a section next to Every expense, which is where it always belonged: every charge it files is an ordinary expense row. Nothing was removed and nothing needs setting up again -- your reports, filters, subscriptions and their filed charges are exactly where they were, one level in. The tab you are on is also obvious now: it carries a green cap along its top edge and a faint green tint, in both the light and dark themes, and the section tabs inside Board and Expense Tracker mark themselves the same way."},
   {ts:"2026-09-06T14:00:00+08:00",text:"Tasks on the Board can carry notes. Every task row grew a small speech bubble; tap it and a drawer opens under the task holding as many notes as you want, each with its own edit and delete. Closed, the bubble turns green and shows a count, so you can see which tasks have detail behind them without opening anything."},
   {ts:"2026-09-06T13:10:00+08:00",text:"New Widgets button in the header, opening a small panel that floats over whatever tab you are on -- it does not move you off your work, and the board stays usable underneath it. Two things live in it so far. World Clocks shows your own time at the top, always, with up to four other cities under it; each one gives the time, the date, how far ahead or behind it is, and a marker when it is already tomorrow there or still yesterday. You can reorder them and swap them out, and it tells you when you have used all four. The Bible widget lets you read the King James or New King James version without leaving the app -- pick a book and chapter, or search for a phrase and jump straight to the verse, or just type something like John 3:16. Text size is adjustable, it remembers where you stopped reading, and any chapter you have already opened stays readable with no connection."},
@@ -4340,12 +4327,6 @@ function renderHeader(){
   document.getElementById("sRit").textContent=(S.rituals.length?Math.round(done/S.rituals.length*100):0)+"%";
   document.getElementById("sTask").textContent=S.tasks.filter(function(t){return !t.done;}).length;
   document.getElementById("sStreak").textContent=daysStreak();
-
-  var n=nowSm(),pc=Math.round(n/1440*100);
-  document.getElementById("dayFill").style.width=pc+"%";
-  document.getElementById("dayPct").textContent=pc+"% through the shift";
-  var left=1440-n;
-  document.getElementById("dayLeft").textContent=Math.floor(left/60)+"h "+(left%60)+"m until 7am";
 }
 
 function renderNow(){
@@ -4438,59 +4419,27 @@ function renderNudges(){
   });
 }
 
-/* ---------- the shift window, now editable ----------
-   Changing this moves the boundary of every logical day, so it is not a
-   cosmetic label: work logged at 3am lands on a different date afterwards.
-   The caption is generated from the value rather than written down, because a
-   hardcoded "rolls over at 7am" sitting under a chip that says 5:00am is worse
-   than no caption at all. */
+/* ---------- the shift window ----------
+   The roll time is no longer editable from the UI - the chip and its time
+   picker were removed on 2026-09-07. It is still read from S.roll through
+   rollM(), so any value already stored keeps working and every date
+   calculation stays correct; only the way to change it from here is gone.
+   The caption is still generated from the value rather than written down, so
+   it cannot drift out of step with the shift window it describes. */
 function rollRange(){var h=fmt(rollHHMM());return h+" → "+h;}
 function renderRoll(){
-  var b=document.getElementById("rollBtn");
-  if(!b)return;
-  if(b.dataset.editing)return;                 // don't clobber an open input
-  b.textContent=rollRange();
-  var rh=Math.floor(rollM()/60),sub=document.getElementById("rollSub");
+  var sub=document.getElementById("rollSub");
   if(!sub)return;
   // Pick an example hour that actually falls inside the pre-roll window, so
   // the sentence stays true at any roll time. Below 2am there is no room for
   // one, so the clause is dropped rather than made up.
+  var rh=Math.floor(rollM()/60);
   var ex = rh>=5 ? rh-4 : (rh>=2 ? rh-1 : null);
   var exTxt = ex===null ? "" :
     " — so "+fmt(String(ex).padStart(2,"0")+":00")+" work logs to the right shift";
   sub.textContent = rollM()===0
     ? "Your day rolls over at midnight, like an ordinary calendar."
     : "Your day rolls over at "+fmt(rollHHMM())+", not midnight"+exTxt+".";
-}
-function editRoll(){
-  var b=document.getElementById("rollBtn");
-  if(b.dataset.editing)return;
-  b.dataset.editing="1";
-  var prev=rollHHMM();
-  b.innerHTML='<input type="time" id="rollIn" value="'+prev+'" step="900">';
-  var inp=document.getElementById("rollIn");
-  inp.addEventListener("click",function(e){e.stopPropagation();});
-  function finish(){
-    delete b.dataset.editing;
-    var v=inp.value;
-    if(v&&/^\d{2}:\d{2}$/.test(v)){
-      var m=mins(v);
-      if(m!==rollM()){
-        S.roll=m;
-        save();
-        // Everything downstream of the roll has to be recomputed, including
-        // the calendar, whose day keys are shift keys.
-        renderAll();
-        if(document.body.classList.contains("view-cal"))renderCalendar();
-        stamp("Day now starts at "+fmt(v));
-        return;
-      }
-    }
-    renderRoll();
-  }
-  inp.addEventListener("change",finish);
-  inp.addEventListener("blur",finish);
-  try{inp.focus();}catch(e){}
 }
 
 /* Ticking a task has to mean exactly the same thing in the Classic columns and
@@ -5170,7 +5119,6 @@ function renderAll(){
 document.querySelectorAll("[data-bview]").forEach(function(b){
   b.addEventListener("click",function(){ setBoardView(b.dataset.bview); save(); });
 });
-document.getElementById("rollBtn").addEventListener("click",editRoll);
 document.getElementById("ritAddBtn").addEventListener("click",addRitual);
 ["ritName","ritTag","ritTarget"].forEach(function(id){
   document.getElementById(id).addEventListener("keydown",function(e){if(e.key==="Enter")addRitual();});});

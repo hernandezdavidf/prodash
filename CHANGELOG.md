@@ -2,6 +2,56 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-07 — Removed the shift progress bar and the editable roll time (v4.3)
+
+Two removals, both requested by David. Neither changes any stored data.
+
+### 1. The header progress bar is gone
+
+The `.daybar` strip under the nudges — a green fill across the header footer
+with "1h 9m until 7am" on the left and "95% through the shift" on the right.
+It measured the clock rather than the work, so it read as pressure without
+information: at 5am it always said 95%, whatever the state of the board.
+
+Removed in three places:
+
+- the `.daybar` / `.daybar-track` / `.daybar-fill` / `.daybar-lbl` rules in the
+  `<style>` block
+- the `<div class="daybar">` markup at the foot of `<header>`
+- the last five lines of `renderHeader()`, which computed `pc`, `left`, and
+  wrote `#dayFill`, `#dayPct` and `#dayLeft`
+
+`nowSm()` stays — it is the shift-relative clock that the Now bar, the nudges
+and the timeline all read. Only its use in the header went.
+
+### 2. The shift start time is no longer editable
+
+The `7:00am → 7:00am` chip on the Shift timeline header opened a `<input
+type="time">` that wrote `S.roll` and re-rendered everything downstream. The
+chip, its time picker and `editRoll()` are all removed, along with the
+`.roll-edit` CSS and the click listener on `#rollBtn`.
+
+**What deliberately stayed:**
+
+- `S.roll` itself, and `rollM()` reading it with a 420 (07:00) fallback. The
+  roll time is still the boundary of every logical day; it is just fixed now.
+  Nothing forces `S.roll` back to 420, so a stored value keeps working rather
+  than silently moving anyone's day boundary as a side effect of this change.
+- `rollRange()`, which the header date line still uses
+  (`… shift · 7:00am → 7:00am`).
+- `renderRoll()` and the `#rollSub` caption under the timeline heading, slimmed
+  to write the caption only. It is still *generated* from `rollM()` rather than
+  hardcoded, so it cannot claim 7:00am while the app runs on something else.
+
+Only the Shift timeline card's **header controls** were removed. The routine
+block schedule, the Hidden-from-your-schedule restore list and the appointment
+adder are all untouched.
+
+### Version
+
+`APP_VERSION` 4.2 → 4.3, `CACHE_VERSION` `prodash-v5` → `prodash-v6`.
+
+
 ## 2026-09-07 — Navigation hierarchy: Reports under Board, Subscriptions under Expenses (v4.2)
 
 Seven main tabs became four. Reports and Subscriptions did not go away — they
