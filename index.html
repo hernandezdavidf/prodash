@@ -686,8 +686,27 @@ header h1{font-size:26px;letter-spacing:.3px}
    align-items:flex-end bottom-aligns the strip, so the active tab's extra
    padding-top makes it RISE rather than sink - that height difference is the
    "in front" cue, on top of the colour and the z-index. */
-.tabbar .tab.on{z-index:10;background:var(--panel);color:var(--ink);
-  border-bottom-color:var(--panel);padding-top:11px;padding-bottom:8px}
+/* The active tab now says so in COLOUR as well as in position. Three cues,
+   deliberately layered rather than one loud one:
+     1. a 4px brand-green cap along the top edge. A border, not a pseudo-
+        element, so it follows the 12px corner radius exactly and cannot poke
+        outside the tab's silhouette. --olive rather than --forest because it
+        has to read as green against BOTH panels (#E4E9EB light, #141B1E dark)
+        and the darker --forest disappears into the dark one.
+     2. a green wash that fades out by 62%, so the BOTTOM of the tab is still
+        exactly --panel - the join with the sheet below is the whole illusion
+        here and tinting through it would break it.
+     3. the label at weight 800 against the inactive tabs' 600.
+   The label stays --ink rather than going green on purpose: --forest-ink on
+   --panel is 4.2:1, and this text is 12.5px, so a green label would be the one
+   part of this change that failed AA. Colour carries the emphasis, the neutral
+   carries the words.
+   padding-top drops 11px -> 8px because the border grew 1px -> 4px: the raise
+   that marks the active tab is the same height it always was. */
+.tabbar .tab.on{z-index:10;color:var(--ink);font-weight:800;
+  background:linear-gradient(180deg,var(--olive-lt) 0,var(--panel) 62%);
+  border-top:4px solid var(--olive);
+  border-bottom-color:var(--panel);padding-top:8px;padding-bottom:8px}
 /* Inset offset: the ring would otherwise be half-hidden under the neighbouring
    tab that overlaps this one's edge. */
 .tabbar .tab:focus-visible{outline:2px solid var(--forest-ink);outline-offset:-3px;z-index:11}
@@ -721,7 +740,10 @@ header h1{font-size:26px;letter-spacing:.3px}
   .tab-lg{display:none}
   .tab-sm{display:inline}
   .tab{padding:8px 12px 7px;font-size:11.5px;margin-right:-8px}
-  .tab.on{padding-top:10px;padding-bottom:8px}
+  /* Qualified .tabbar .tab.on, not .tab.on: the desktop rule above is (0,3,0)
+     and a media query changes nothing about specificity, so the phone version
+     of this line was silently losing to it and never applied. */
+  .tabbar .tab.on{padding-top:7px;padding-bottom:8px}
   /* Full-bleed sheet on phones. -20px lands exactly on .wrap's border box
      (.wrap padding is 20px), so this cannot cause horizontal overflow, and the
      14px inset is NARROWER than the 20px it replaces - content gets wider, not
@@ -745,10 +767,20 @@ header h1{font-size:26px;letter-spacing:.3px}
 }
 
 
-body.view-reports .board-only,body.view-history .board-only,body.view-cal .board-only,body.view-exp .board-only,body.view-admin .board-only,body.view-subs .board-only{display:none}
-/* #view-reports itself is shown/hidden by toggling its `hidden` attribute in
-   setView() - a CSS rule here can't win against the UA [hidden]{display:none}
-   without matching or exceeding its specificity, so don't add one. */
+/* view-reports and view-subs are gone from this list because they are gone as
+   main views: Reports is a Board sub-view (so it IS .board-only now) and
+   Subscriptions lives inside #view-exp. */
+body.view-history .board-only,body.view-cal .board-only,body.view-exp .board-only,body.view-admin .board-only{display:none}
+/* #view-reports, #checklist and #boardCols are shown/hidden by toggling their
+   `hidden` attribute in setBoardView() - a CSS rule here can't win against the
+   UA [hidden]{display:none} without matching or exceeding its specificity, so
+   don't add one. */
+/* An account granted `reports` but not `board`. Reports is a Board sub-view
+   now, so the Board tab has to open for them - but onto Reports and nothing
+   else. Stated once here rather than as a hidden= flag on each of the Board's
+   parts, so there is one place that says which parts of the Board are the
+   Board and which part is Reports. */
+body.reports-only .board-only:not(.bview):not(#view-reports){display:none}
 
 /* ---- reports ---- */
 .rep-controls{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin:12px 0}
@@ -1463,8 +1495,11 @@ return {
     <button class="tab on" id="tabBoard" role="tab" aria-selected="true" aria-controls="viewPanel" tabindex="0">Board</button>
     <button class="tab" id="tabCal" role="tab" aria-selected="false" aria-controls="viewPanel" tabindex="-1"><span class="tab-lg">My Personal </span>Calendar</button>
     <button class="tab" id="tabExp" role="tab" aria-selected="false" aria-controls="viewPanel" tabindex="-1"><span class="tab-lg">Expense Tracker</span><span class="tab-sm">Expenses</span></button>
-    <button class="tab" id="tabSubs" role="tab" aria-selected="false" aria-controls="viewPanel" tabindex="-1"><span class="tab-lg">Subscriptions</span><span class="tab-sm">Subs</span></button>
-    <button class="tab" id="tabReports" role="tab" aria-selected="false" aria-controls="viewPanel" tabindex="-1">Reports</button>
+    <!-- Reports and Subscriptions used to sit here. Both moved DOWN a level
+         rather than away: Reports is a sub-view of Board (it reads the lanes
+         and nothing else) and Subscriptions is a section of Expense Tracker
+         (it only ever files expense rows). Five main tabs instead of seven,
+         and each one is now a place rather than a screen. -->
     <button class="tab" id="tabHistory" role="tab" aria-selected="false" aria-controls="viewPanel" tabindex="-1"><span class="tab-lg">Board </span>History</button>
     <!-- Super Admin only. Starts hidden and applyAccess() reveals it, so the
          default for every account that has not proved otherwise is "absent". -->
@@ -1533,12 +1568,19 @@ return {
   .hb-chip:hover{border-style:solid;border-color:var(--olive);color:var(--forest-ink)}
   .hb-chip span{opacity:.65;font-variant-numeric:tabular-nums}
 
-  /* ---- Board layout switcher: pennant tabs --------------------------------
+  /* ---- section navigation: pennant tabs -----------------------------------
      Banner shape with a downward point, icon, uppercase label and a gradient,
-     per the reference. EVERY rule here is scoped under .bview on purpose:
-     `.sub-tab` is shared by thirteen buttons across three unrelated groups
-     (this one, the Calendar view switcher, the Board History sub-views), so an
-     unscoped change would restyle all of them.
+     per the reference. EVERY rule here is scoped under .pnav on purpose:
+     `.sub-tab` is shared by sixteen buttons across four unrelated groups (the
+     pennants, the Calendar view switcher, the Board History sub-views, the
+     Subscriptions filter), so an unscoped change would restyle all of them.
+
+     .pnav, not .bview: this was the Board's private layout switcher until the
+     Expense Tracker needed the same thing for its Subscriptions section. Both
+     answer the same question - "which part of this tab am I in" - so they are
+     one style with one class, and the app has ONE idiom for a nested section
+     rather than a second one invented per tab. .bview survives as the Board's
+     own hook (see body.reports-only) and carries no styling of its own.
 
      Colour follows the app's rule that hue carries meaning rather than
      decoration, which is why this does NOT copy the reference's magenta and
@@ -1547,9 +1589,9 @@ return {
      dilute the one thing they are for. The active tab is brand green because
      green means focus - "this is the view you are in" - and the inactive one is
      neutral. */
-  .bview{display:flex;justify-content:flex-start;margin-bottom:16px}
-  .bview .sub-tabs{gap:10px;margin:0;align-items:flex-start}
-  .bview .sub-tab{
+  .pnav{display:flex;justify-content:flex-start;margin-bottom:16px}
+  .pnav .sub-tabs{gap:10px;margin:0;align-items:flex-start}
+  .pnav .sub-tab{
     position:relative;display:flex;align-items:center;gap:8px;
     /* the extra bottom padding is the pennant's point, which the clip-path
        below cuts out of it - without it the notch would eat the label */
@@ -1564,28 +1606,28 @@ return {
        clipped silhouette. */
     filter:drop-shadow(0 2px 2px rgba(var(--shadow-rgb),.22));
     transition:filter .15s,color .15s}
-  .bview .sub-tab:hover{filter:drop-shadow(0 3px 4px rgba(var(--shadow-rgb),.3))}
-  .bview .sub-tab:not(.on):hover{color:var(--ink)}
+  .pnav .sub-tab:hover{filter:drop-shadow(0 3px 4px rgba(var(--shadow-rgb),.3))}
+  .pnav .sub-tab:not(.on):hover{color:var(--ink)}
   /* Gradient stays inside a range where white clears AA: the palette green
      #43A047 is only 3.3:1 with white, and 11.5px bold is nowhere near WCAG's
      large-text threshold, so the band runs --forest -> --forest-dk instead. */
-  .bview .sub-tab.on{
+  .pnav .sub-tab.on{
     background:linear-gradient(180deg,var(--forest),var(--forest-dk));
     color:var(--on-brand);
     filter:drop-shadow(0 3px 4px rgba(var(--shadow-rgb),.34))}
-  .bview .sub-tab.on:hover{filter:drop-shadow(0 4px 6px rgba(var(--shadow-rgb),.38))}
+  .pnav .sub-tab.on:hover{filter:drop-shadow(0 4px 6px rgba(var(--shadow-rgb),.38))}
   /* The ring would be clipped away with the rest of the box, so focus is shown
      as a glow that survives the clip. */
-  .bview .sub-tab:focus-visible{outline:none;
+  .pnav .sub-tab:focus-visible{outline:none;
     filter:drop-shadow(0 0 0 2px var(--olive)) drop-shadow(0 3px 4px rgba(var(--shadow-rgb),.34))}
-  .bview .bv-i{flex:none;fill:currentColor;margin-top:-1px}
-  .bview .bv-i-s{fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+  .pnav .bv-i{flex:none;fill:currentColor;margin-top:-1px}
+  .pnav .bv-i-s{fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
   @media(max-width:620px){
     /* "Consolidated view" and "Classic view" lose their qualifier - two
        pennants at uppercase-with-tracking do not fit a phone otherwise. */
-    .bview .bv-lg{display:none}
-    .bview .sub-tab{padding:8px 14px 18px;font-size:11px;letter-spacing:.5px}
-    .bview .sub-tabs{gap:7px}
+    .pnav .bv-lg{display:none}
+    .pnav .sub-tab{padding:8px 14px 18px;font-size:11px;letter-spacing:.5px}
+    .pnav .sub-tabs{gap:7px}
   }
   #checklist[hidden],.cols[hidden]{display:none}
 
@@ -1690,22 +1732,32 @@ return {
   }
   </style>
 
-  <div class="bview board-only">
-    <div class="sub-tabs">
-      <button class="sub-tab on" data-bview="classic">
+  <!-- Three sub-views now. Reports joined Classic and Consolidated Checklist
+       here rather than staying a main tab because it is not a separate screen:
+       it reads S.tasks and S.lanes and nothing else, so "the lanes as columns",
+       "the lanes as one checklist" and "the lanes counted up over a date range"
+       are three ways of looking at the same thing, and belong in the same
+       switcher. -->
+  <div class="bview pnav board-only">
+    <div class="sub-tabs" role="tablist" aria-label="Board views">
+      <button class="sub-tab on" id="bvClassic" data-bview="classic" role="tab" aria-selected="true" aria-controls="boardCols">
         <svg class="bv-i" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><rect x="1" y="2" width="3.6" height="12" rx="1"/><rect x="6.2" y="2" width="3.6" height="12" rx="1"/><rect x="11.4" y="2" width="3.6" height="12" rx="1"/></svg>
         <span>Classic<span class="bv-lg"> view</span></span>
       </button>
-      <button class="sub-tab" data-bview="checklist">
+      <button class="sub-tab" id="bvChecklist" data-bview="checklist" role="tab" aria-selected="false" aria-controls="checklist">
         <svg class="bv-i bv-i-s" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="M1.6 4.4 3.2 6l2.8-2.8"/><path d="M1.6 11.2l1.6 1.6L6 10"/><path d="M8.6 4.4h5.8M8.6 11.4h5.8"/></svg>
         <span><span class="bv-lg">Consolidated </span>Checklist</span>
+      </button>
+      <button class="sub-tab" id="bvReports" data-bview="reports" role="tab" aria-selected="false" aria-controls="view-reports">
+        <svg class="bv-i bv-i-s" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="M1.7 13.7h12.6"/><path d="M3.7 13.7V8.3M7.2 13.7V3.2M10.7 13.7V6.1M14 13.7v-2.6"/></svg>
+        <span>Reports</span>
       </button>
     </div>
   </div>
 
-  <div id="checklist" class="board-only" hidden></div>
+  <div id="checklist" class="board-only" role="tabpanel" aria-labelledby="bvChecklist" tabindex="-1" hidden></div>
 
-  <div class="cols board-only">
+  <div class="cols board-only" id="boardCols" role="tabpanel" aria-labelledby="bvClassic" tabindex="-1">
     <div>
       <div class="card timelinecard">
         <h2>Shift timeline <button class="cnt roll-edit" id="rollBtn" title="Click to change when your day starts">7:00am → 7:00am</button></h2>
@@ -1754,7 +1806,10 @@ return {
     </div>
   </div>
 
-  <div id="view-reports" hidden>
+  <!-- A Board sub-view, not a main view: `board-only` so it disappears with the
+       rest of the Board when you leave the tab, and its `hidden` attribute is
+       driven by setBoardView() alongside #checklist and #boardCols. -->
+  <div id="view-reports" class="board-only" role="tabpanel" aria-labelledby="bvReports" tabindex="-1" hidden>
     <div class="card">
       <h2>Reports <span class="cnt" id="repCount">0 tasks</span></h2>
       <div class="sub">Completed and pending tasks recorded in the lanes, filtered by the date they were added.</div>
@@ -2071,6 +2126,28 @@ return {
        morning's date, not the previous evening's shift. This is the one place
        in the app where today() is deliberately NOT the right function. -->
   <div id="view-exp" hidden>
+
+    <!-- Expense Tracker sub-navigation. Subscriptions used to be a main tab of
+         its own; it is a SECTION of this one now, because it was never a second
+         ledger - every charge a subscription files is an ordinary Expense
+         Tracker row in the same array, and it always rode on the same `exp`
+         capability. Same pennant shapes as the Board's view switcher rather
+         than a second nav idiom, so a nested section looks the same wherever
+         the app has one. -->
+    <div class="pnav">
+      <div class="sub-tabs" role="tablist" aria-label="Expense Tracker sections">
+        <button class="sub-tab on" id="xnavTracker" data-xnav="tracker" role="tab" aria-selected="true" aria-controls="exp-pane-tracker">
+          <svg class="bv-i bv-i-s" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="M3.4 1.9h9.2v12.2l-1.85-1.2-1.85 1.2-1.8-1.2-1.85 1.2z"/><path d="M5.9 5.5h4.2M5.9 8.5h4.2"/></svg>
+          <span><span class="bv-lg">Every </span>Expense</span>
+        </button>
+        <button class="sub-tab" id="xnavSubs" data-xnav="subs" role="tab" aria-selected="false" aria-controls="view-subs">
+          <svg class="bv-i bv-i-s" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="M13.5 7.3A5.6 5.6 0 0 0 3.6 4.3"/><path d="M2.5 8.7a5.6 5.6 0 0 0 9.9 3"/><path d="M3.3 1.7v2.9h2.9M12.7 14.3v-2.9H9.8"/></svg>
+          <span><span class="bv-lg">Recurring </span>Subscriptions</span>
+        </button>
+      </div>
+    </div>
+
+    <div id="exp-pane-tracker" role="tabpanel" aria-labelledby="xnavTracker" tabindex="-1">
     <div class="card">
       <h2>Expense Tracker <span class="cnt" id="xCnt">0</span></h2>
       <div class="sub">Catch it the moment it happens. An amount and a few words is a complete entry &mdash; the date, category and the rest can wait, or never come at all.</div>
@@ -2123,6 +2200,83 @@ return {
       </div>
       <div id="xList"></div>
     </div>
+    </div><!-- /#exp-pane-tracker -->
+
+    <!-- ================= RECURRING SUBSCRIPTIONS ===============================
+         A subscription is a RULE, not a transaction. The transactions it produces
+         are ordinary Expense Tracker rows - same array, same shape, same id
+         space - which is why every existing total, breakdown, trend, search and
+         filter picks them up without one line of those functions changing. The
+         only thing marking them out is a `sub` field carrying the rule's id.
+
+         That is also why this is a section of the Expense Tracker rather than a
+         tab beside it. It was its own tab first, on the argument that the two
+         are used at different rhythms - expenses many times a day, subscriptions
+         set up once and left alone - but rhythm is a reason to make something a
+         second STOP, not a second PLACE: a rule that only ever produces expenses
+         belongs where the expenses are. It has always ridden on the same `exp`
+         capability, so nothing about who can see it changed.               -->
+    <div id="view-subs" role="tabpanel" aria-labelledby="xnavSubs" tabindex="-1" hidden>
+      <div class="card">
+        <h2>Recurring Subscriptions <span class="cnt" id="sbCnt">0</span></h2>
+        <div class="sub">Everything you pay for on a schedule. Each one files its own expense on its billing date, so subscriptions turn up in your weekly, monthly and yearly totals without you ever typing them in.</div>
+        <div class="xsum" id="sbSum"></div>
+        <div id="sbUpcoming"></div>
+      </div>
+
+      <div class="card">
+        <h2 id="sbFormTitle">Add a subscription</h2>
+        <div class="sub" id="sbFormSub">Charges are recorded from the billing date onward. Set a date in the past and the charges since then are filed too &mdash; useful when you are catching up, surprising if you did not mean it.</div>
+        <form class="sbf" id="sbForm" autocomplete="off">
+          <div class="sbf-row">
+            <div class="ag-f sbf-grow">
+              <label for="sbName">Service</label>
+              <input id="sbName" maxlength="60" placeholder="Netflix, Spotify, iCloud&hellip;">
+            </div>
+            <div class="ag-f">
+              <label for="sbAmt">Amount</label>
+              <input id="sbAmt" type="text" inputmode="decimal" placeholder="0.00">
+            </div>
+          </div>
+          <div class="sbf-row">
+            <div class="ag-f">
+              <label for="sbFreq">Billing</label>
+              <select id="sbFreq">
+                <option value="monthly">Monthly</option>
+                <option value="yearly">Yearly</option>
+              </select>
+            </div>
+            <div class="ag-f">
+              <label for="sbDate">Billing date</label>
+              <input id="sbDate" type="date">
+            </div>
+            <div class="ag-f">
+              <label for="sbCat">Category</label>
+              <select id="sbCat"></select>
+            </div>
+          </div>
+          <div class="ag-f">
+            <label for="sbNote">Notes</label>
+            <input id="sbNote" maxlength="200" placeholder="Optional &mdash; which card it is on, who else uses it&hellip;">
+          </div>
+          <label class="am-check"><input type="checkbox" id="sbActive" checked> Active &mdash; keep filing expenses for this one</label>
+          <div class="sbf-act">
+            <button class="ag-btn" type="submit" id="sbSave">Add subscription</button>
+            <button class="ag-btn ghost" type="button" id="sbCancel" hidden>Cancel</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Your subscriptions</h2>
+        <div class="sub-tabs">
+          <button class="sub-tab on" data-sbview="active">Active</button>
+          <button class="sub-tab" data-sbview="inactive">Paused</button>
+          <button class="sub-tab" data-sbview="all">All</button>
+        </div>
+        <div id="sbList"></div>
+      </div>
+    </div>
   </div>
 
 
@@ -2154,79 +2308,6 @@ return {
     </div>
   </div>
 
-  <!-- ================= RECURRING SUBSCRIPTIONS ===============================
-       A subscription is a RULE, not a transaction. The transactions it produces
-       are ordinary Expense Tracker rows - same array, same shape, same id
-       space - which is why every existing total, breakdown, trend, search and
-       filter picks them up without one line of those functions changing. The
-       only thing marking them out is a `sub` field carrying the rule's id.
-
-       Kept on its own tab rather than folded into the Expense Tracker because
-       the two are used at completely different rhythms: expenses are captured
-       many times a day, subscriptions are set up once and then left alone. It
-       rides on the SAME `exp` capability though - if you can see the Expense
-       Tracker you can see what feeds it.                                    -->
-  <div id="view-subs" hidden>
-    <div class="card">
-      <h2>Recurring Subscriptions <span class="cnt" id="sbCnt">0</span></h2>
-      <div class="sub">Everything you pay for on a schedule. Each one files its own expense on its billing date, so subscriptions turn up in your weekly, monthly and yearly totals without you ever typing them in.</div>
-      <div class="xsum" id="sbSum"></div>
-      <div id="sbUpcoming"></div>
-    </div>
-
-    <div class="card">
-      <h2 id="sbFormTitle">Add a subscription</h2>
-      <div class="sub" id="sbFormSub">Charges are recorded from the billing date onward. Set a date in the past and the charges since then are filed too &mdash; useful when you are catching up, surprising if you did not mean it.</div>
-      <form class="sbf" id="sbForm" autocomplete="off">
-        <div class="sbf-row">
-          <div class="ag-f sbf-grow">
-            <label for="sbName">Service</label>
-            <input id="sbName" maxlength="60" placeholder="Netflix, Spotify, iCloud&hellip;">
-          </div>
-          <div class="ag-f">
-            <label for="sbAmt">Amount</label>
-            <input id="sbAmt" type="text" inputmode="decimal" placeholder="0.00">
-          </div>
-        </div>
-        <div class="sbf-row">
-          <div class="ag-f">
-            <label for="sbFreq">Billing</label>
-            <select id="sbFreq">
-              <option value="monthly">Monthly</option>
-              <option value="yearly">Yearly</option>
-            </select>
-          </div>
-          <div class="ag-f">
-            <label for="sbDate">Billing date</label>
-            <input id="sbDate" type="date">
-          </div>
-          <div class="ag-f">
-            <label for="sbCat">Category</label>
-            <select id="sbCat"></select>
-          </div>
-        </div>
-        <div class="ag-f">
-          <label for="sbNote">Notes</label>
-          <input id="sbNote" maxlength="200" placeholder="Optional &mdash; which card it is on, who else uses it&hellip;">
-        </div>
-        <label class="am-check"><input type="checkbox" id="sbActive" checked> Active &mdash; keep filing expenses for this one</label>
-        <div class="sbf-act">
-          <button class="ag-btn" type="submit" id="sbSave">Add subscription</button>
-          <button class="ag-btn ghost" type="button" id="sbCancel" hidden>Cancel</button>
-        </div>
-      </form>
-    </div>
-
-    <div class="card">
-      <h2>Your subscriptions</h2>
-      <div class="sub-tabs">
-        <button class="sub-tab on" data-sbview="active">Active</button>
-        <button class="sub-tab" data-sbview="inactive">Paused</button>
-        <button class="sub-tab" data-sbview="all">All</button>
-      </div>
-      <div id="sbList"></div>
-    </div>
-  </div>
   </div><!-- /.viewpanel : closes the sheet opened just under the tab strip -->
 
   <style>
@@ -2960,6 +3041,20 @@ var WC_MAX=4;
 // then - slice(0, undefined) silently keeps the whole string.
 var NOTE_MAX=2000;
 
+/* The Board's sub-views: the lane columns, the ruled checklist, and Reports.
+   ONE list, read by both norm() below and setBoardView() further down, because
+   holding the set in two places is exactly how Reports first shipped as a
+   sub-view that setBoardView() accepted and norm() then quietly rewrote back to
+   "classic" on the next load.
+   Declared up here for the same reason as WC_MAX and NOTE_MAX above: norm()
+   runs during initial execution (var S = load()), so a `var` beside
+   setBoardView() would still be undefined by then - and an undefined lookup
+   here means EVERY board opens on Classic.
+   An unknown value falling back to "classic" is also what makes this safe to
+   sync: a device on an older build hands this a boardView it has never heard
+   of, and vice versa. */
+var BOARD_VIEWS={classic:1,checklist:1,reports:1};
+
 function norm(s){
   if(!s||typeof s!=="object")s={};
   if(!s.tasks)s.tasks=[];
@@ -3003,8 +3098,9 @@ function norm(s){
   // two devices disagreeing about when "today" begins would put the same
   // 3am edit on two different dates.
   if(typeof s.roll!=="number"||s.roll<0||s.roll>=1440)s.roll=420;
-  // Which Board layout is showing: the lane columns, or the ruled checklist.
-  if(["classic","checklist"].indexOf(s.boardView)<0)s.boardView="classic";
+  // Which Board sub-view is showing. BOARD_VIEWS, not a literal list: see the
+  // note on its declaration for what a second copy of this set cost us.
+  if(!BOARD_VIEWS[s.boardView])s.boardView="classic";
   /* Expenses. KEYED like tasks, so two devices that both add a transaction
      while offline keep BOTH on merge rather than one overwriting the other -
      which for money is the difference between a record and a guess. */
@@ -3297,7 +3393,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="4.0";
+var APP_VERSION="4.2";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -3308,6 +3404,8 @@ var APP_VERSION="4.0";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-07T09:15:00+08:00",text:"Seven tabs across the top became four. Reports moved down into the Board, where it now sits beside Classic view and Consolidated checklist -- three ways of looking at the same lanes, in one switcher, instead of a report living a tab away from the thing it reports on. Subscriptions moved into the Expense Tracker in the same way, as a section next to Every expense, which is where it always belonged: every charge it files is an ordinary expense row. Nothing was removed and nothing needs setting up again -- your reports, filters, subscriptions and their filed charges are exactly where they were, one level in. The tab you are on is also obvious now: it carries a green cap along its top edge and a faint green tint, in both the light and dark themes, and the section tabs inside Board and Expense Tracker mark themselves the same way."},
+  {ts:"2026-09-06T14:00:00+08:00",text:"Tasks on the Board can carry notes. Every task row grew a small speech bubble; tap it and a drawer opens under the task holding as many notes as you want, each with its own edit and delete. Closed, the bubble turns green and shows a count, so you can see which tasks have detail behind them without opening anything."},
   {ts:"2026-09-06T13:10:00+08:00",text:"New Widgets button in the header, opening a small panel that floats over whatever tab you are on -- it does not move you off your work, and the board stays usable underneath it. Two things live in it so far. World Clocks shows your own time at the top, always, with up to four other cities under it; each one gives the time, the date, how far ahead or behind it is, and a marker when it is already tomorrow there or still yesterday. You can reorder them and swap them out, and it tells you when you have used all four. The Bible widget lets you read the King James or New King James version without leaving the app -- pick a book and chapter, or search for a phrase and jump straight to the verse, or just type something like John 3:16. Text size is adjustable, it remembers where you stopped reading, and any chapter you have already opened stays readable with no connection."},
   {ts:"2026-09-06T09:40:00+08:00",text:"New Subscriptions tab for everything you pay for on a schedule -- Netflix, iCloud, the gym. Add a service with its amount, whether it bills monthly or yearly, and the billing date, and from then on it files its own expense every time it comes due. Those charges are ordinary transactions, so they turn up in your weekly, monthly and yearly totals, the category breakdown and the twelve-month trend without you typing anything. Pause one and it stops filing but keeps its history; delete a charge by hand and it stays deleted. The tab also shows what your subscriptions cost per month and per year, and what is due in the next 30 days."},
   {ts:"2026-09-06T08:20:00+08:00",text:"The app can call you something other than \"Dave\" now. Set a nickname when you sign up, or have a Super Admin set one for you, and the greeting and the browser tab both use it. Leave it blank and it picks a silly one for you instead -- Pumpkin, Goofball, Silly Goose and eleven others -- fresh every time you open the app. A nickname a Super Admin sets reaches you the next time you sign in."},
@@ -4526,14 +4624,31 @@ function renderChecklist(){
   }
 }
 
+// BOARD_VIEWS is declared beside norm() near the top of this script - it has
+// to exist before load() runs, and norm() and this function must agree on the
+// set or a saved sub-view gets rewritten out from under you.
 function setBoardView(v){
-  S.boardView=(v==="checklist")?"checklist":"classic";
-  var chk=S.boardView==="checklist";
-  document.getElementById("checklist").hidden=!chk;
-  document.querySelector(".cols").hidden=chk;
+  if(!BOARD_VIEWS[v])v="classic";
+  /* An account holding `reports` and not `board` reaches the Board tab only
+     because Reports lives inside it (see applyAccess), so this is the only
+     sub-view it can be on - including when a synced S.boardView says otherwise.
+     Enforced here rather than only at the click handler because renderAll()
+     calls straight into this function on every save. */
+  if(v!=="reports"&&!can("board")&&can("reports"))v="reports";
+  S.boardView=v;
+  document.getElementById("boardCols").hidden=(v!=="classic");
+  document.getElementById("checklist").hidden=(v!=="checklist");
+  document.getElementById("view-reports").hidden=(v!=="reports");
   document.querySelectorAll("[data-bview]").forEach(function(b){
-    b.classList.toggle("on",b.dataset.bview===S.boardView);});
-  if(chk)renderChecklist();
+    var on=(b.dataset.bview===v);
+    b.classList.toggle("on",on);
+    b.setAttribute("aria-selected",on?"true":"false");
+  });
+  if(v==="checklist")renderChecklist();
+  // Reports reads S.tasks live, so it is rebuilt on arrival AND on every
+  // renderAll() while you are standing on it - a task ticked in another window
+  // must not leave a stale count here.
+  if(v==="reports")renderReportsView();
 }
 
 function toggleTask(id){
@@ -5043,9 +5158,11 @@ function renderAll(){
   // Both Board layouts re-render together. The checklist is cheap (one pass
   // over S.tasks) and this way a change made in either one is reflected in the
   // other the moment you switch, with no staleness to reason about.
+  // ...and Reports with them: setBoardView() re-renders whichever of the three
+  // is showing, which is why the separate "if we are on the reports view"
+  // re-render that used to sit below is gone.
   setBoardView(S.boardView);
   renderAptLaneOptions();
-  if(document.body.classList.contains("view-reports"))renderReportsView();
   applyTheme();
 }
 
@@ -5133,21 +5250,25 @@ document.addEventListener("visibilitychange",function(){if(!document.hidden&&fil
    2. The parts that ARE a boundary - the guest clock and anything that touches
       another person's row - are enforced by the Worker. A forged capability
       list gets a 403 from the server, not a working admin panel.            */
-/* One capability can own more than one tab: Subscriptions is part of expense
-   tracking, not a separate permission, so it rides on `exp`. Giving it a
-   capability of its own would have meant a Worker deploy to add one string to
-   three role defaults, for a screen nobody would ever want separately. */
+/* What each capability switches on. These are element ids, not view names, and
+   two of them now name a SUB-tab rather than a main tab - which is the whole
+   point: `exp` no longer has to list a second main tab for Subscriptions
+   because Subscriptions is a section inside the Expense Tracker and rides on
+   `exp` wholesale, and `reports` points at the Reports pennant inside the
+   Board. Subscriptions still gets no capability of its own: giving it one
+   would mean a Worker deploy to add a string to three role defaults, for a
+   screen nobody would ever want separately from the expenses it files. */
 var CAP_TABS = {
   board:  ["tabBoard"],
   cal:    ["tabCal"],
-  exp:    ["tabExp","tabSubs"],
-  reports:["tabReports"],
+  exp:    ["tabExp"],
+  reports:["bvReports"],
   history:["tabHistory"],
   admin:  ["tabAdmin"]
 };
 var CAP_LABELS = {
   board:"Board", cal:"Personal Calendar", exp:"Expense Tracker & Subscriptions",
-  reports:"Reports", history:"Board History",
+  reports:"Board Reports", history:"Board History",
   "history.appver":"App version history", admin:"User & Role Management"
 };
 var ROLE_LABELS = {superadmin:"Super Admin", user:"User", guest:"Guest"};
@@ -5163,19 +5284,29 @@ function myCaps(){
 function can(cap){ return myCaps().indexOf(cap)>=0; }
 function myRole(){ var u=PDAuth.user()||{}; return u.role||"user"; }
 
-/* Hide the tabs this account has no business seeing, and make sure we are not
-   standing on one of them. Called once at boot. */
+/* Hide the tabs - and now the SUB-tabs - this account has no business seeing,
+   and make sure we are not standing on one of them. Called once at boot. */
 function applyAccess(){
   var caps=myCaps(), firstVisible=null;
   Object.keys(CAP_TABS).forEach(function(cap){
     var ok=caps.indexOf(cap)>=0;
     // "history.appver" grants the History TAB, but only its version sub-view.
     if(cap==="history"&&!ok&&caps.indexOf("history.appver")>=0)ok=true;
+    /* The same shape one level down, and the reason it exists: Reports is a
+       Board sub-view now, so an account given `reports` without `board` has to
+       be let through the Board tab or it cannot reach the one screen it was
+       granted. What it then sees inside is narrowed below. */
+    if(cap==="board"&&!ok&&caps.indexOf("reports")>=0)ok=true;
     CAP_TABS[cap].forEach(function(id){
       var el=document.getElementById(id);
       if(el)el.hidden=!ok;
     });
-    if(ok&&!firstVisible)firstVisible=cap;
+    // `reports` is excluded because it no longer names a main tab, and
+    // setView("reports") would be a view that does not exist. Written as an
+    // explicit exclusion rather than a lookup in MAIN_TABS because that object
+    // is declared with `var` further down the file - hoisted but still
+    // undefined when applyAccess() runs at boot.
+    if(ok&&!firstVisible&&cap!=="reports")firstVisible=cap;
   });
   /* Board History's sub-views: someone with only history.appver sees the app's
      changelog and none of the board's own audit trail. Done here rather than in
@@ -5185,6 +5316,16 @@ function applyAccess(){
     b.hidden=appverOnly&&b.dataset.hview!=="appver";
   });
   if(appverOnly)curHView="appver";
+  /* The Board's sub-views, on the same principle: someone holding `reports`
+     and not `board` gets the Board tab as a door to Reports, and nothing else
+     inside it. body.reports-only hides the Board's own content (one CSS rule),
+     this hides the two pennants that would switch to it, and setBoardView()
+     refuses the switch even if one were clicked. */
+  var repOnly=!can("board")&&can("reports");
+  document.body.classList.toggle("reports-only",repOnly);
+  document.querySelectorAll("[data-bview]").forEach(function(b){
+    b.hidden=repOnly&&b.dataset.bview!=="reports";
+  });
   // If the active tab just got hidden, move somewhere they can actually be.
   var active=document.querySelector(".tab.on");
   if(active&&active.hidden&&firstVisible)setView(firstVisible==="board"?"board":firstVisible);
@@ -5261,10 +5402,10 @@ function closeProfile(){ pfEl("profModal").hidden=true; }
    contradicts what it can do. Overrides on it made by hand in the sheet are
    still preserved - see umOverrides. */
 var UM_PERMS=[
-  ["board","Board","Lanes, tasks, the shift timeline and the daily reminders."],
+  ["board","Board","Lanes, tasks, the shift timeline and the daily reminders, in Classic view and the Consolidated Checklist."],
   ["cal","My Personal Calendar","Month, week, day, year and agenda views, and recurring activities."],
-  ["exp","Expense Tracker","Recording expenses, the recurring Subscriptions that file them, and every total and breakdown built from both."],
-  ["reports","Reports","Completion reports, lane breakdowns and the spreadsheet export."],
+  ["exp","Expense Tracker","Recording expenses, the Recurring Subscriptions section that files them, and every total and breakdown built from both."],
+  ["reports","Board Reports","The Reports section of the Board: completion reports, lane breakdowns and the spreadsheet export. Granted on its own it opens the Board tab showing only this section."],
   ["history","Board History","The full audit trail of every change made to the board."],
   ["history.appver","App version history","The plain-English changelog of the app itself. Grants the Board History tab on its own, showing only this section and none of the audit trail."]
 ];
@@ -7098,11 +7239,38 @@ document.querySelectorAll("[data-sbview]").forEach(function(b){
   });
 });
 
+/* ---- Expense Tracker sub-navigation --------------------------------------
+   Deliberately NOT persisted the way S.boardView is. The Board opens where you
+   left it because you live in one layout for weeks at a time; Subscriptions is
+   somewhere you go, change a thing and leave, and reopening the app onto the
+   subscription form instead of onto today's spending would be wrong every
+   time. So this is a plain var, reset to the tracker on reload - and it is not
+   board data, so it must never enter S or the sync registry. */
+var expNav="tracker";
+function setExpNav(v){
+  expNav=(v==="subs")?"subs":"tracker";
+  document.getElementById("exp-pane-tracker").hidden=(expNav!=="tracker");
+  document.getElementById("view-subs").hidden=(expNav!=="subs");
+  document.querySelectorAll("[data-xnav]").forEach(function(b){
+    var on=(b.dataset.xnav===expNav);
+    b.classList.toggle("on",on);
+    b.setAttribute("aria-selected",on?"true":"false");
+  });
+  // Rebuilt on arrival: a charge filed by subCatchUp() since you last looked
+  // moves a "next due" date, and the summary is read off S.subs each time.
+  if(expNav==="subs")renderSubs();
+}
+document.querySelectorAll("[data-xnav]").forEach(function(b){
+  b.addEventListener("click",function(){ setExpNav(b.dataset.xnav); });
+});
+
 // One place naming the main tabs, so setView and the keyboard handler
 // agree on both the order and the element ids.
 // Order must match the DOM: the keyboard handler walks this map.
-var MAIN_TABS={board:"tabBoard",cal:"tabCal",exp:"tabExp",subs:"tabSubs",
-  reports:"tabReports",history:"tabHistory",admin:"tabAdmin"};
+// Reports and Subscriptions are absent on purpose - they are sub-views now,
+// owned by setBoardView() and setExpNav() respectively.
+var MAIN_TABS={board:"tabBoard",cal:"tabCal",exp:"tabExp",
+  history:"tabHistory",admin:"tabAdmin"};
 Object.keys(MAIN_TABS).forEach(function(k){
   document.getElementById(MAIN_TABS[k]).addEventListener("click",function(){setView(k);});
 });
@@ -7112,21 +7280,21 @@ function setView(v){
      a signed token. Both exist so the app never renders a screen it would then
      have to fill with 403s. */
   if(v==="admin"&&!can("admin"))v="board";
-  document.body.classList.toggle("view-reports",v==="reports");
   document.body.classList.toggle("view-history",v==="history");
   document.body.classList.toggle("view-cal",v==="cal");
   document.body.classList.toggle("view-exp",v==="exp");
   document.body.classList.toggle("view-admin",v==="admin");
-  document.body.classList.toggle("view-subs",v==="subs");
   // the CSS class alone can't win: the static `hidden` attribute in the markup
   // forces display:none via the UA stylesheet no matter what a class-based
   // rule says, so the attribute itself has to be flipped here.
-  document.getElementById("view-reports").hidden=(v!=="reports");
+  // #view-reports and #view-subs are NOT in this list any more - they are
+  // sub-views inside Board and Expense Tracker, and their `hidden` belongs to
+  // setBoardView() and setExpNav(). Flipping them here too would mean two
+  // owners for one attribute and a sub-view that reopens on the wrong pane.
   document.getElementById("view-history").hidden=(v!=="history");
   document.getElementById("view-cal").hidden=(v!=="cal");
   document.getElementById("view-exp").hidden=(v!=="exp");
   document.getElementById("view-admin").hidden=(v!=="admin");
-  document.getElementById("view-subs").hidden=(v!=="subs");
   /* Driven from one map rather than four repeated lines, so the class, the
      aria state and the roving tabindex cannot fall out of step - which they
      would the first time someone added a fifth tab and updated only the
@@ -7140,12 +7308,16 @@ function setView(v){
   });
   document.getElementById("viewPanel").setAttribute("aria-labelledby",MAIN_TABS[v]||"tabBoard");
   if(v==="cal")renderCalendar();
-  if(v==="exp"){ subCatchUp(); renderExpenses(); }
-  if(v==="subs"){ subCatchUp(); renderSubs(); renderExpenses(); }
+  // Returning to a tab re-enters whichever sub-view you left it on, and each
+  // of these re-renders that sub-view rather than trusting what is on screen.
+  if(v==="board")setBoardView(S.boardView);
+  // subCatchUp() first, then both panes: a subscription that fell due while you
+  // were elsewhere has to become an expense row before either the totals or the
+  // "next due" dates are drawn from it.
+  if(v==="exp"){ subCatchUp(); renderExpenses(); setExpNav(expNav); }
   // Re-read on every visit rather than caching: roles and statuses are edited
   // from other sessions, and a stale list here is a list you act on.
   if(v==="admin")umLoad();
-  if(v==="reports")renderReportsView();
   if(v==="history"){ curHView=curHView||"log"; flushHistory(); renderHistory(); }
   else curHView=null;
 }

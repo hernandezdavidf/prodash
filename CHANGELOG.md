@@ -2,6 +2,124 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-07 — Navigation hierarchy: Reports under Board, Subscriptions under Expenses (v4.2)
+
+Seven main tabs became four. Reports and Subscriptions did not go away — they
+moved **down a level**, each into the tab whose data it was already made of.
+
+### Reports is a Board sub-view
+
+`#view-reports` reads `S.tasks` and `S.lanes` and nothing else. "The lanes as
+columns", "the lanes as one checklist" and "the lanes counted up over a date
+range" are three views of one dataset, so they now share one switcher: the
+Board's pennant strip gained a third tab, **Reports**, beside Classic view and
+Consolidated checklist.
+
+Mechanically that meant `#view-reports` becoming `.board-only` and its `hidden`
+attribute changing owner — from `setView()` to `setBoardView()`, which now
+drives three panes instead of two:
+
+```js
+document.getElementById("boardCols").hidden   = (v!=="classic");
+document.getElementById("checklist").hidden   = (v!=="checklist");
+document.getElementById("view-reports").hidden= (v!=="reports");
+```
+
+`body.view-reports` is gone, and so is the `if(document.body.classList
+.contains("view-reports"))renderReportsView()` line in `renderAll()` —
+`setBoardView()` re-renders whichever pane is showing, so Reports stays live
+while you tick tasks off in another window.
+
+**The bug this shipped with, and the fix.** `norm()` had its own copy of the
+valid sub-view list:
+
+```js
+if(["classic","checklist"].indexOf(s.boardView)<0)s.boardView="classic";
+```
+
+`setBoardView()` accepted `"reports"`, saved it, and `norm()` silently rewrote
+it back on the next load — the Board reopened on Classic every time. Both now
+read one `BOARD_VIEWS` map, declared beside `NOTE_MAX` at the top of the script
+for the same hoisting reason: `norm()` runs during `var S = load()`, so a `var`
+declared beside `setBoardView()` would still be `undefined` there, and an
+`undefined` lookup would send *every* board to Classic.
+
+### Subscriptions is an Expense Tracker section
+
+A subscription is a rule that produces ordinary expense rows in the same array;
+it has always ridden on the same `exp` capability. It was originally its own tab
+on the argument that the two are used at different rhythms — expenses many times
+a day, subscriptions set up once and left alone. That is a reason to make
+something a second *stop*, not a second *place*.
+
+`#view-subs` moved inside `#view-exp`, alongside a new `#exp-pane-tracker`
+wrapper, switched by `setExpNav()`. That state is a plain `var expNav`, not part
+of `S`: the Board reopens where you left it because you live in one layout for
+weeks, whereas reopening the app onto the subscription form instead of today's
+spending would be wrong every time.
+
+### One idiom for a nested section
+
+The Board's pennant CSS was scoped under `.bview`. It is now `.pnav` and shared
+by both switchers, so the app has one look for "which part of this tab am I in"
+rather than a second one invented per tab. `.bview` survives as the Board's own
+hook and carries no styling. Both groups gained `role="tablist"` /
+`aria-selected`, kept in step by their set functions.
+
+### The active tab now says so in colour
+
+Three layered cues on `.tabbar .tab.on`, replacing "it is the pale one":
+
+* a **4px `--olive` cap** along the top edge — a `border-top`, not a pseudo-
+  element, so it follows the 12px corner radius and cannot escape the tab's
+  silhouette. `--olive`, not `--forest`, because it has to read as green on
+  both `--panel` values (`#E4E9EB` light, `#141B1E` dark) and `--forest`
+  vanishes into the dark one;
+* a **green wash that fades out by 62%**, so the bottom of the tab is still
+  exactly `--panel` — the seamless join with the sheet below is the whole
+  illusion and tinting through it would break it;
+* the label at **weight 800** against the inactive tabs' 600.
+
+The label stays `--ink`. `--forest-ink` on `--panel` is 4.2:1 and this text is
+12.5px, so a green label would have been the one part of this change that failed
+AA — colour carries the emphasis, the neutral carries the words. The pennants
+and the pill sub-tabs were already brand-green when active, so the same rule now
+reads top to bottom.
+
+Fixed in passing: the phone-width `.tab.on{padding-top:10px}` rule was `(0,2,0)`
+against a `(0,3,0)` desktop rule and had never applied. A media query does not
+change specificity.
+
+### Access control follows the move
+
+`CAP_TABS` now points two capabilities at sub-tabs rather than main tabs. `exp`
+no longer lists a second tab for Subscriptions; `reports` points at the Reports
+pennant. An account granted `reports` without `board` is let through the Board
+tab — it is the only door to the screen it was granted — and then sees only
+Reports, stated as one CSS rule:
+
+```css
+body.reports-only .board-only:not(.bview):not(#view-reports){display:none}
+```
+
+`setBoardView()` refuses any other sub-view for that account even if one were
+clicked, and the two other pennants are hidden. Same shape as the existing
+`history.appver` case, one level down.
+
+### Unchanged
+
+Every Reports filter, the Current Day Report and its Excel export, every
+subscription rule, its filed charges and its effect on the weekly/monthly/yearly
+totals, the breakdown and the twelve-month trend. Nothing to re-enter and no
+migration: `boardView` is the only synced value that changed meaning, and an
+unknown one falls back to Classic in both directions, so a device on the old
+build and a device on this one can sync to each other without either losing its
+place.
+
+Also added: a version-history line for v4.1 (sub-notes), which shipped without
+one.
+
+
 ## 2026-09-06 — Sub-notes on tasks (v4.1)
 
 A task on the Board can now carry notes. Every task row grew one quiet speech
