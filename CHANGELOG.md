@@ -2,6 +2,38 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-07 — Removed the "company-hour" nudge (v4.3.1)
+
+David flagged this as a bug, and it was one. The rule in `renderNudges()` was:
+
+```js
+if(n>sm("14:00")&&!l.biz)
+  out.push(["","company-hour","<b>Your company didn't get its hour.</b> …"]);
+```
+
+`n` is minutes since the 07:00 roll and `sm("14:00")` is 420, so the condition
+reads "any time after 2pm" — with **no upper bound**. Once the shift crossed
+2pm the banner stayed up for the remaining seventeen hours, which is why it was
+still on screen at 5:43am insisting that "Once Day Client starts it's gone"
+about a Day Client block that had ended the previous afternoon. The copy is
+written for the minutes around 2pm; the condition kept it alive all night.
+
+Both lines are removed, replaced by a comment recording the failure mode so the
+rule doesn't get re-added without an end time.
+
+**Not touched:** the `biz` non-negotiable ("My company — 30 min") is still in
+`DEFAULT_RITUALS` and still counts toward the Rituals percentage and the
+streak. Only its nudge is gone.
+
+**Same shape elsewhere:** `school-fetch` (16:15) and `nighta-eod` (06:30) are
+written identically — no upper bound — so they also persist to the end of the
+shift. Left as they are; both are arguably still actionable late, and neither
+was reported. Worth a bounded window if they start reading as noise too.
+
+### Version
+
+`APP_VERSION` 4.3 → 4.3.1, `CACHE_VERSION` `prodash-v6` → `prodash-v7`.
+
 ## 2026-09-07 — Removed the shift progress bar and the editable roll time (v4.3)
 
 Two removals, both requested by David. Neither changes any stored data.

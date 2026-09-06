@@ -3379,7 +3379,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="4.3";
+var APP_VERSION="4.3.1";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -3390,6 +3390,7 @@ var APP_VERSION="4.3";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-07T16:10:00+08:00",text:"Removed the reminder that said your company didn't get its hour. It had no end time, so it appeared at 2pm and then simply stayed for the rest of the shift -- at 5am it was still telling you that Day Client was about to take the 1-2pm slot, hours after Day Client had finished. Your \"My company -- 30 min\" non-negotiable is unchanged and still on the list; it just no longer puts a banner at the top of the board."},
   {ts:"2026-09-07T15:30:00+08:00",text:"Two things left the app. The green progress bar across the bottom of the header is gone -- the one counting how far through the shift you were and how long until 7am. It measured the clock, not you, and a bar sitting at 95% at 5am was only ever telling you the day was nearly over. The shift start time is also no longer editable: the 7:00am chip on the Shift timeline and its time picker have been removed. Your day still rolls over at 7:00am exactly as before, and the line under the timeline still says so -- it just cannot be changed from the app any more."},
   {ts:"2026-09-07T09:15:00+08:00",text:"Seven tabs across the top became four. Reports moved down into the Board, where it now sits beside Classic view and Consolidated checklist -- three ways of looking at the same lanes, in one switcher, instead of a report living a tab away from the thing it reports on. Subscriptions moved into the Expense Tracker in the same way, as a section next to Every expense, which is where it always belonged: every charge it files is an ordinary expense row. Nothing was removed and nothing needs setting up again -- your reports, filters, subscriptions and their filed charges are exactly where they were, one level in. The tab you are on is also obvious now: it carries a green cap along its top edge and a faint green tint, in both the light and dark themes, and the section tabs inside Board and Expense Tracker mark themselves the same way."},
   {ts:"2026-09-06T14:00:00+08:00",text:"Tasks on the Board can carry notes. Every task row grew a small speech bubble; tap it and a drawer opens under the task holding as many notes as you want, each with its own edit and delete. Closed, the bubble turns green and shows a count, so you can see which tasks have detail behind them without opening anything."},
@@ -4357,8 +4358,12 @@ function renderNudges(){
     out.push(["cool","sleep-window","<b>This is your sleep window.</b> It's the only one in the 24 hours. Anything you do now is borrowed against tomorrow's judgment, not found time."]);
   if(b&&b.nadir)
     out.push(["","circadian-low","<b>2:30–6am is your circadian low.</b> Mechanical work only — tickets, logs, routine tasks. Don't send anything you can't unsend, and don't make calls you'd want to revisit."]);
-  if(n>sm("14:00")&&!l.biz)
-    out.push(["","company-hour","<b>Your company didn't get its hour.</b> 1–2pm is the only slot in the day nobody else has a claim on. Once Day Client starts it's gone."]);
+  // The "company-hour" nudge was removed on 2026-09-07. Its condition was
+  // n > sm("14:00") && !l.biz, with no upper bound - so once the shift passed
+  // 2pm it stayed on screen for the remaining seventeen hours, still claiming
+  // at 5am that Day Client was about to take the 1-2pm slot. Don't re-add it
+  // without an end time. The "My company - 30 min" non-negotiable is untouched;
+  // it just no longer raises a nudge of its own.
   if(n>sm("16:15")&&!l.fetch)
     out.push(["","school-fetch","<b>School fetch unchecked</b> — it's past 4:15pm."]);
   if(n>sm("06:30")&&!l.nightclienta)
