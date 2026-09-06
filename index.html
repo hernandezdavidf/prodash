@@ -244,6 +244,35 @@ header h1{font-size:26px;letter-spacing:.3px}
 .nowbar .nt{font-family:var(--serif);font-size:19px;font-weight:700}
 .nowbar .nm{color:var(--muted);font-size:12.5px}
 .nowbar .spacer{flex:1}
+/* When the thing you are IN is a calendar appointment rather than a routine
+   block, the whole bar takes the same transparent orange wash the timeline
+   already puts on .blk.ev - same rgba, deliberately, so "this is a commitment"
+   looks identical in both places instead of being two dialects of orange.
+   Must-attend swaps the left rule to red, matching the .nudge.apt-must tier. */
+.nowbar.ev{background:linear-gradient(90deg,rgba(251,140,0,.14),var(--paper) 62%)}
+.nowbar.ev .nt{color:var(--terra-ink)}
+.nowbar.must{border-left-color:var(--alert)}
+/* Upcoming is a quieter SECOND ROW, not a second colour: one thing is
+   happening and one thing is coming, and they must not compete for the same
+   glance. flex-basis:100% is what drops it onto its own line inside the
+   wrapping .nowbar. The 3px left bar echoes .blk-b in the timeline. */
+.nowup{flex-basis:100%;display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;
+  margin-top:11px;padding:8px 11px;border-radius:8px;border-left:3px solid var(--terra);
+  background:linear-gradient(90deg,rgba(251,140,0,.13),transparent 72%)}
+/* display:flex beats the UA [hidden] rule, so without this the row keeps its
+   box and its orange wash on every day that has no pending activity. */
+.nowup[hidden]{display:none}
+.nowup .nu-l{font-size:9.5px;text-transform:uppercase;letter-spacing:1.1px;font-weight:800;color:var(--terra-ink)}
+.nowup .nu-n{font-size:12.5px;font-weight:700;overflow-wrap:anywhere;min-width:0}
+.nowup .nu-m{font-size:11.5px;color:var(--muted)}
+.nowup .nu-c{font-size:11.5px;font-weight:700;color:var(--terra-ink);font-variant-numeric:tabular-nums}
+.nowup.must{border-left-color:var(--alert);background:linear-gradient(90deg,rgba(229,57,53,.11),transparent 72%)}
+.nowup.must .nu-l,.nowup.must .nu-c{color:var(--alert-ink)}
+/* Same token pair as .cal-tag.must, and for the reason those two tokens exist:
+   they FLIP together, so this reads as red type on a red tint in both themes.
+   A solid --alert-ink ground is right in light (5.6:1 with white) but wrong in
+   dark, where --alert-ink is itself a light red meant to BE the text. */
+.apt.must{background:var(--alert-lt);color:var(--alert-ink)}
 .pill{border:1px solid var(--line);border-radius:999px;padding:7px 15px;font-size:12.5px;font-weight:600;background:var(--paper);color:var(--forest-ink);transition:.15s}
 .pill:hover{background:var(--olive-lt);border-color:var(--olive)}
 .pill.on{background:var(--forest);color:var(--on-brand);border-color:var(--forest-ink)}
@@ -1519,6 +1548,13 @@ return {
         <div class="synced-note" id="cloudNote"></div>
       </div>
     </div>
+    <!-- The second commitment line. Empty and hidden whenever there is nothing
+         pending, so a quiet day looks exactly as it did before this existed.
+         It sits INSIDE .nowbar rather than under it because "what you are in"
+         and "what is coming" are one answer to one question - and .nowbar
+         already wraps, so flex-basis:100% drops this onto its own line
+         underneath both the block description and the sync pair. -->
+    <div class="nowup" id="nowUp" hidden></div>
   </div>
 
   <style>
@@ -3379,7 +3415,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="4.3.1";
+var APP_VERSION="4.4";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -3390,6 +3426,7 @@ var APP_VERSION="4.3.1";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-07T17:45:00+08:00",text:"The Now bar at the top of the Board now tells you about appointments as well as routine blocks. When what you are in is an actual commitment from your calendar rather than a block of your routine, the whole bar takes the same soft orange the Shift timeline uses and the label changes to Happening now, so a school run no longer arrives looking exactly like Wake + prep. Underneath it, a second line shows what is coming: the next activity you have not done yet, with the time it runs and a countdown, and it flips to Also now with the time remaining once that one starts too. Anything that has finished drops off by itself and the next one steps up. Must-attend items are marked in red rather than pushed to the front, so the order still matches your day. On a shift with nothing booked the second line is not there at all and the bar looks exactly as it always did. This is the Board only -- your Calendar tab is unchanged."},
   {ts:"2026-09-07T16:10:00+08:00",text:"Removed the reminder that said your company didn't get its hour. It had no end time, so it appeared at 2pm and then simply stayed for the rest of the shift -- at 5am it was still telling you that Day Client was about to take the 1-2pm slot, hours after Day Client had finished. Your \"My company -- 30 min\" non-negotiable is unchanged and still on the list; it just no longer puts a banner at the top of the board."},
   {ts:"2026-09-07T15:30:00+08:00",text:"Two things left the app. The green progress bar across the bottom of the header is gone -- the one counting how far through the shift you were and how long until 7am. It measured the clock, not you, and a bar sitting at 95% at 5am was only ever telling you the day was nearly over. The shift start time is also no longer editable: the 7:00am chip on the Shift timeline and its time picker have been removed. Your day still rolls over at 7:00am exactly as before, and the line under the timeline still says so -- it just cannot be changed from the app any more."},
   {ts:"2026-09-07T09:15:00+08:00",text:"Seven tabs across the top became four. Reports moved down into the Board, where it now sits beside Classic view and Consolidated checklist -- three ways of looking at the same lanes, in one switcher, instead of a report living a tab away from the thing it reports on. Subscriptions moved into the Expense Tracker in the same way, as a section next to Every expense, which is where it always belonged: every charge it files is an ordinary expense row. Nothing was removed and nothing needs setting up again -- your reports, filters, subscriptions and their filed charges are exactly where they were, one level in. The tab you are on is also obvious now: it carries a green cap along its top edge and a faint green tint, in both the light and dark themes, and the section tabs inside Board and Expense Tracker mark themselves the same way."},
@@ -4330,19 +4367,92 @@ function renderHeader(){
   document.getElementById("sStreak").textContent=daysStreak();
 }
 
+/* ---------- the Now bar --------------------------------------------------
+   It answers two questions, not one: what am I in, and what is coming.
+
+   "Ongoing" needed no new lookup - currentBlock() has always preferred an
+   appointment over the routine block it sits inside, so the bar was already
+   naming the right thing. What it never did was LOOK different, so a doctor's
+   appointment and "Wake + prep" arrived with identical weight. It now wears
+   the same transparent orange as .blk.ev in the timeline.
+
+   "Upcoming" was missing outright. The only warning about a commitment that
+   had not started yet was the appt-soon nudge, which is capped by that
+   activity's own lead time (2h by default, and 0 means never) - so anything
+   further out was invisible on the Board until it began.
+
+   Timed activities only. An all-day one has no start to count down to and no
+   end to pass, so it has no upcoming -> ongoing -> over transition to show;
+   it keeps announcing itself in the nudge strip, which is the right shape for
+   it. This is a Board change: .nowbar is board-only and the Calendar tab's
+   own rendering is untouched - the calendar is only where the data lives. */
+/* An activity that crosses the roll - 6:45am to 7:30am, with the day starting
+   at 7:00 - has an END minute SMALLER than its start, because sm() measures
+   from the roll and wraps there. The rest of the app has always been loose
+   about this (renderTimeline draws such a block as "past" all day) and fixing
+   the shift model properly is a much bigger job than this row. What this row
+   must not do is silently swallow the activity, so the wrap is tested for
+   explicitly instead of being left to fall through the "already over" check. */
+function apptSpan(b){
+  var st=sm(b.s),en=smEnd(b.e);
+  return {st:st,en:en,wraps:en<=st};
+}
+function pendingAppts(){
+  var n=nowSm(),k=today(),cur=currentBlock(),out=[];
+  dayBlocks().forEach(function(b){
+    if(!b.ev)return;
+    if(isDone(b,k))return;                 // ticked off - no longer pending
+    var sp=apptSpan(b);
+    if(!sp.wraps&&n>=sp.en)return;         // over: drops out on its own, no cleanup
+    if(b===cur)return;                     // already the headline, don't say it twice
+    out.push(b);
+  });
+  return out;                              // dayBlocks() is already start-sorted
+}
 function renderNow(){
   var b=currentBlock(),bar=document.getElementById("nowbar");
-  bar.className="nowbar board-only"+(b&&b.sleep?" sleep":"");
-  document.getElementById("nowLbl").textContent=b&&b.sleep?"Should be asleep":"Now";
+  var onEv=!!(b&&b.ev);
+  bar.className="nowbar board-only"+(b&&b.sleep?" sleep":"")+
+    (onEv?" ev":"")+(onEv&&b.must?" must":"");
+  document.getElementById("nowLbl").textContent=
+    b&&b.sleep?"Should be asleep":(onEv?"Happening now":"Now");
   if(b){
-    document.getElementById("nowName").textContent=b.n;
+    // innerHTML here, so esc() on the name is load-bearing: an activity is
+    // user-typed and reaches this line straight from the Calendar editor.
+    document.getElementById("nowName").innerHTML=esc(b.n)+
+      (onEv?' <span class="apt'+(b.must?" must":"")+'">'+(b.must?"must attend":"appointment")+'</span>':"");
     var rem=smEnd(b.e)-nowSm();
     document.getElementById("nowMeta").textContent=
-      fmt(b.s)+"–"+fmt(b.e)+" · "+(rem>=60?Math.floor(rem/60)+"h "+(rem%60)+"m":rem+" min")+" left · "+b.d;
+      fmt(b.s)+"–"+fmt(b.e)+" · "+(rem>=60?Math.floor(rem/60)+"h "+(rem%60)+"m":rem+" min")+" left"+
+      (b.d?" · "+b.d:"");
   }else{
     document.getElementById("nowName").textContent="Unscheduled";
     document.getElementById("nowMeta").textContent="";
   }
+
+  /* The second row. Ordering is chronological rather than must-attend-first:
+     a calendar is a sequence, and promoting a 4pm must-attend over a 9am one
+     would be lying about what happens next. Must-attend is marked instead of
+     re-ordered. Two overlapping activities are why "Also now" exists - the
+     headline can only hold one, and silently dropping the other would be the
+     same class of bug as the nudge that never ended. */
+  var up=pendingAppts(),el=document.getElementById("nowUp");
+  if(!up.length){el.hidden=true;el.innerHTML="";return;}
+  var e=up[0],n=nowSm(),sp=apptSpan(e),started=n>=sp.st;
+  // A wrapping activity that has started runs past the roll, so its remaining
+  // time is measured the long way round rather than as a negative number.
+  var gap=started?(sp.wraps?sp.en+1440-n:sp.en-n):sp.st-n;
+  var dur=gap>=60?Math.floor(gap/60)+"h "+(gap%60)+"m":gap+" min";
+  el.hidden=false;
+  el.className="nowup"+(e.must?" must":"");
+  el.innerHTML=
+    '<span class="nu-l">'+(started?"Also now":"Up next")+'</span>'+
+    '<span class="nu-n">'+esc(e.n)+'</span>'+
+    (e.must?'<span class="apt must">must attend</span>':"")+
+    (e.rr?'<span class="apt">↻</span>':"")+
+    '<span class="nu-m">'+fmt(e.s)+"–"+fmt(e.e)+'</span>'+
+    '<span class="nu-c">'+(started?dur+" left":"in "+dur)+'</span>'+
+    (up.length>1?'<span class="nu-m">+'+(up.length-1)+" more this shift</span>":"");
 }
 
 // In-memory only, resets on reload: dismissing a nudge hides that exact,

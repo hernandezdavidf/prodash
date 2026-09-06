@@ -2,6 +2,84 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-07 — The Now bar carries appointments: Happening now / Up next (v4.4)
+
+A **Board** change, in the `.nowbar` strip above the view switcher. The
+Calendar tab's own rendering is untouched — the calendar is only where the
+data comes from.
+
+### What was actually missing
+
+Two different gaps, and only one of them was a rendering problem.
+
+**Ongoing already worked, but didn't look like anything.** `currentBlock()`
+has always preferred an appointment over the routine block it sits inside, so
+the bar was naming the right thing — it just gave "Chase: Sunday School" and
+"Wake + prep" identical weight.
+
+**Upcoming was missing outright.** The only warning about a commitment that
+hadn't started was the `appt-soon` nudge, which is capped by that activity's
+own lead time — 120 minutes by default, and `0` means never. Anything further
+out than that was invisible on the Board.
+
+### What it does now
+
+- **Happening now** — when `currentBlock()` returns an appointment, `.nowbar`
+  gains `.ev` and takes `rgba(251,140,0,.14)`, the same transparent orange
+  `.blk.ev` already puts on appointments in the Shift timeline. Deliberately
+  the same rgba, so a commitment doesn't get two dialects of orange. The title
+  goes `--terra-ink` and picks up the existing `.apt` badge.
+- **Up next** — a second row (`.nowup`, `flex-basis:100%` so it drops onto its
+  own line inside the wrapping bar) showing the next pending activity: name,
+  its time range, and a countdown. It flips to **Also now** with time
+  remaining once that one starts, which is what covers two overlapping
+  activities — the headline holds one, and the other would otherwise vanish.
+- **Must attend** is *marked*, not promoted. Ordering stays chronological,
+  because a calendar is a sequence and floating a 4pm must-attend above a 9am
+  one would misstate what happens next.
+- `+N more this shift` when others follow.
+
+### Dropping off
+
+An activity leaves on its own: `pendingAppts()` filters `n >= smEnd(b.e)`, and
+the existing 60-second tick already calls `renderNow()`. Ticked-off activities
+are filtered via `isDone()`, matching what the nudges do.
+
+### Two bugs caught while testing, both real
+
+1. **`hidden` did nothing.** `.nowup{display:flex}` overrides the UA
+   `[hidden]{display:none}` rule, so on a day with no appointments the row kept
+   its box and its orange wash while holding no text. Fixed with an explicit
+   `.nowup[hidden]{display:none}`.
+2. **Roll-crossing activities were swallowed.** Something running 6:46–7:31am
+   has an end minute *smaller* than its start, because `sm()` measures from the
+   07:00 roll and wraps there — so `n >= smEnd(b.e)` read it as long over and
+   dropped it entirely. `apptSpan()` now tests for the wrap explicitly, and a
+   started one measures its remaining time the long way round.
+
+   Note this is a **pre-existing** limitation of the shift model, not something
+   introduced here: `renderTimeline()` draws such a block as `.past` all day
+   and `currentBlock()` never matches it. Only the new row handles it. Fixing
+   `sm()` properly is a larger job.
+
+### Deliberately excluded
+
+All-day activities. They have no start to count down to and no end to pass, so
+there is no upcoming → ongoing → over transition to show. They keep announcing
+themselves in the nudge strip, which is the right shape for them.
+
+### Contrast
+
+The must-attend badge first used `background:var(--alert-ink)` with white text
+— correct in light (5.6:1) but wrong in dark, where `--alert-ink` flips to
+`#EF9A9A`, a light red meant to *be* text; white on it is ~1.9:1. It now uses
+the `--alert-lt` / `--alert-ink` pair, exactly as `.cal-tag.must` does, because
+those two tokens flip together and stay legible in both themes.
+
+### Version
+
+`APP_VERSION` 4.3.1 → 4.4, `CACHE_VERSION` `prodash-v7` → `prodash-v8`.
+
 ## 2026-09-07 — Removed the "company-hour" nudge (v4.3.1)
 
 David flagged this as a bug, and it was one. The rule in `renderNudges()` was:
