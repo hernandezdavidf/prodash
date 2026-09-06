@@ -2,6 +2,122 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-06 — Sub-notes on tasks (v4.1)
+
+A task on the Board can now carry notes. Every task row grew one quiet speech
+bubble; tap it and a drawer opens underneath the task holding as many notes as
+you want, each with its own edit and delete. Collapsed, the bubble turns green
+and shows a count, so you can see which tasks have detail behind them without
+opening anything.
+
+This exists because of rows like *"Scheduling Project: Check each roles
+permissions first before moving to the next."* — a heading with the detail
+crammed into the title, because there was nowhere else to put it. The follow-up
+(the doc link, the answer someone gave you, the three sub-steps) either became
+another top-level task, inflating the lane's open count, or it lived outside the
+app entirely.
+
+### Notes live on the task object
+
+```js
+t.notes = [ {id:"note_…", text:"…", at:1757…, ed:1757…} ]
+```
+
+That one decision does most of the work. `tasks` is already in `BOARD_KEYS` and
+`KEYED`, and `diffOps()` compares keyed items with `JSON.stringify`, so notes
+sync to the Worker and the OneDrive file and enter Board History with **no
+registry change at all**. They ride along automatically when a task changes
+lane, gets ticked, sorts to the bottom, or falls into the checklist's
+"Unassigned" section — there is nothing to keep in step. `deleteTask()` filters
+the task out and the notes go with it, so nothing can orphan.
+
+`norm()` defends the new key the way it defends every other one: a board saved
+before this feature has no `notes` at all, a junk value is dropped, malformed
+entries are filtered, and a task with no notes keeps **no empty array** — an
+absent key and an empty one must not look like different objects to `diffOps()`.
+
+### Whether a drawer is open is not board data
+
+`noteOpen`, `noteDraft` and `noteEdit` sit in module scope, outside `S`. Your
+phone does not need to know which drawer is open on the laptop. That is also
+what lets them survive the `renderLanes()` rebuild that every save and the
+60-second tick trigger — the same reason `laneRenamingId` and `laneDraft` exist.
+
+**Not `<details>`.** Its `toggle` event fires asynchronously, and this app
+already paid for that once: the comment in `renderHiddenBlocks()` records
+ticking a task re-rendering from a stale flag and springing the drawer back
+open. With one `<details>` per task that would happen to every row at once.
+
+The composer restores its text, its focus **and its caret position** after a
+rebuild. Without the caret restore, the minute tick lands mid-sentence and drops
+you back at the start of your own note. `laneDraft` gets away without this
+because a lane name is one short line; a note is not.
+
+### The panel is inside the task, not beside it
+
+`.tsk` gained `flex-wrap:wrap` and the notes panel is a full-width child of the
+task row itself. No wrapper element — a wrapper would have changed what
+`.tsk:last-of-type`, the drag handlers and `closest(".tsk")` all match. This way
+the notes are grouped with their task by construction rather than by agreement
+between two siblings, and `e.target.closest(".tsk")` still resolves correctly
+from inside the panel. The checklist uses the same trick on `.chk-row`.
+
+Note actions are dispatched from a `data-nact` branch that runs **before** the
+existing `data-act` line, because that line reads the attribute off `e.target`
+directly rather than via `closest()` (a button containing an `<svg>` would never
+have dispatched), and because the `save(); renderAll();` after it is
+unconditional — which must not fire for merely opening a drawer.
+
+### Links, and nothing else
+
+Notes keep their line breaks and turn `http(s)://` and bare `www.` runs into
+real links. That is the whole formatting story — no markdown, no rich text.
+
+The body is built from **DOM nodes** — text nodes for prose, `<a>` elements for
+links — and never assigns `innerHTML`. `esc()` would have been safe enough, but
+this is the position already stated at the greeting: the strongest guarantee is
+the one that never parses the string as markup at all, and a note body is the
+one place in this app that renders a URL pasted in from somewhere else. Only
+`http(s)` and `www.` match, so `javascript:` and `data:` can never become an
+href. Trailing sentence punctuation is trimmed back off, along with an
+unbalanced closing bracket, so `see https://x.dev/a).` links the URL and leaves
+the `).` as prose — while a balanced Wikipedia `..._(disambiguation)` stays whole.
+
+Deleting a note asks first, unlike deleting a task. A note holds far more typing
+than a one-line task and lives in a drawer that is shut most of the time, so a
+stray tap is both easier to make and more expensive. The confirm quotes the
+first line back, so it says *which* note.
+
+### Both Board layouts, one set of classes
+
+Full add/edit/delete in the lane columns **and** in the Consolidated Checklist,
+sharing `noteOpen` — a task expanded in one is expanded in the other. On the
+ruled page the notes are re-tuned to the notebook's rhythm: every height and
+line-height a whole multiple of `var(--rl)`, no vertical margins, and a textarea
+with no chrome at all, so a note is simply written on the next line in the same
+serif hand, one size down. Three bugs came out of holding that line — a
+textarea's inline-block baseline reserving 5px of descender space, a
+`flex-basis:100%` panel overflowing by exactly its own left margin, and the
+`pointer: coarse` block's negative side margins pulling ✎ and × nine pixels into
+each other so "edit" could delete.
+
+### Board History stopped guessing
+
+An update to a task used to mean one thing only — the box was ticked — so
+`opText()` assumed it. Sub-notes made that assumption wrong, and *"Reopened
+task"* is a bad thing for the history to say about someone pasting a link into a
+note. `diffOps()` now records `ch`, the **names** of the fields that actually
+moved (names only: storing the whole previous object would roughly double the
+size of every task edit in a document that syncs over mobile data). Revisions
+written before `ch` existed have none and fall through to the old wording, which
+was correct for them.
+
+### Not touched
+
+Reports and the XLSX export read `t.text` and still do. Worth revisiting; not
+part of adding notes to the Board.
+
+
 ## 2026-09-06 — App Widgets: World Clocks and Bible (v4.0)
 
 A **Widgets** button in the header opens a dock that floats over whatever tab is

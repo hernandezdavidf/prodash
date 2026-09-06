@@ -326,7 +326,7 @@ header h1{font-size:26px;letter-spacing:.3px}
    because the next long paste will land somewhere else. .tsk-l already had a
    version of this - it is the same bug, found once before in task titles. */
 .rit-l,.rit-tag,.tsk-l,.blk-n,.blk-d,.lane-h h3,.rep-lane-h h3,
-.cal-rn,.cal-rd,.chk-t,.rev-note{min-width:0;overflow-wrap:anywhere}
+.cal-rn,.cal-rd,.chk-t,.rev-note,.tnote-b{min-width:0;overflow-wrap:anywhere}
 /* The nudge strip was missed the first time round. It sits in <header>, and the
    sweep that checked the rest measured children AGAINST .nudge as a container -
    so a nudge that overflowed the PAGE passed. overflow-wrap inherits, so one
@@ -508,7 +508,13 @@ header h1{font-size:26px;letter-spacing:.3px}
 .laf-save{background:var(--forest);color:var(--on-brand);border-radius:7px;padding:6px 12px;font-weight:700;font-size:12.5px}
 .laf-cancel{color:var(--muted);font-size:12.5px;padding:6px 4px}
 .laf-cancel:hover{color:var(--terra-ink)}
-.tsk{display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px dashed var(--line)}
+/* flex-wrap is what lets the sub-notes panel live INSIDE the task row as a
+   full-width third line, instead of needing a wrapper element around .tsk.
+   A wrapper would have changed what .tsk:last-of-type, the drag handlers and
+   closest(".tsk") all match; this changes nothing that already exists, and the
+   notes are visually grouped with their task by construction rather than by
+   agreement between two sibling elements. */
+.tsk{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px dashed var(--line)}
 .tsk:last-of-type{border-bottom:none}
 .tsk-l{flex:1;font-size:12.5px;word-break:break-word}
 .tsk.done .tsk-l{color:var(--muted);text-decoration:line-through}
@@ -519,6 +525,72 @@ header h1{font-size:26px;letter-spacing:.3px}
 .addrow input:focus{border-color:var(--olive);background:var(--paper)}
 .addrow button{background:var(--forest);color:var(--on-brand);border-radius:7px;padding:6px 11px;font-weight:700}
 .empty{font-size:11.5px;color:var(--muted);font-style:italic;padding:7px 0}
+
+/* ---- sub-notes on a task --------------------------------------------------
+   One set of classes for BOTH Board layouts. The lane column is the tight case
+   (224px minimum), so these are sized for it; the ruled checklist re-tunes them
+   further down where the notebook rhythm needs multiples of --rl.
+
+   Everything here is deliberately one step quieter than the task it hangs off:
+   11.5px against the task's 12.5px, --muted against --ink, an indent rule
+   instead of a card. A note that competed with the task title, or with the lane
+   name above it, would defeat the point of hiding it behind a disclosure. */
+.tnote-btn{flex:none;display:flex;align-items:center;gap:3px;color:var(--sage);
+  padding:0 2px;line-height:1;border-radius:5px;transition:color .15s}
+.tnote-btn.has{color:var(--forest-ink)}
+.tsk:hover .tnote-btn{color:var(--olive)}
+.tnote-btn[aria-expanded="true"]{color:var(--forest)}
+.tnote-i{width:11px;height:11px;fill:currentColor;display:block;margin-top:1px}
+/* Same pill family as .lane-n, one level down in the hierarchy. */
+.tnote-n{font-size:9px;font-weight:700;line-height:1;color:var(--forest-ink);
+  background:var(--olive-lt);border:1px solid var(--line);border-radius:999px;padding:1px 4px}
+/* A basis of 100% is what makes this a full-width row inside the wrapping task,
+   and the 27px left margin - checkbox (19) + gap (8) - hangs it under the task
+   TEXT rather than under its checkbox. It must be allowed to SHRINK, though:
+   100% plus a 27px margin is 27px wider than the row, and with flex:0 0 100%
+   it overflowed, putting the per-note ✎ and × on the lane's right border.
+   min-width:0 is the usual partner - a flex child otherwise refuses to go
+   narrower than its content.
+
+   -webkit-user-drag:none is what lets you SELECT a note instead of dragging the
+   lane. The whole .lane carries draggable=true, and a mouse-drag anywhere
+   inside a draggable element starts the drag rather than a selection, which
+   would make "copy the link out of this note" impossible with a mouse. Paired
+   with the dragstart guard in renderLanes(). Touch was never affected: HTML5
+   drag doesn't fire on touch, so long-press selection already worked. */
+.tnotes{flex:1 1 100%;min-width:0;margin:0 0 2px 27px;padding-left:9px;
+  border-left:2px solid var(--line);-webkit-user-drag:none}
+.tnote{display:flex;align-items:flex-start;gap:6px;padding:3px 0}
+.tnote+.tnote{border-top:1px dotted var(--line)}
+.tnote-b{flex:1;min-width:0;font-size:11.5px;line-height:1.45;color:var(--muted);
+  white-space:pre-wrap;overflow-wrap:anywhere;user-select:text;-webkit-user-select:text}
+.tsk.done .tnote-b{opacity:.7}
+.tnote-b a{color:var(--forest-ink);text-decoration:underline}
+.tnote-b a:hover{color:var(--olive)}
+.tnote-r{flex:none;display:flex;gap:1px}
+/* Always rendered, never opacity:0 - there is no hover on a phone, and these
+   are the only way to edit or remove a note. */
+.tnote-act{color:var(--sage);font-size:12px;line-height:1;padding:1px 3px;border-radius:4px}
+.tnote:hover .tnote-act{color:var(--muted)}
+.tnote-act:hover{color:var(--terra)}
+.tnote-form{padding:4px 0 2px}
+/* display:block, not the textarea default of inline-block: an inline-block sits
+   on a text baseline and reserves descender space under itself, which on the
+   ruled checklist put the composer 5px out and knocked every line below it off
+   the ruling. */
+.tnote-ta{display:block;width:100%;box-sizing:border-box;resize:vertical;min-height:44px;
+  font:inherit;font-size:11.5px;line-height:1.45;color:var(--ink);
+  border:1px solid var(--line);border-radius:7px;padding:6px 8px;
+  background:var(--ivory);outline:none}
+.tnote-ta:focus{border-color:var(--olive);background:var(--paper)}
+.tnote-btns{display:flex;gap:6px;align-items:center;margin-top:5px}
+.tnote-save{background:var(--forest);color:var(--on-brand);border-radius:6px;
+  padding:4px 10px;font-weight:700;font-size:11px}
+.tnote-cancel{color:var(--muted);font-size:11px;padding:4px 2px}
+.tnote-cancel:hover{color:var(--terra-ink)}
+.tnote-hint{margin-left:auto;font-size:9.5px;color:var(--sage)}
+.tnote-add{color:var(--forest-ink);font-size:11px;font-weight:700;padding:4px 0;text-align:left}
+.tnote-add:hover{color:var(--olive)}
 
 .week{display:flex;gap:6px;margin-top:4px}
 .wd{flex:1;text-align:center}
@@ -791,6 +863,19 @@ body.view-reports .board-only,body.view-history .board-only,body.view-cal .board
   .lane-del{margin-right:-8px}
   .reorder button{padding:7px 9px}
   .tsk .x,.rit .x{padding:9px 8px;margin:-9px -6px}
+  /* Sub-notes joined this block the day they were written, rather than being
+     retrofitted the way .lane-pin had to be. The bubble is the one control on
+     a task row that is used constantly, so it gets the checkbox treatment:
+     grow the padding, leave the 11px glyph alone.
+     The negative margin is VERTICAL ONLY here, unlike everywhere else in this
+     block. The house idiom cancels padding on both axes, which is right for an
+     icon standing alone - but ✎ and × sit side by side, and two -5px side
+     margins pulled them 9px into each other, so the tap areas overlapped and
+     "edit" could delete. Vertical still keeps the row from growing; horizontal
+     spacing is what makes two adjacent targets distinct. */
+  .tnote-btn{padding:8px 6px;margin:-8px 0}
+  .tnote-act{padding:9px 7px;margin:-9px 0}
+  .tnote-add{padding:9px 0}
   .swatch{width:28px;height:28px}
   .wk-add{padding:7px 12px}
   .apt-must input,.aptM{width:20px;height:20px}
@@ -1534,7 +1619,9 @@ return {
   .chk-hn{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .chk-pin{font-size:12px;opacity:.95;flex-shrink:0}
 
-  .chk-row{display:flex;align-items:flex-start;gap:11px;padding:0 14px 0 68px;
+  /* flex-wrap for the same reason .tsk has it: the sub-notes panel is a
+     full-width third line inside the row, not a sibling of it. */
+  .chk-row{display:flex;flex-wrap:wrap;align-items:flex-start;gap:11px;padding:0 14px 0 68px;
     min-height:var(--rl);position:relative}
   .chk-row:hover{background:rgba(var(--glow-rgb),.07)}
   .chk-t{flex:1;min-width:0;font-family:var(--serif);font-size:15px;line-height:var(--rl);
@@ -1552,6 +1639,31 @@ return {
   .chk-row:hover .chk-x{opacity:.75}
   .chk-x:hover{opacity:1;color:var(--alert-ink)}
 
+  /* ---- sub-notes, re-tuned for the ruled page --------------------------
+     Same classes as the lane columns, but the notebook has one rule the lanes
+     don't: every height and line-height must be var(--rl) or a whole multiple
+     of it (see the RHYTHM note above), or the notes drift off the ruling and
+     the whole paper illusion collapses. So: no vertical margins, no row-gap,
+     no textarea chrome - a note is simply written on the next line, in the
+     same serif hand as the task, one size down and in the muted ink. */
+  .chk-row{row-gap:0}
+  .chk-row .tnote-btn{height:var(--rl);align-items:center}
+  .chk-row .tnote-i{margin-top:0;width:12px;height:12px}
+  .chk-row .tnotes{margin:0 0 0 30px;padding-left:11px;border-left-color:var(--rule-margin)}
+  .chk-row .tnote{padding:0;align-items:flex-start}
+  .chk-row .tnote+.tnote{border-top:none}
+  .chk-row .tnote-b{font-family:var(--serif);font-size:13px;line-height:var(--rl);
+    color:var(--note-ink);opacity:.72}
+  .chk-row.done .tnote-b{opacity:.45}
+  .chk-row .tnote-act{line-height:var(--rl);font-size:13px;padding:0 3px}
+  .chk-row .tnote-form{padding:0}
+  .chk-row .tnote-ta{font-family:var(--serif);font-size:13px;line-height:var(--rl);
+    color:var(--note-ink);min-height:calc(var(--rl)*2);padding:0;
+    border:none;border-radius:0;background:transparent}
+  .chk-row .tnote-ta:focus{background:transparent;box-shadow:inset 0 -2px 0 var(--olive)}
+  .chk-row .tnote-btns{height:var(--rl);margin-top:0}
+  .chk-row .tnote-add{line-height:var(--rl);padding:0;font-family:var(--serif);font-size:13px}
+
   .chk-top{display:flex;flex-wrap:wrap;gap:14px;align-items:baseline;margin-bottom:12px}
   .chk-title{font-family:var(--serif);font-size:19px;color:var(--forest-ink)}
   .chk-sum{font-size:12.5px;color:var(--muted)}
@@ -1565,6 +1677,16 @@ return {
     .chk-paper:before{left:34px}
     .chk-head,.chk-row,.chk-empty{padding-left:46px}
     .chk-t{font-size:14px}
+  }
+  /* The touch-target block in <head> can't reach these: ".chk-row .tnote-act"
+     is more specific than the bare ".tnote-act" it sets there, so its padding
+     lost and only its margin applied. Widened here instead, where the ruled
+     layout is defined. Only the horizontal axis moves - the row's height is
+     already a full var(--rl), which is a 34px target and the rhythm the whole
+     page is built on. */
+  @media (pointer: coarse){
+    .chk-row .tnote-act{padding:0 8px}
+    .chk-row .tnote-btn{padding:0 6px}
   }
   </style>
 
@@ -2832,9 +2954,35 @@ function shift(k,n){var p=k.split("-");var d=new Date(+p[0],+p[1]-1,+p[2]);d.set
    clamp would quietly never fire. */
 var WC_MAX=4;
 
+// Longest a single sub-note may be. Declared up here rather than beside the
+// rest of the note code because norm() runs during initial execution (var S =
+// load(), below) and a `var` further down the file would still be undefined by
+// then - slice(0, undefined) silently keeps the whole string.
+var NOTE_MAX=2000;
+
 function norm(s){
   if(!s||typeof s!=="object")s={};
   if(!s.tasks)s.tasks=[];
+  /* Sub-notes hang off each task as t.notes = [{id,text,at,ed}]. Normalised
+     here for the same reason every other key is: a board saved before this
+     feature existed has no such key at all, and a board arriving from the
+     Worker or the OneDrive file is JSON from another machine. Tasks with no
+     notes keep no empty array - an absent key and an empty one must not read
+     as different objects to diffOps(), which compares by JSON.stringify. */
+  s.tasks.forEach(function(t){
+    if(!t||typeof t!=="object"||t.notes===undefined)return;
+    if(!Array.isArray(t.notes)){delete t.notes;return;}
+    t.notes=t.notes.filter(function(n){
+      return n&&typeof n==="object"&&typeof n.text==="string"&&n.text.trim()!=="";
+    }).map(function(n){
+      var o={id:(typeof n.id==="string"&&n.id)?n.id:rid("note_"),
+             text:n.text.slice(0,NOTE_MAX),
+             at:typeof n.at==="number"?n.at:0};
+      if(typeof n.ed==="number")o.ed=n.ed;
+      return o;
+    });
+    if(!t.notes.length)delete t.notes;
+  });
   if(!s.log)s.log={};
   if(!s.days)s.days={};
   /* Focus mode was removed. An old board may still carry a "focus" key; it is
@@ -3288,13 +3436,25 @@ function mergeDevices(a,b){
 
 /* ---- diff / apply ---- */
 function byId(arr){var m={};(arr||[]).forEach(function(x){if(x&&x.id)m[x.id]=x;});return m;}
+/* Which top-level fields of a keyed item actually moved. Only the NAMES are
+   kept: storing the whole previous object would roughly double the size of
+   every task edit in a document that syncs over mobile data, and the names are
+   all opText() needs to describe the change instead of guessing at it. */
+function changedKeys(a,b){
+  var seen={},out=[];
+  Object.keys(a||{}).concat(Object.keys(b||{})).forEach(function(k){
+    if(seen[k])return;seen[k]=1;
+    if(JSON.stringify((a||{})[k])!==JSON.stringify((b||{})[k]))out.push(k);
+  });
+  return out;
+}
 function diffOps(a,b){
   var ops=[];
   KEYED.forEach(function(k){
     var A=byId(a[k]),B=byId(b[k]),touched=false;
     Object.keys(B).forEach(function(id){
       if(!A[id]){ops.push({k:k,o:"add",id:id,v:B[id]});touched=true;}
-      else if(JSON.stringify(A[id])!==JSON.stringify(B[id])){ops.push({k:k,o:"upd",id:id,v:B[id]});touched=true;}
+      else if(JSON.stringify(A[id])!==JSON.stringify(B[id])){ops.push({k:k,o:"upd",id:id,v:B[id],ch:changedKeys(A[id],B[id])});touched=true;}
     });
     Object.keys(A).forEach(function(id){
       if(!B[id]){ops.push({k:k,o:"del",id:id,v:A[id]});touched=true;}
@@ -3377,8 +3537,23 @@ function opText(op){
   var verb={add:"Added",upd:"Updated",del:"Deleted"}[op.o];
   if(op.k==="tasks"&&verb){
     var t=op.v||{},w=t.lane?" in "+esc(laneName(t.lane)):"";
-    if(op.o==="upd")return (t.done?"Completed":"Reopened")+" task “"+esc(t.text||"")+"”"+w;
-    return verb+" task “"+esc(t.text||"")+"”"+w;
+    var q=" task “"+esc(t.text||"")+"”"+w;
+    if(op.o==="upd"){
+      /* An update to a task used to mean one thing only - the box was ticked -
+         so this line could assume it. Sub-notes made that assumption wrong, and
+         "Reopened task" is a bad thing for the history to say about someone
+         pasting a link into a note. op.ch names the fields that actually moved;
+         revisions written before it existed have no .ch and fall through to the
+         old wording, which was correct for them. */
+      var ch=op.ch;
+      if(ch&&ch.length&&ch.indexOf("done")<0&&ch.indexOf("notes")>=0){
+        var nn=Array.isArray(t.notes)?t.notes.length:0;
+        return "Noted on"+q+(nn?" · "+nn+(nn===1?" note":" notes"):"");
+      }
+      if(ch&&ch.length&&ch.indexOf("done")<0)return "Updated"+q;
+      return (t.done?"Completed":"Reopened")+q;
+    }
+    return verb+q;
   }
   if(op.k==="lanes"){
     if(op.o==="ord")return "Reordered lanes";
@@ -3777,6 +3952,285 @@ function ageOf(t){
 function esc(s){return String(s).replace(/[&<>"']/g,function(c){
   return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
 
+/* ---------- sub-notes on tasks ---------------------------------------------
+   A task can carry an ordered list of notes: t.notes = [{id,text,at,ed}]. They
+   live ON the task object rather than in a map beside it, and that one choice
+   is what makes them survive everything that moves a task around - changing its
+   lane, ticking it, the undone-first sort, the orphan-lane path in the
+   checklist - with no bookkeeping at all. deleteTask() filters the task out and
+   its notes go with it, so there is nothing to leak. It also means they sync
+   and enter Board History for free: "tasks" is already in BOARD_KEYS and KEYED,
+   and diffOps() compares keyed items by JSON.stringify.
+
+   Whether a drawer is OPEN, by contrast, is not board data - it is this
+   device's business and has no place being pushed to the phone - so all of the
+   UI state below sits in module scope. That is also what lets it survive the
+   renderLanes() rebuild that every save() and the 60-second tick trigger; it is
+   the same reason laneRenamingId and laneDraft exist.
+
+   Not <details>. Its "toggle" event fires ASYNCHRONOUSLY, and this app already
+   paid for that once - see the comment in renderHiddenBlocks(), where ticking a
+   task re-rendered from a stale flag and sprang the drawer back open. With one
+   <details> per task that would happen to every row on the board at once. */
+var noteOpen={};       // {taskId:true} - which rows are expanded, this device only
+var noteDraft=null;    // {id:taskId, text, sel} - a new note being composed
+var noteEdit=null;     // {id:noteId, taskId, text, sel} - an existing note being edited
+// Focus is only restored to a composer that HAD it (or was just opened), so an
+// unrelated save doesn't yank the caret out of the add-task box mid-word.
+// noteBusy suppresses the blur that firing innerHTML="" would otherwise cause.
+var noteFocus=false, noteBusy=false;
+
+function taskById(id){
+  var a=S.tasks||[];
+  for(var i=0;i<a.length;i++)if(a[i]&&a[i].id===id)return a[i];
+  return null;
+}
+function noteList(t){return (t&&Array.isArray(t.notes))?t.notes:[];}
+
+/* Every URL-ish run in a note, as [start, end, href]. Only http(s):// and a
+   bare www. are matched - never a bare scheme - so "javascript:" and "data:"
+   cannot become an href no matter what gets typed or pasted. Trailing sentence
+   punctuation is trimmed back off the match, along with an unbalanced closing
+   bracket, so "see https://x.dev/a)." links the URL and leaves the ")." as
+   prose instead of swallowing it into a broken link. */
+var NOTE_URL=/(?:https?:\/\/|www\.)[^\s<>"']+/gi;
+var NOTE_PAIR={")":"(","]":"[","}":"{"};
+function noteLinks(text){
+  var out=[],m;NOTE_URL.lastIndex=0;
+  while((m=NOTE_URL.exec(text))){
+    var s=m.index,raw=m[0];
+    while(raw.length){
+      var last=raw.charAt(raw.length-1);
+      if(".,;:!?'\"".indexOf(last)>=0){raw=raw.slice(0,-1);continue;}
+      // More closers than openers means the bracket belongs to the sentence,
+      // not the URL. A balanced one - the Wikipedia "..._(disambiguation)"
+      // case - stays part of the link.
+      if(NOTE_PAIR[last]&&
+         raw.split(last).length > raw.split(NOTE_PAIR[last]).length){raw=raw.slice(0,-1);continue;}
+      break;
+    }
+    // "www." on its own, or a bare "https://", is not a link worth making.
+    if(raw.length<8||!/[a-z0-9]\.[a-z]{2}/i.test(raw)){NOTE_URL.lastIndex=s+m[0].length;continue;}
+    out.push([s,s+raw.length,/^www\./i.test(raw)?"https://"+raw:raw]);
+    NOTE_URL.lastIndex=s+raw.length;
+  }
+  return out;
+}
+
+/* Renders a note INTO el as real DOM nodes - text nodes for prose, <a> elements
+   for links - and never assigns innerHTML. esc() would be safe enough, but this
+   is the house position already stated at the greeting: the strongest guarantee
+   is the one that never parses the string as markup at all, and a note body is
+   the one place in this app that renders a URL somebody pasted from elsewhere.
+   Line breaks need no <br>; white-space:pre-wrap keeps them as typed, which is
+   also what makes select-and-copy come out looking like what is on screen. */
+function noteBody(text,el){
+  el.textContent="";
+  var s=String(text||""),links=noteLinks(s),at=0;
+  links.forEach(function(L){
+    if(L[0]>at)el.appendChild(document.createTextNode(s.slice(at,L[0])));
+    var a=document.createElement("a");
+    a.href=L[2];a.target="_blank";a.rel="noopener noreferrer";
+    a.textContent=s.slice(L[0],L[1]);
+    el.appendChild(a);
+    at=L[1];
+  });
+  if(at<s.length)el.appendChild(document.createTextNode(s.slice(at)));
+}
+
+/* currentColor speech bubble, ~11px. The lane header's icons are HTML entities
+   and this would ideally be one too, but there is no monochrome note glyph
+   worth using and the emoji ones (📝 💬) would put a second hue on a board that
+   deliberately runs one colour. Same fill:currentColor trick as the board-view
+   sub-tabs, so empty vs has-notes is a single colour change. */
+var NOTE_ICO='<svg class="tnote-i" viewBox="0 0 16 16" aria-hidden="true" focusable="false">'+
+  '<path d="M2.6 2h10.8c.9 0 1.6.7 1.6 1.6v6.3c0 .9-.7 1.6-1.6 1.6H6.9l-3.1 2.3'+
+  'c-.5.4-1.2 0-1.2-.6v-1.7h-.1C1.6 11.5 1 10.8 1 9.9V3.6C1 2.7 1.7 2 2.6 2z"/></svg>';
+
+function noteBtnHtml(t){
+  var n=noteList(t).length,open=!!noteOpen[t.id];
+  var lbl=n?(n+(n===1?" note":" notes")):"Add a note";
+  return '<button class="tnote-btn'+(n?" has":"")+'" data-nact="toggle"'+
+    ' aria-expanded="'+(open?"true":"false")+'" title="'+lbl+'"'+
+    ' aria-label="'+lbl+(n?" on this task":"")+'">'+
+    NOTE_ICO+(n?'<span class="tnote-n">'+n+'</span>':'')+'</button>';
+}
+
+/* Structure only - not one character the user typed passes through this string.
+   Note bodies come back as nodes in wireNotes(), and the textarea's value is
+   set as a property there too. */
+function notePanelHtml(t){
+  if(!noteOpen[t.id])return "";
+  var rows=noteList(t).map(function(n){
+    if(noteEdit&&noteEdit.id===n.id)
+      return '<div class="tnote editing">'+noteFormHtml("edit")+'</div>';
+    var nid=esc(n.id);
+    return '<div class="tnote" data-nid="'+nid+'">'+
+      '<div class="tnote-b" data-nb="'+nid+'"></div>'+
+      '<div class="tnote-r">'+
+        '<button class="tnote-act" data-nact="edit" data-nid="'+nid+'" title="Edit note" aria-label="Edit note">&#9998;</button>'+
+        '<button class="tnote-act" data-nact="del" data-nid="'+nid+'" title="Delete note" aria-label="Delete note">&times;</button>'+
+      '</div></div>';
+  }).join("");
+  var foot=(noteDraft&&noteDraft.id===t.id)
+    ? noteFormHtml("add")
+    : '<button class="tnote-add" data-nact="addOpen">+ Add note</button>';
+  return '<div class="tnotes">'+rows+foot+'</div>';
+}
+function noteFormHtml(which){
+  var save=which==="edit"?"editSave":"addSave", cancel=which==="edit"?"editCancel":"addCancel";
+  return '<div class="tnote-form">'+
+    '<textarea class="tnote-ta" data-nta="'+which+'" rows="2" maxlength="'+NOTE_MAX+'"'+
+      ' placeholder="Note… links become clickable" aria-label="Note text"></textarea>'+
+    '<div class="tnote-btns">'+
+      '<button class="tnote-save" data-nact="'+save+'">Save</button>'+
+      '<button class="tnote-cancel" data-nact="'+cancel+'">Cancel</button>'+
+      '<span class="tnote-hint">Ctrl+Enter</span>'+
+    '</div></div>';
+}
+
+// Called by both renderers immediately BEFORE they wipe their host, so a
+// composer that currently holds focus gets it back after the rebuild.
+function noteSnapFocus(){
+  var a=document.activeElement;
+  if(a&&a.classList&&a.classList.contains("tnote-ta"))noteFocus=true;
+  noteBusy=true;
+}
+
+/* Called by both renderers after their innerHTML lands: fills note bodies with
+   real nodes, and puts the composer's text, focus and CARET POSITION back.
+   Without the caret restore the 60-second tick - or any save from elsewhere on
+   the board - would rebuild mid-sentence and drop you at the start of your own
+   note. laneDraft gets away without this because a lane name is one short line;
+   a note is not. */
+function wireNotes(host){
+  host.querySelectorAll(".tnote-b[data-nb]").forEach(function(el){
+    var row=el.closest("[data-id]");if(!row)return;
+    var t=taskById(row.getAttribute("data-id"));if(!t)return;
+    var id=el.getAttribute("data-nb"),n=null;
+    noteList(t).forEach(function(x){if(x.id===id)n=x;});
+    if(n)noteBody(n.text,el);
+  });
+  host.querySelectorAll("textarea.tnote-ta").forEach(function(ta){
+    var which=ta.getAttribute("data-nta");
+    var st=which==="edit"?noteEdit:noteDraft;
+    if(!st)return;
+    ta.value=st.text;
+    ta.addEventListener("input",function(){st.text=ta.value;st.sel=ta.selectionStart;});
+    ta.addEventListener("keyup",function(){st.sel=ta.selectionStart;});
+    ta.addEventListener("blur",function(){if(!noteBusy)noteFocus=false;});
+    ta.addEventListener("keydown",function(e){
+      // Plain Enter must insert a newline - multi-line is the point of a note -
+      // so committing is Ctrl/Cmd+Enter, and Escape backs out.
+      if(e.key==="Escape"){e.preventDefault();noteCancel(which);}
+      else if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)){e.preventDefault();noteCommit(which);}
+    });
+    // Both Board layouts render every task, so this textarea exists twice. Only
+    // the copy that is actually on screen has an offsetParent.
+    if(noteFocus&&ta.offsetParent){
+      var p=typeof st.sel==="number"?Math.min(st.sel,ta.value.length):ta.value.length;
+      ta.focus();try{ta.setSelectionRange(p,p);}catch(err){}
+    }
+  });
+  noteBusy=false;
+}
+
+// Redraw both layouts without touching S. Used for pure UI moves - expanding a
+// drawer, opening the composer - which must never write to the board or push a
+// revision to the other devices.
+function noteRerender(){
+  renderLanes();
+  if(S.boardView==="checklist")renderChecklist();
+}
+function noteCancel(which){
+  if(which==="edit")noteEdit=null; else noteDraft=null;
+  noteFocus=false;noteRerender();
+}
+function noteCommit(which){
+  if(which==="edit"){
+    if(!noteEdit)return;
+    var st=noteEdit,txt=String(st.text||"").trim(),t=taskById(st.taskId),n=null;
+    noteEdit=null;noteFocus=false;
+    if(!t)return noteRerender();
+    noteList(t).forEach(function(x){if(x.id===st.id)n=x;});
+    if(!n)return noteRerender();
+    if(!txt){
+      // Clearing a note and saving is the same intent as deleting it, and the
+      // confirm has effectively already happened - you emptied it by hand.
+      t.notes=noteList(t).filter(function(x){return x.id!==st.id;});
+      if(!t.notes.length)delete t.notes;
+      save();renderAll();stamp("Note removed");return;
+    }
+    if(n.text===txt.slice(0,NOTE_MAX))return noteRerender();
+    n.text=txt.slice(0,NOTE_MAX);n.ed=Date.now();
+    save();renderAll();stamp("Note updated");
+    return;
+  }
+  if(!noteDraft)return;
+  var task=taskById(noteDraft.id),v=String(noteDraft.text||"").trim();
+  if(!task||!v){noteDraft=null;noteFocus=false;return noteRerender();}
+  if(!Array.isArray(task.notes))task.notes=[];
+  task.notes.push({id:rid("note_"),text:v.slice(0,NOTE_MAX),at:Date.now()});
+  // The composer stays open and empty. Notes arrive in bursts - three sub-steps,
+  // two links - and re-opening it between each one is three taps a note on a
+  // phone. Escape or Cancel closes it when you are done.
+  noteDraft={id:task.id,text:"",sel:0};noteFocus=true;
+  save();renderAll();stamp("Note added");
+}
+
+/* The one action dispatcher, shared by both layouts. Both renderers resolve
+   data-nact with closest() and hand off here BEFORE their own data-act branch
+   runs - the lane one reads data-act off e.target directly rather than via
+   closest (so a button containing an <svg> would never dispatch), and then
+   calls save() and renderAll() unconditionally, neither of which should happen
+   for merely expanding a drawer. */
+function noteAction(act,taskId,nid){
+  var t=taskById(taskId);if(!t)return;
+  if(act==="toggle"){
+    if(noteOpen[taskId]){
+      delete noteOpen[taskId];
+      if(noteDraft&&noteDraft.id===taskId)noteDraft=null;
+      if(noteEdit&&noteEdit.taskId===taskId)noteEdit=null;
+      noteFocus=false;
+    }else{
+      noteOpen[taskId]=true;
+      // Nothing here yet: land in the composer rather than showing an empty
+      // drawer with a second button to press.
+      if(!noteList(t).length){noteDraft={id:taskId,text:"",sel:0};noteEdit=null;noteFocus=true;}
+    }
+    noteRerender();return;                 // deliberately no save()
+  }
+  if(act==="addOpen"){
+    noteDraft={id:taskId,text:"",sel:0};noteEdit=null;noteFocus=true;noteRerender();return;
+  }
+  if(act==="addCancel")return noteCancel("add");
+  if(act==="addSave")return noteCommit("add");
+  if(act==="editCancel")return noteCancel("edit");
+  if(act==="editSave")return noteCommit("edit");
+  if(act==="edit"){
+    var n=null;noteList(t).forEach(function(x){if(x.id===nid)n=x;});
+    if(!n)return;
+    noteEdit={id:n.id,taskId:taskId,text:n.text,sel:String(n.text||"").length};
+    noteDraft=null;noteFocus=true;noteRerender();return;
+  }
+  if(act==="del"){
+    var d=null;noteList(t).forEach(function(x){if(x.id===nid)d=x;});
+    if(!d)return;
+    /* Guarded, unlike deleting a task. A note holds far more typing than a
+       one-line task, and it lives inside a drawer that is shut most of the
+       time - so a stray tap here is both easier to make and more expensive
+       than a stray tap on the row above it. The first line is quoted back so
+       the confirm says WHICH note, not just "a note". */
+    var full=String(d.text||""),peek=full.replace(/\s+/g," ").slice(0,60);
+    if(!confirm("Delete this note?\n\n“"+peek+(full.length>60?"…":"")+"”"))return;
+    t.notes=noteList(t).filter(function(x){return x.id!==nid;});
+    if(!t.notes.length)delete t.notes;
+    if(noteEdit&&noteEdit.id===nid){noteEdit=null;noteFocus=false;}
+    save();renderAll();stamp("Note deleted");
+    return;
+  }
+}
+
 // ---------- render ----------
 function renderHeader(){
   var p=today().split("-");
@@ -4016,6 +4470,7 @@ function renderChecklist(){
     return;
   }
 
+  noteSnapFocus();                 // before the wipe, while the caret still exists
   var seen={}, body="";
   lanes.forEach(function(L){
     var mine=tasks.filter(function(t){return t.lane===L.id;});
@@ -4037,6 +4492,17 @@ function renderChecklist(){
       save();renderAll();
     });
   });
+  /* Its own loop rather than widening the one above. That one is an if/else
+     with deleteTask() as the fallback, so anything it matched that wasn't
+     "tog" would delete the task - not a branch to hand new buttons to. */
+  host.querySelectorAll(".chk-row [data-nact]").forEach(function(el){
+    el.addEventListener("click",function(){
+      noteAction(el.getAttribute("data-nact"),
+                 el.closest(".chk-row").getAttribute("data-id"),
+                 el.getAttribute("data-nid"));
+    });
+  });
+  wireNotes(host);
 
   function section(name,color,list,pinned){
     // Open tasks first, so the page reads as "what is left" with the crossed-
@@ -4052,7 +4518,9 @@ function renderChecklist(){
           '<button class="chk-box'+(t.done?" done":"")+'" data-act="tog" role="checkbox" aria-checked="'+
             (t.done?"true":"false")+'" aria-label="'+esc(t.text)+'"></button>'+
           '<div class="chk-t">'+esc(t.text)+'</div>'+
+          noteBtnHtml(t)+
           '<button class="chk-x" data-act="del" aria-label="Delete task">&times;</button>'+
+          notePanelHtml(t)+
         '</div>';
       }).join("");
   }
@@ -4257,6 +4725,7 @@ function renderLanes(){
   var c=document.getElementById("lanes"),cur=currentBlock();
   var act=[];
   if(cur){if(cur.lane)act.push(cur.lane);if(cur.lane2)act.push(cur.lane2);}
+  noteSnapFocus();                 // before the wipe, while the caret still exists
   c.innerHTML="";
   laneOrder().forEach(function(L){
     var mine=S.tasks.filter(function(t){return t.lane===L.id;});
@@ -4308,10 +4777,15 @@ function renderLanes(){
       // stale-task nudge still uses it - the signal was worth keeping, the
       // permanent column of orange numbers next to every task was not.
       ? mine.slice().sort(function(a,b){return (a.done?1:0)-(b.done?1:0);}).map(function(t){
-          return '<div class="tsk'+(t.done?" done":"")+'" data-id="'+t.id+'">'+
+          // The notes panel is the last child of .tsk itself, not a sibling -
+          // .tsk wraps, so it lands on its own full-width line directly under
+          // this task and cannot drift away from it.
+          return '<div class="tsk'+(t.done?" done":"")+'" data-id="'+esc(t.id)+'">'+
             '<div class="box'+(t.done?" done":"")+'" data-act="tog"></div>'+
             '<div class="tsk-l">'+esc(t.text)+'</div>'+
-            '<button class="x" data-act="del" aria-label="delete">×</button></div>';
+            noteBtnHtml(t)+
+            '<button class="x" data-act="del" aria-label="delete">×</button>'+
+            notePanelHtml(t)+'</div>';
         }).join("")
       : '<div class="empty">Nothing queued.</div>';
     el.innerHTML=h+body+'<div class="addrow"><input placeholder="Add to '+esc(L.name)+'..."><button>+</button></div>';
@@ -4331,6 +4805,18 @@ function renderLanes(){
           save();renderAll();
           stamp(L.pinned?'"'+L.name+'" pinned to the top':'"'+L.name+'" unpinned');
         }
+        return;
+      }
+      /* Sub-notes are resolved with closest() and handled BEFORE the line
+         below, for two reasons. That line reads data-act off e.target itself,
+         so a button with an <svg> inside it would silently never dispatch; and
+         the save()+renderAll() at the end of this handler is unconditional
+         once a .tsk matches, which must not fire for merely opening a drawer. */
+      var nact=e.target.closest("[data-nact]");
+      if(nact){
+        var nrow=nact.closest(".tsk");
+        if(nrow)noteAction(nact.getAttribute("data-nact"),nrow.getAttribute("data-id"),
+                           nact.getAttribute("data-nid"));
         return;
       }
       var a=e.target.getAttribute("data-act");if(!a)return;
@@ -4360,6 +4846,9 @@ function renderLanes(){
     inp.addEventListener("keydown",function(e){if(e.key==="Enter")add_();});
 
     el.addEventListener("dragstart",function(e){
+      // A drag that starts inside an open notes panel is someone selecting text
+      // to copy, not someone reordering the board. Let the selection happen.
+      if(e.target&&e.target.closest&&e.target.closest(".tnotes")){e.preventDefault();return;}
       draggedLaneId=L.id;
       e.dataTransfer.effectAllowed="move";
       e.dataTransfer.setData("text/plain",L.id);
@@ -4373,6 +4862,9 @@ function renderLanes(){
     c.appendChild(el);
   });
   c.appendChild(renderLaneAddTile());
+  // Note bodies are filled with nodes (never innerHTML) and any open composer
+  // gets its text, focus and caret back, now that the lanes are in the document.
+  wireNotes(c);
 }
 
 function renderLaneAddTile(){
