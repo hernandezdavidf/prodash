@@ -218,6 +218,12 @@ header:after{content:"";position:absolute;right:-40px;top:-40px;width:220px;heig
 .hdr-out{font:inherit;font-size:12px;font-weight:600;color:var(--on-brand);cursor:pointer;
   padding:5px 11px;border-radius:999px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35)}
 .hdr-out:hover{background:rgba(255,255,255,.26)}
+/* The one header control with an icon. inline-flex (not block) so the glyph and
+   its label share a baseline-ish row; the icon inherits --on-brand through
+   fill:currentColor, exactly like the board-view pennants do. */
+.hdr-wg{display:inline-flex;align-items:center;gap:6px}
+.hdr-wg .bv-i{flex:none;fill:currentColor}
+.hdr-wg[aria-expanded="true"]{background:rgba(255,255,255,.3);border-color:rgba(255,255,255,.6)}
 header h1{font-size:26px;letter-spacing:.3px}
 /* Header text sits on the brand green. Hierarchy comes from size/weight, NOT
    opacity — fading --on-brand drops it under 4.5:1 against --forest. */
@@ -651,6 +657,16 @@ header h1{font-size:26px;letter-spacing:.3px}
   .tabbar{margin-left:-20px;margin-right:-20px;padding-left:14px}
   .viewpanel{margin-left:-20px;margin-right:-20px;padding:14px 14px 20px;
     border-left:none;border-right:none;border-radius:0}
+  /* Widgets collapses to its icon here. Same reasoning as .tab-lg above: the
+     header has three controls and a phone has room for three pills, not four. */
+  .wg-lbl{display:none}
+  .hdr-wg{padding:5px 9px}
+  /* ...and even icon-only it does not fit on one line at 375px. This row was
+     ALREADY ~28px past the header's inner width before Widgets joined it -
+     header has overflow:hidden, so "Sign out" was being quietly clipped rather
+     than wrapping. flex-shrink:0 on .hdr-user is what forced that, and it is
+     right on a desktop where the row does fit; here the group wraps instead. */
+  .hdr-user{flex-wrap:wrap;flex-shrink:1;min-width:0;row-gap:8px}
 }
 @media(max-width:400px){
   .tab{padding:8px 9px 7px;font-size:11px}
@@ -1333,6 +1349,13 @@ return {
           <b id="whoName"></b>
           <span id="whoUser"></span>
           <span class="hdr-role" id="whoRole" hidden></span>
+        </button>
+        <!-- App Widgets. Sits before Theme because it is the one control here
+             you actually reach for during work; Theme and Sign out are set-once.
+             The label drops at 620px (see .wg-lbl) so the header keeps its
+             three-across shape on a phone instead of wrapping to a second row. -->
+        <button class="hdr-out hdr-wg" id="wgBtn" aria-haspopup="dialog" aria-controls="wgDock" aria-expanded="false" title="App Widgets — world clocks and Bible">
+          <svg class="bv-i" viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" focusable="false"><rect x="1" y="1" width="6" height="6" rx="1.4"/><rect x="9" y="1" width="6" height="6" rx="1.4"/><rect x="1" y="9" width="6" height="6" rx="1.4"/><rect x="9" y="9" width="6" height="6" rx="1.4"/></svg><span class="wg-lbl">Widgets</span>
         </button>
         <button class="hdr-out" id="themeBtn" title="Light / dark / follow the system">Theme: auto</button>
         <button class="hdr-out" id="signOutBtn">Sign out</button>
@@ -2421,6 +2444,242 @@ return {
     </div>
   </div>
 
+  <!-- ================== APP WIDGETS ==================================
+       A floating dock rather than an eighth tab, because the whole point is to
+       check a clock or a verse WITHOUT leaving whatever you were doing. It is
+       deliberately NON-modal at its default size: no scrim, the board stays
+       clickable underneath. Only the expanded (.wg-max) size dims the page,
+       because at that size it has taken over the screen anyway and pretending
+       otherwise would just look broken.
+
+       It lives here, as a sibling of #profModal and OUTSIDE .viewpanel, for the
+       reason spelled out at the top of this file: a transform/filter/contain on
+       .viewpanel would trap a position:fixed descendant inside it. Keep it here.
+
+       Adding a third widget later: add a <section class="wg-panel" id="wgp-x">
+       below, plus one entry in WG_LIST. Nothing else knows the list. -->
+  <style>
+    #wgScrim{position:fixed;inset:0;z-index:9990;background:rgba(var(--shadow-rgb),.5)}
+    #wgScrim[hidden]{display:none}
+    #wgDock{position:fixed;z-index:9991;right:18px;bottom:18px;width:400px;
+      max-width:calc(100vw - 36px);max-height:min(78vh,720px);
+      display:flex;flex-direction:column;overflow:hidden;
+      background:var(--paper);border:1px solid var(--line);border-radius:14px;
+      box-shadow:0 18px 60px rgba(var(--shadow-rgb),.34);
+      animation:wgIn .18s ease-out}
+    #wgDock[hidden]{display:none}
+    @keyframes wgIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+    /* Expanded. transform on the dock itself is fine - the warning about
+       transforms is about ANCESTORS of a fixed element, not the element. */
+    #wgDock.wg-max{right:auto;bottom:auto;left:50%;top:50%;transform:translate(-50%,-50%);
+      width:min(920px,92vw);max-width:none;height:88vh;max-height:none;animation:none}
+    .wg-head{flex:none;display:flex;align-items:center;gap:8px;padding:9px 9px 9px 12px;
+      border-bottom:1px solid var(--line);background:var(--panel)}
+    /* Chips scroll rather than wrap, so a fourth or fifth widget lengthens the
+       strip instead of pushing the close button onto a second line. */
+    .wg-chips{display:flex;gap:6px;flex:1 1 auto;min-width:0;overflow-x:auto;scrollbar-width:none}
+    .wg-chips::-webkit-scrollbar{display:none}
+    .wg-chip{flex:none;font-size:11.5px;font-weight:700;letter-spacing:.3px;
+      padding:6px 12px;border-radius:999px;border:1px solid var(--line);
+      background:var(--paper);color:var(--muted);white-space:nowrap}
+    .wg-chip:hover{color:var(--ink);border-color:var(--sage)}
+    .wg-chip.on{background:var(--forest);border-color:var(--forest);color:var(--on-brand)}
+    .wg-acts{display:flex;gap:3px;flex:none}
+    .wg-ico{width:30px;height:30px;border-radius:8px;border:1px solid transparent;
+      color:var(--muted);font-size:15px;line-height:1;display:flex;align-items:center;justify-content:center}
+    .wg-ico:hover{background:var(--ivory);color:var(--ink);border-color:var(--line)}
+    .wg-body{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
+    .wg-panel{padding:12px 13px 16px}
+    .wg-panel[hidden]{display:none}
+    .wg-msg{padding:10px 12px;border-radius:9px;font-size:12.5px;line-height:1.5;
+      background:var(--ivory);color:var(--muted);border:1px solid var(--line)}
+    .wg-msg[hidden]{display:none}
+    .wg-msg.warn{background:var(--terra-lt);color:var(--terra-ink);border-color:var(--terra)}
+    .wg-mut{font-size:11.5px;color:var(--muted)}
+    /* .ag-btn is full-width by default (it was written for the sign-in form's
+       stacked buttons). Same override the activity modal makes, same reason.
+       cursor:progress is also wrong here - a disabled Add is "you can't", not
+       "wait a moment". */
+    .wg-panel .ag-btn{width:auto;padding:8px 14px;font-size:13px}
+    .wg-panel .ag-btn[disabled]{cursor:not-allowed;opacity:.45}
+
+    /* ---- World clocks ---- */
+    .wc-row{display:flex;align-items:center;gap:10px;padding:10px 11px;margin-bottom:8px;
+      border:1px solid var(--line);border-radius:11px;background:var(--paper)}
+    /* The local row is the anchor everything else is read against, so it is
+       tinted rather than just labelled - you should find it without reading. */
+    .wc-row.wc-local{background:var(--olive-lt);border-color:var(--olive)}
+    .wc-main{flex:1 1 auto;min-width:0}
+    .wc-nm{font-size:13px;font-weight:700;color:var(--ink);overflow-wrap:anywhere}
+    .wc-sub{font-size:11px;color:var(--muted);margin-top:2px;overflow-wrap:anywhere}
+    .wc-tw{flex:none;text-align:right}
+    .wc-time{font-family:var(--serif);font-size:23px;line-height:1.05;
+      font-variant-numeric:tabular-nums;color:var(--forest-ink)}
+    .wc-mer{font-family:var(--sans);font-size:10.5px;font-weight:700;color:var(--muted);margin-left:3px}
+    .wc-tag{display:inline-block;margin-top:3px;font-size:9px;font-weight:800;letter-spacing:.6px;
+      text-transform:uppercase;padding:2px 6px;border-radius:999px;
+      background:var(--panel);color:var(--muted);border:1px solid var(--line)}
+    .wc-tag.here{background:var(--olive);border-color:var(--olive);color:#0B2410}
+    /* Crossing midnight is the fact that actually bites when your shifts run
+       2PM-7AM, so it gets the attention colour and nothing else does. */
+    .wc-tag.day{background:var(--terra-lt);border-color:var(--terra);color:var(--terra-ink)}
+    .wc-ctl{display:flex;gap:1px;flex:none}
+    .wc-ctl button{width:26px;height:26px;border-radius:7px;color:var(--sage);
+      font-size:13px;line-height:1;display:flex;align-items:center;justify-content:center;border:1px solid transparent}
+    .wc-ctl button:hover:not(:disabled){background:var(--ivory);color:var(--ink);border-color:var(--line)}
+    .wc-ctl button:disabled{opacity:.28;cursor:default}
+    .wc-ctl .wc-del:hover{background:var(--alert-lt);color:var(--alert-ink);border-color:var(--alert)}
+    .wc-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;
+      margin-top:10px;padding-top:11px;border-top:1px solid var(--line)}
+    .wc-count{font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;
+      color:var(--muted);font-variant-numeric:tabular-nums}
+    .wc-count.full{color:var(--terra-ink)}
+    .wc-pick{margin-top:10px}
+    .wc-pick[hidden]{display:none}
+    .wc-pick input[type=text]{width:100%;box-sizing:border-box;padding:8px 10px;
+      border:1px solid var(--line);border-radius:9px;background:var(--paper)}
+    .wc-pick select{width:100%;box-sizing:border-box;margin-top:7px;padding:6px;
+      border:1px solid var(--line);border-radius:9px;background:var(--paper);
+      color:var(--ink);font-family:var(--sans);font-size:13px}
+    .wc-pick-acts{display:flex;gap:7px;margin-top:8px}
+    /* Expanded: the same rows become a card grid and the numerals get big
+       enough to read from across a desk. */
+    .wg-max .wc-list{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(min(100%,290px),1fr))}
+    .wg-max .wc-row{margin-bottom:0}
+    .wg-max .wc-time{font-size:32px}
+    .wg-max .wc-nm{font-size:14.5px}
+
+    /* ---- Bible ---- */
+    .bb-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:9px}
+    .bb-seg{display:flex;gap:3px;padding:3px;background:var(--panel);border-radius:999px;border:1px solid var(--line)}
+    .bb-seg button{padding:5px 11px;border-radius:999px;font-size:11.5px;font-weight:700;color:var(--muted)}
+    .bb-seg button.on{background:var(--paper);color:var(--forest-ink);box-shadow:var(--lift)}
+    .bb-seg.bb-size button{padding:5px 9px;font-family:var(--serif)}
+    .bb-size [data-bsize=s]{font-size:11px}
+    .bb-size [data-bsize=m]{font-size:13px}
+    .bb-size [data-bsize=l]{font-size:16px}
+    .bb-nav{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+    .bb-crumb{padding:7px 12px;border:1px solid var(--line);border-radius:9px;background:var(--paper);
+      font-size:12.5px;font-weight:700;color:var(--ink)}
+    .bb-crumb:hover{border-color:var(--forest);color:var(--forest-ink)}
+    .bb-crumb.on{background:var(--forest);border-color:var(--forest);color:var(--on-brand)}
+    .bb-find{display:flex;flex:1 1 150px;min-width:0;gap:5px}
+    .bb-find input{flex:1 1 auto;min-width:0;box-sizing:border-box;padding:7px 10px;
+      border:1px solid var(--line);border-radius:9px;background:var(--paper)}
+    .bb-go{flex:none;padding:0 11px;border:1px solid var(--line);border-radius:9px;
+      background:var(--panel);color:var(--muted);font-size:14px}
+    .bb-go:hover{background:var(--forest);border-color:var(--forest);color:var(--on-brand)}
+    .bb-grid{display:grid;gap:6px;grid-template-columns:repeat(auto-fill,minmax(min(100%,118px),1fr))}
+    .bb-grid.bb-ch{grid-template-columns:repeat(auto-fill,minmax(48px,1fr))}
+    .bb-grid button{padding:9px 8px;border:1px solid var(--line);border-radius:9px;background:var(--paper);
+      font-size:12px;color:var(--ink);text-align:left;min-width:0;overflow-wrap:anywhere}
+    .bb-grid.bb-ch button{text-align:center;font-variant-numeric:tabular-nums}
+    .bb-grid button:hover{border-color:var(--forest);color:var(--forest-ink)}
+    .bb-grid button.on{background:var(--forest);border-color:var(--forest);color:var(--on-brand)}
+    .bb-eyebrow{font-size:9.5px;font-weight:800;letter-spacing:1px;text-transform:uppercase;
+      color:var(--muted);margin:12px 0 7px}
+    .bb-eyebrow:first-child{margin-top:0}
+    /* The reading surface. --paper-note is the same warm stock the checklist
+       uses; scripture is the one thing in here read in paragraphs, so it gets
+       the serif, a real measure, and line-height well above the app's 1.5. */
+    .bb-read{background:var(--paper-note);border:1px solid var(--line);border-radius:11px;padding:15px 17px}
+    .bb-ref{font-family:var(--serif);font-size:17px;color:var(--forest-ink);margin:0 0 10px}
+    .bb-txt{font-family:var(--serif);font-size:16px;line-height:1.78;color:var(--note-ink);max-width:34em}
+    .bb-size-s .bb-txt{font-size:14.5px;line-height:1.7}
+    .bb-size-l .bb-txt{font-size:19px;line-height:1.85}
+    .bb-verse{display:inline;border-radius:4px}
+    .bb-n{font-family:var(--sans);font-size:.62em;font-weight:800;color:var(--muted);
+      vertical-align:.45em;margin-right:3px;font-variant-numeric:tabular-nums}
+    .bb-verse.hit{background:var(--olive-lt);box-shadow:0 0 0 3px var(--olive-lt)}
+    .bb-pager{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:12px}
+    .bb-pager button{padding:8px 13px;border:1px solid var(--line);border-radius:9px;
+      background:var(--paper);font-size:12px;font-weight:700;color:var(--ink)}
+    .bb-pager button:hover:not(:disabled){border-color:var(--forest);color:var(--forest-ink)}
+    .bb-pager button:disabled{opacity:.35;cursor:default}
+    .bb-hit{display:block;width:100%;text-align:left;padding:10px 11px;margin-bottom:7px;
+      border:1px solid var(--line);border-radius:10px;background:var(--paper)}
+    .bb-hit:hover{border-color:var(--forest)}
+    .bb-hit-ref{font-size:10px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:var(--forest-ink)}
+    .bb-hit-tx{font-family:var(--serif);font-size:13.5px;line-height:1.55;color:var(--ink);
+      margin-top:4px;overflow-wrap:anywhere}
+    .bb-hit-tx mark{background:var(--olive-lt);color:var(--forest-ink);padding:0 2px;border-radius:3px}
+    .bb-cite{margin-top:10px;font-size:10.5px;line-height:1.5;color:var(--sage)}
+    .wg-max .bb-txt{font-size:17.5px}
+    .wg-max .bb-size-l .bb-txt{font-size:21px}
+    .wg-max .bb-read{padding:22px 26px}
+
+    @media(max-width:620px){
+      /* Bottom sheet. Full-bleed and anchored to the bottom edge because that
+         is where a thumb is, and because a floating card on a 375px screen is
+         just a modal with wasted margins. */
+      #wgDock{right:0;left:0;bottom:0;width:auto;max-width:none;height:84vh;max-height:none;
+        border-radius:16px 16px 0 0;border-left:none;border-right:none;border-bottom:none}
+      #wgDock.wg-max{left:0;right:0;top:auto;bottom:0;transform:none;
+        width:auto;height:93vh;border-radius:16px 16px 0 0}
+      .wg-panel{padding:12px 12px 20px}
+      .bb-read{padding:14px 14px}
+    }
+    /* Touch: grow the hit area, not the glyph - same rule the board follows. */
+    @media(pointer:coarse){
+      .wc-ctl button{width:34px;height:34px}
+      .wg-ico{width:36px;height:36px}
+    }
+  </style>
+
+  <div id="wgScrim" hidden></div>
+  <div id="wgDock" hidden role="dialog" aria-label="App Widgets" tabindex="-1">
+    <div class="wg-head">
+      <div class="wg-chips" id="wgChips" role="tablist" aria-label="Widgets"></div>
+      <div class="wg-acts">
+        <button class="wg-ico" id="wgMax" title="Expand" aria-label="Expand widgets" aria-pressed="false">&#9974;</button>
+        <button class="wg-ico" id="wgClose" title="Close widgets" aria-label="Close widgets">&times;</button>
+      </div>
+    </div>
+    <div class="wg-body" id="wgBody">
+
+      <section class="wg-panel" id="wgp-clocks" role="tabpanel" aria-labelledby="wgc-clocks" hidden>
+        <div class="wc-list" id="wcList"></div>
+        <div class="wc-foot">
+          <span class="wc-count" id="wcCount">0 / 4</span>
+          <button class="ag-btn" id="wcAddBtn">+ Add time zone</button>
+        </div>
+        <div class="wg-msg warn" id="wcMsg" hidden></div>
+        <div class="wc-pick" id="wcPick" hidden>
+          <input type="text" id="wcFilter" placeholder="Filter — e.g. tokyo, london, new york" autocomplete="off" spellcheck="false">
+          <select id="wcSel" size="8" aria-label="Time zone"></select>
+          <div class="wc-pick-acts">
+            <button class="ag-btn" id="wcAdd">Add</button>
+            <button class="ag-btn ghost" id="wcCancel">Cancel</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="wg-panel" id="wgp-bible" role="tabpanel" aria-labelledby="wgc-bible" hidden>
+        <div class="bb-bar">
+          <div class="bb-seg" id="bbVerSeg" role="group" aria-label="Bible version">
+            <button data-bver="KJV">KJV</button>
+            <button data-bver="NKJV">NKJV</button>
+          </div>
+          <div class="bb-seg bb-size" id="bbSizeSeg" role="group" aria-label="Text size">
+            <button data-bsize="s" title="Small text" aria-label="Small text">A</button>
+            <button data-bsize="m" title="Medium text" aria-label="Medium text">A</button>
+            <button data-bsize="l" title="Large text" aria-label="Large text">A</button>
+          </div>
+        </div>
+        <div class="bb-nav">
+          <button class="bb-crumb" id="bbBookBtn">Genesis</button>
+          <button class="bb-crumb" id="bbChapBtn">1</button>
+          <form class="bb-find" id="bbFind" role="search">
+            <input type="search" id="bbQ" placeholder="Search, or go to John 3:16" autocomplete="off" aria-label="Search the Bible">
+            <button class="bb-go" type="submit" aria-label="Search">&#8594;</button>
+          </form>
+        </div>
+        <div id="bbStage"></div>
+      </section>
+
+    </div>
+  </div>
+
   <div class="saved" id="saved"></div>
   <div class="foot">
     <button id="exportBtn">Export backup</button>
@@ -2567,6 +2826,12 @@ function today(){
 }
 function shift(k,n){var p=k.split("-");var d=new Date(+p[0],+p[1]-1,+p[2]);d.setDate(d.getDate()+n);return key(d);}
 
+/* Declared up here, not down with the rest of the widget code, because norm()
+   below clamps s.zones against it and norm() runs at load() - long before the
+   App Widgets section. A `var` further down would hoist as undefined and the
+   clamp would quietly never fire. */
+var WC_MAX=4;
+
 function norm(s){
   if(!s||typeof s!=="object")s={};
   if(!s.tasks)s.tasks=[];
@@ -2608,6 +2873,23 @@ function norm(s){
   // ids of BLOCKS entries (the fixed routine schedule, not appointments)
   // this user has removed from their timeline. See dayBlocks().
   if(!Array.isArray(s.hiddenBlocks))s.hiddenBlocks=[];
+  /* ---- App Widgets ----
+     zones: the world clock's chosen time zones, [{id,tz,label}], capped at
+     WC_MAX. KEYED like tasks so two devices that each add a zone offline keep
+     both instead of one silently winning. The device's own local time is NOT
+     in here - it is rendered from Intl every tick and can't be removed, so
+     storing it would only create a row that disagrees with the machine.
+     The Bible keys are pure preferences (which translation, how big, where you
+     stopped reading) and are last-write-wins. Note what is deliberately absent:
+     the chapter TEXT never enters S. It is per-device cache, it is not the
+     user's data, and pushing megabytes of scripture through the sync document
+     on mobile data would be indefensible. See BB_CACHE_KEY. */
+  if(!Array.isArray(s.zones))s.zones=[];
+  if(s.zones.length>WC_MAX)s.zones=s.zones.slice(0,WC_MAX);
+  if(["KJV","NKJV"].indexOf(s.bibleVer)<0)s.bibleVer="KJV";
+  if(typeof s.bibleAt!=="string"||!/^\d+:\d+$/.test(s.bibleAt))s.bibleAt="43:1";
+  if(["s","m","l"].indexOf(s.bibleSize)<0)s.bibleSize="m";
+  if(["clocks","bible"].indexOf(s.wgLast)<0)s.wgLast="clocks";
   return s;
 }
 function load(){
@@ -2867,7 +3149,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="3.9";
+var APP_VERSION="4.0";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -2878,6 +3160,7 @@ var APP_VERSION="3.9";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-06T13:10:00+08:00",text:"New Widgets button in the header, opening a small panel that floats over whatever tab you are on -- it does not move you off your work, and the board stays usable underneath it. Two things live in it so far. World Clocks shows your own time at the top, always, with up to four other cities under it; each one gives the time, the date, how far ahead or behind it is, and a marker when it is already tomorrow there or still yesterday. You can reorder them and swap them out, and it tells you when you have used all four. The Bible widget lets you read the King James or New King James version without leaving the app -- pick a book and chapter, or search for a phrase and jump straight to the verse, or just type something like John 3:16. Text size is adjustable, it remembers where you stopped reading, and any chapter you have already opened stays readable with no connection."},
   {ts:"2026-09-06T09:40:00+08:00",text:"New Subscriptions tab for everything you pay for on a schedule -- Netflix, iCloud, the gym. Add a service with its amount, whether it bills monthly or yearly, and the billing date, and from then on it files its own expense every time it comes due. Those charges are ordinary transactions, so they turn up in your weekly, monthly and yearly totals, the category breakdown and the twelve-month trend without you typing anything. Pause one and it stops filing but keeps its history; delete a charge by hand and it stays deleted. The tab also shows what your subscriptions cost per month and per year, and what is due in the next 30 days."},
   {ts:"2026-09-06T08:20:00+08:00",text:"The app can call you something other than \"Dave\" now. Set a nickname when you sign up, or have a Super Admin set one for you, and the greeting and the browser tab both use it. Leave it blank and it picks a silly one for you instead -- Pumpkin, Goofball, Silly Goose and eleven others -- fresh every time you open the app. A nickname a Super Admin sets reaches you the next time you sign in."},
   {ts:"2026-09-06T07:30:00+08:00",text:"The Expense Tracker now does weeks. \"Where it goes\" has a This week option alongside the month, year and all-time views, and the row of totals gained a This week card showing the week's spend, the dates it covers, and your average per day so far. Weeks run Sunday to Saturday, the same as the calendar."},
@@ -2922,8 +3205,8 @@ var APP_VERSION_HISTORY=[
    pushed" is per-account, though - it tracks a specific board's revisions. */
 var DEV_KEY="prodash.deviceId", DEV_NAME_KEY="prodash.deviceName", PUSHED_KEY=PDAuth.ns("prodash.pushedUpTo");
 var HIST_CAP=400, CKPT_EVERY=25, BATCH_MS=2500;
-var BOARD_KEYS=["tasks","log","days","events","lanes","rituals","theme","hiddenBlocks","plans","roll","boardView","expenses","cur","subs","subSkip"];
-var KEYED=["tasks","events","lanes","rituals","expenses","subs"], MAPS=["log","days","plans"], SCALARS=["theme","roll","boardView","cur"];
+var BOARD_KEYS=["tasks","log","days","events","lanes","rituals","theme","hiddenBlocks","plans","roll","boardView","expenses","cur","subs","subSkip","zones","bibleVer","bibleAt","bibleSize","wgLast"];
+var KEYED=["tasks","events","lanes","rituals","expenses","subs","zones"], MAPS=["log","days","plans"], SCALARS=["theme","roll","boardView","cur","bibleVer","bibleAt","bibleSize","wgLast"];
 // Plain arrays of primitive ids (not objects with their own .id, so KEYED's
 // per-item union doesn't apply) compared by CONTENT, not reference - a
 // cloned snapshot never shares object identity with the live array even
@@ -6486,6 +6769,679 @@ document.getElementById("cdrExport").addEventListener("click",function(){
   });
   var label=(laneId?laneNameOf(laneId):"All_lanes").replace(/[^\w-]+/g,"_");
   downloadXlsx(rows,"prodash-"+label+"-"+today()+".xlsx");
+});
+
+/* ================= APP WIDGETS =============================================
+   A dock that floats over whatever view is open. It deliberately never calls
+   setView(), never touches document.body's view-* classes and never reads or
+   writes the tab strip - opening a widget must not cost you your place.
+
+   Prefixes are strict because function declarations in this IIFE share one
+   namespace and the last one silently wins (see the fmtWhen note above):
+     wg*  the dock itself       wc*  world clocks       bb*  Bible
+   ========================================================================== */
+function wgEl(id){return document.getElementById(id);}
+
+/* The registry IS the feature list. Chips, panel routing and mount/unmount all
+   read from here and nothing else enumerates widgets, so a third widget is one
+   entry plus a <section class="wg-panel" id="wgp-ID"> in the markup above. */
+var WG_LIST=[
+  {id:"clocks",name:"World Clocks",mount:wcMount,unmount:wcUnmount},
+  {id:"bible", name:"Bible",       mount:bbMount, unmount:bbUnmount}
+];
+var wgCur="";           // id of the mounted widget, "" when the dock is closed
+
+function wgChips(){
+  var host=wgEl("wgChips");
+  host.innerHTML=WG_LIST.map(function(w){
+    return '<button class="wg-chip" id="wgc-'+esc(w.id)+'" data-wg="'+esc(w.id)+'" '+
+           'role="tab" aria-selected="false" aria-controls="wgp-'+esc(w.id)+'">'+esc(w.name)+'</button>';
+  }).join("");
+  host.querySelectorAll("[data-wg]").forEach(function(b){
+    b.addEventListener("click",function(){wgShow(b.getAttribute("data-wg"));});
+  });
+}
+
+/* Swapping widgets always unmounts the old one first. That is what stops the
+   clock's one-second interval from surviving a switch to the Bible and ticking
+   against a panel nobody is looking at. */
+function wgShow(id){
+  var next=null;
+  WG_LIST.forEach(function(w){if(w.id===id)next=w;});
+  if(!next)next=WG_LIST[0];
+  if(wgCur===next.id)return;
+  WG_LIST.forEach(function(w){
+    var on=(w.id===next.id), panel=wgEl("wgp-"+w.id), chip=wgEl("wgc-"+w.id);
+    if(wgCur===w.id&&!on&&w.unmount)w.unmount();
+    if(panel)panel.hidden=!on;
+    if(chip){chip.classList.toggle("on",on);chip.setAttribute("aria-selected",on?"true":"false");}
+  });
+  wgCur=next.id;
+  if(next.mount)next.mount();
+  if(S.wgLast!==next.id){S.wgLast=next.id;save();}
+  wgEl("wgBody").scrollTop=0;
+}
+
+function wgOpen(id){
+  if(!wgEl("wgDock").hidden){wgShow(id||S.wgLast);return;}
+  wgEl("wgDock").hidden=false;
+  wgEl("wgBtn").setAttribute("aria-expanded","true");
+  wgCur="";                                  // force wgShow to actually mount
+  wgShow(id||S.wgLast);
+  // Same 30ms focus idiom the auth gate and the activity modal use.
+  setTimeout(function(){try{wgEl("wgDock").focus();}catch(e){}},30);
+}
+function wgClose(){
+  if(wgEl("wgDock").hidden)return;
+  WG_LIST.forEach(function(w){if(w.id===wgCur&&w.unmount)w.unmount();});
+  wgCur="";
+  wgEl("wgDock").hidden=true;
+  wgEl("wgDock").classList.remove("wg-max");
+  wgEl("wgScrim").hidden=true;
+  wgEl("wgMax").setAttribute("aria-pressed","false");
+  wgEl("wgBtn").setAttribute("aria-expanded","false");
+  try{wgEl("wgBtn").focus();}catch(e){}      // put the ring back where it came from
+}
+function wgToggle(){ if(wgEl("wgDock").hidden)wgOpen(); else wgClose(); }
+function wgSetMax(on){
+  // Refuse to touch the scrim while the dock is shut. Nothing in the UI can
+  // reach this button then (it lives inside the dock), but a stale scrim left
+  // covering the page would swallow every click on the board, so the cheap
+  // guard is worth more than the line it costs.
+  if(wgEl("wgDock").hidden)return;
+  wgEl("wgDock").classList.toggle("wg-max",!!on);
+  wgEl("wgScrim").hidden=!on;
+  var b=wgEl("wgMax");
+  b.setAttribute("aria-pressed",on?"true":"false");
+  b.title=on?"Shrink":"Expand";
+  b.setAttribute("aria-label",on?"Shrink widgets":"Expand widgets");
+}
+
+wgChips();
+wgEl("wgBtn").addEventListener("click",wgToggle);
+wgEl("wgClose").addEventListener("click",wgClose);
+wgEl("wgMax").addEventListener("click",function(){
+  wgSetMax(!wgEl("wgDock").classList.contains("wg-max"));
+});
+// Only the expanded size is modal enough to dismiss by its backdrop.
+wgEl("wgScrim").addEventListener("click",function(){wgSetMax(false);});
+/* Escape steps back one level - expanded shrinks, docked closes - rather than
+   nuking straight to closed, which would lose your place mid-chapter. There is
+   deliberately NO click-outside close: the dock is non-modal, and a stray click
+   on the board while reading should not dismiss it. */
+document.addEventListener("keydown",function(ev){
+  if(ev.key!=="Escape"||wgEl("wgDock").hidden)return;
+  /* One Escape dismisses ONE thing, and it has to be the topmost thing. The
+     profile and activity modals sit above the dock (z-index 9998 against 9991)
+     and register their own Escape handlers, so while either is open this one
+     stands down - otherwise a single press closed the modal AND the dock
+     underneath it, losing the reader's place for no reason. */
+  if(!wgEl("profModal").hidden||!wgEl("actModal").hidden)return;
+  if(wgEl("wgDock").classList.contains("wg-max"))wgSetMax(false); else wgClose();
+/* Capture phase, and that is load-bearing. The modals' own Escape handlers are
+   registered earlier in this file, so in the bubble phase they run FIRST and
+   have already set hidden=true by the time the guard above looks - which let a
+   single Escape close the modal and then the dock behind it. Running on capture
+   means the guard sees the modal while it is still open. */
+},true);
+
+/* ---------------- Widget: World Clocks -------------------------------------
+   No time zone database ships with this app and none is needed: Intl has the
+   whole IANA set built into the browser, handles DST correctly, and costs no
+   bytes and no network. */
+var WC_MONS={Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+var wcTimer=null;
+/* Used when Intl.supportedValuesOf is missing (pre-2022 engines). Not meant to
+   be exhaustive - it is meant to cover the places someone actually works with,
+   so the widget degrades to "fewer choices" instead of "broken". */
+var WC_FALLBACK=["Pacific/Honolulu","America/Anchorage","America/Los_Angeles","America/Denver",
+  "America/Phoenix","America/Chicago","America/New_York","America/Toronto","America/Mexico_City",
+  "America/Bogota","America/Lima","America/Sao_Paulo","America/Argentina/Buenos_Aires",
+  "Atlantic/Reykjavik","Europe/Lisbon","Europe/London","Europe/Dublin","Europe/Madrid","Europe/Paris",
+  "Europe/Brussels","Europe/Amsterdam","Europe/Berlin","Europe/Zurich","Europe/Rome","Europe/Prague",
+  "Europe/Warsaw","Europe/Stockholm","Europe/Oslo","Europe/Helsinki","Europe/Athens","Europe/Kyiv",
+  "Europe/Istanbul","Europe/Moscow","Africa/Casablanca","Africa/Lagos","Africa/Cairo",
+  "Africa/Johannesburg","Africa/Nairobi","Asia/Jerusalem","Asia/Riyadh","Asia/Dubai","Asia/Karachi",
+  "Asia/Kolkata","Asia/Kathmandu","Asia/Dhaka","Asia/Bangkok","Asia/Jakarta","Asia/Ho_Chi_Minh",
+  "Asia/Singapore","Asia/Kuala_Lumpur","Asia/Manila","Asia/Hong_Kong","Asia/Shanghai","Asia/Taipei",
+  "Asia/Seoul","Asia/Tokyo","Australia/Perth","Australia/Adelaide","Australia/Brisbane",
+  "Australia/Sydney","Pacific/Auckland","UTC"];
+
+function wcLocalTz(){
+  try{return Intl.DateTimeFormat().resolvedOptions().timeZone||"UTC";}catch(e){return "UTC";}
+}
+function wcLabelOf(tz){
+  var last=String(tz).split("/").pop();
+  return last.replace(/_/g," ");
+}
+/* The wall-clock reading in `tz`, expressed as a UTC timestamp. Diffing two of
+   these gives the offset between two zones without any table of my own, and it
+   stays right through DST because Intl already applied it. */
+function wcWall(tz,d){
+  try{
+    var p=new Intl.DateTimeFormat("en-US",{timeZone:tz,hourCycle:"h23",
+      year:"numeric",month:"short",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit"}).formatToParts(d);
+    var o={},i;
+    for(i=0;i<p.length;i++)o[p[i].type]=p[i].value;
+    return Date.UTC(+o.year,WC_MONS[o.month],+o.day,(+o.hour)%24,+o.minute,+o.second);
+  }catch(e){return NaN;}
+}
+function wcParts(tz,d){
+  try{
+    var p=new Intl.DateTimeFormat("en-US",{timeZone:tz,hour:"numeric",minute:"2-digit",
+      hour12:true,weekday:"short",month:"short",day:"numeric"}).formatToParts(d);
+    var o={},i;
+    for(i=0;i<p.length;i++)o[p[i].type]=p[i].value;
+    return o;
+  }catch(e){return null;}
+}
+function wcValidTz(tz){
+  try{ new Intl.DateTimeFormat("en-US",{timeZone:tz}).format(new Date()); return true; }
+  catch(e){ return false; }
+}
+function wcOffTxt(mins){
+  if(!isFinite(mins))return "";
+  if(mins===0)return "same time";
+  var s=mins<0?"−":"+", a=Math.abs(mins), h=Math.floor(a/60), m=a%60;
+  return s+h+"h"+(m?" "+m+"m":"");
+}
+
+/* The rows in display order: local first and always, then the chosen zones. */
+function wcSeries(){
+  var list=[{tz:wcLocalTz(),label:wcLabelOf(wcLocalTz()),local:true}];
+  S.zones.forEach(function(z){ list.push({tz:z.tz,label:z.label||wcLabelOf(z.tz),local:false}); });
+  return list;
+}
+/* Everything about a row that changes as time passes, in one place, so the
+   full rebuild and the once-a-second update can never disagree about it. */
+function wcCells(tz,isLocal,now,lw){
+  var p=wcParts(tz,now);
+  if(!p)return null;
+  var w=wcWall(tz,now), off=Math.round((w-lw)/60000);
+  var a=new Date(w), b=new Date(lw);
+  var dd=Math.round((Date.UTC(a.getUTCFullYear(),a.getUTCMonth(),a.getUTCDate())-
+                     Date.UTC(b.getUTCFullYear(),b.getUTCMonth(),b.getUTCDate()))/86400000);
+  var tag="", cls="";
+  if(isLocal){tag="Local";cls=" here";}
+  else if(dd>0){tag="Tomorrow";cls=" day";}
+  else if(dd<0){tag="Yesterday";cls=" day";}
+  else if(off===0){tag="Same time";}
+  return {time:p.hour+":"+p.minute, mer:p.dayPeriod||"", tag:tag, tagCls:cls,
+    sub:p.weekday+", "+p.month+" "+p.day+(isLocal?"":" · "+wcOffTxt(off))};
+}
+
+/* Full rebuild. Called when the LIST changes - mount, add, remove, reorder -
+   never on the clock tick. See wcTick for why. */
+function wcRender(){
+  var host=wgEl("wcList"); if(!host)return;
+  var now=new Date(), lw=wcWall(wcLocalTz(),now), list=wcSeries(), n=S.zones.length;
+
+  host.innerHTML=list.map(function(z,i){
+    var c=wcCells(z.tz,z.local,now,lw);
+    if(!c)return '<div class="wc-row"><div class="wc-main"><div class="wc-nm">'+esc(z.label)+
+      '</div><div class="wc-sub">This device can\'t read that time zone.</div></div></div>';
+    var idx=i-1, ctl="";
+    if(!z.local){
+      ctl='<div class="wc-ctl">'+
+        '<button data-wcup="'+idx+'" title="Move up" aria-label="Move '+esc(z.label)+' up"'+(idx===0?" disabled":"")+'>&#9650;</button>'+
+        '<button data-wcdn="'+idx+'" title="Move down" aria-label="Move '+esc(z.label)+' down"'+(idx===n-1?" disabled":"")+'>&#9660;</button>'+
+        '<button class="wc-del" data-wcdel="'+idx+'" title="Remove" aria-label="Remove '+esc(z.label)+'">&times;</button>'+
+      '</div>';
+    }
+    return '<div class="wc-row'+(z.local?" wc-local":"")+'">'+
+      '<div class="wc-main"><div class="wc-nm">'+esc(z.label)+'</div>'+
+        '<div class="wc-sub">'+esc(c.sub)+'</div></div>'+
+      '<div class="wc-tw"><div class="wc-time">'+esc(c.time)+
+        '<span class="wc-mer">'+esc(c.mer)+'</span></div>'+
+        (c.tag?'<span class="wc-tag'+c.tagCls+'">'+esc(c.tag)+'</span>':"")+'</div>'+
+      ctl+'</div>';
+  }).join("")+(n?"":'<div class="wg-msg">No other time zones yet. Add up to '+WC_MAX+
+      ' and they\'ll show here next to your own.</div>');
+
+  host.querySelectorAll("[data-wcup]").forEach(function(b){
+    b.addEventListener("click",function(){wcMove(+b.getAttribute("data-wcup"),-1);});
+  });
+  host.querySelectorAll("[data-wcdn]").forEach(function(b){
+    b.addEventListener("click",function(){wcMove(+b.getAttribute("data-wcdn"),1);});
+  });
+  host.querySelectorAll("[data-wcdel]").forEach(function(b){
+    b.addEventListener("click",function(){wcDel(+b.getAttribute("data-wcdel"));});
+  });
+  wcCount();
+}
+
+/* The once-a-second update, and the reason it is not just wcRender(): rewriting
+   innerHTML every second destroys the focus ring, so a keyboard user pressing
+   the Move up button repeatedly would lose the button under their finger on
+   every tick. This writes only the text that actually changed and leaves the
+   buttons - and the focus on them - completely alone. It falls back to a full
+   rebuild only when the row COUNT drifts, or when a Tomorrow/Yesterday tag has
+   to appear or disappear, which happens once a day per zone at most. */
+function wcTick(){
+  var host=wgEl("wcList"); if(!host)return;
+  var rows=host.querySelectorAll(".wc-row"), list=wcSeries();
+  if(rows.length!==list.length){wcRender();return;}
+  var now=new Date(), lw=wcWall(wcLocalTz(),now), i;
+  for(i=0;i<rows.length;i++){
+    var c=wcCells(list[i].tz,list[i].local,now,lw);
+    if(!c)continue;
+    var t=rows[i].querySelector(".wc-time"),
+        s=rows[i].querySelector(".wc-sub"),
+        g=rows[i].querySelector(".wc-tag");
+    if(!!c.tag!==!!g){wcRender();return;}
+    if(t)t.innerHTML=esc(c.time)+'<span class="wc-mer">'+esc(c.mer)+'</span>';
+    if(s)s.textContent=c.sub;
+    if(g){g.textContent=c.tag;g.className="wc-tag"+c.tagCls;}
+  }
+}
+
+/* The counter is always visible, not just when you hit the ceiling - "3 / 4"
+   tells you the limit exists before you run into it. */
+function wcCount(){
+  var full=S.zones.length>=WC_MAX;
+  var c=wgEl("wcCount");
+  c.textContent=S.zones.length+" / "+WC_MAX;
+  c.classList.toggle("full",full);
+  var add=wgEl("wcAddBtn");
+  add.disabled=full;
+  add.setAttribute("aria-disabled",full?"true":"false");
+  var msg=wgEl("wcMsg");
+  msg.textContent=full?("Maximum of "+WC_MAX+" time zones reached. Remove one to add another."):"";
+  msg.hidden=!full;
+  if(full)wgEl("wcPick").hidden=true;
+}
+function wcMove(i,d){
+  var j=i+d;
+  if(i<0||i>=S.zones.length||j<0||j>=S.zones.length)return;
+  var t=S.zones[i];S.zones[i]=S.zones[j];S.zones[j]=t;
+  save();wcRender();
+}
+function wcDel(i){
+  if(i<0||i>=S.zones.length)return;
+  S.zones.splice(i,1);
+  save();wcRender();
+}
+function wcZoneList(){
+  var all=null;
+  try{ if(typeof Intl.supportedValuesOf==="function")all=Intl.supportedValuesOf("timeZone"); }catch(e){}
+  if(!all||!all.length)all=WC_FALLBACK;
+  return all;
+}
+function wcFillSel(){
+  var q=(wgEl("wcFilter").value||"").trim().toLowerCase().replace(/\s+/g,"_");
+  var list=wcZoneList().filter(function(tz){
+    return !q||tz.toLowerCase().indexOf(q)>=0;
+  }).slice(0,300);
+  wgEl("wcSel").innerHTML=list.map(function(tz){
+    var parts=tz.split("/"), region=parts.length>1?parts[0].replace(/_/g," "):"";
+    return '<option value="'+esc(tz)+'">'+esc(wcLabelOf(tz))+(region?esc("  —  "+region):"")+'</option>';
+  }).join("")||'<option value="" disabled>No match</option>';
+}
+function wcCommit(){
+  var tz=wgEl("wcSel").value;
+  if(!tz||!wcValidTz(tz))return;
+  if(S.zones.length>=WC_MAX){wcCount();return;}
+  // Same zone twice is a wasted slot out of four, not a useful duplicate.
+  var dupe=false;
+  S.zones.forEach(function(z){if(z.tz===tz)dupe=true;});
+  if(dupe){wgEl("wcPick").hidden=true;stamp("That zone is already listed");return;}
+  S.zones.push({id:rid("tz_"),tz:tz,label:wcLabelOf(tz)});
+  save();
+  wgEl("wcPick").hidden=true;
+  wgEl("wcFilter").value="";
+  wcRender();
+}
+function wcMount(){
+  wcRender();
+  // One interval, owned by the mount. Nothing ticks while the dock is shut.
+  if(wcTimer)clearInterval(wcTimer);
+  wcTimer=setInterval(function(){
+    if(wgEl("wgDock").hidden||wgCur!=="clocks"){wcUnmount();return;}
+    wcTick();
+  },1000);
+}
+function wcUnmount(){ if(wcTimer){clearInterval(wcTimer);wcTimer=null;} }
+
+wgEl("wcAddBtn").addEventListener("click",function(){
+  if(S.zones.length>=WC_MAX)return;
+  var p=wgEl("wcPick");
+  p.hidden=!p.hidden;
+  if(!p.hidden){wcFillSel();setTimeout(function(){try{wgEl("wcFilter").focus();}catch(e){}},30);}
+});
+wgEl("wcFilter").addEventListener("input",wcFillSel);
+wgEl("wcFilter").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();wcCommit();}});
+wgEl("wcSel").addEventListener("dblclick",wcCommit);
+wgEl("wcAdd").addEventListener("click",wcCommit);
+wgEl("wcCancel").addEventListener("click",function(){wgEl("wcPick").hidden=true;});
+
+/* ---------------- Widget: Bible --------------------------------------------
+   Text comes from bolls.life: free, no key, no account, CORS-open, and it
+   carries both KJV and NKJV plus real full-text search. Their docs ask
+   explicitly that get-chapter NOT be used to pull whole translations (it is a
+   single-core server), so this fetches ONE chapter on demand and caches it.
+   No prefetching, no background warming - that request is reasonable and we
+   keep to it.
+
+   The 66-book table is hardcoded rather than fetched. It is 2KB, KJV and NKJV
+   share the same canon and chapter counts, and it means book/chapter browsing
+   works with no network at all - only the verse text needs one. */
+var BB_API="https://bolls.life";
+var BB_CACHE_KEY="prodash.bibleCache";   // unnamespaced: scripture isn't personal data
+var BB_CACHE_MAX=80;
+var BB_BOOKS=[
+  {id:1,n:"Genesis",c:50},{id:2,n:"Exodus",c:40},{id:3,n:"Leviticus",c:27},{id:4,n:"Numbers",c:36},
+  {id:5,n:"Deuteronomy",c:34},{id:6,n:"Joshua",c:24},{id:7,n:"Judges",c:21},{id:8,n:"Ruth",c:4},
+  {id:9,n:"1 Samuel",c:31},{id:10,n:"2 Samuel",c:24},{id:11,n:"1 Kings",c:22},{id:12,n:"2 Kings",c:25},
+  {id:13,n:"1 Chronicles",c:29},{id:14,n:"2 Chronicles",c:36},{id:15,n:"Ezra",c:10},{id:16,n:"Nehemiah",c:13},
+  {id:17,n:"Esther",c:10},{id:18,n:"Job",c:42},{id:19,n:"Psalms",c:150},{id:20,n:"Proverbs",c:31},
+  {id:21,n:"Ecclesiastes",c:12},{id:22,n:"Song of Solomon",c:8},{id:23,n:"Isaiah",c:66},{id:24,n:"Jeremiah",c:52},
+  {id:25,n:"Lamentations",c:5},{id:26,n:"Ezekiel",c:48},{id:27,n:"Daniel",c:12},{id:28,n:"Hosea",c:14},
+  {id:29,n:"Joel",c:3},{id:30,n:"Amos",c:9},{id:31,n:"Obadiah",c:1},{id:32,n:"Jonah",c:4},
+  {id:33,n:"Micah",c:7},{id:34,n:"Nahum",c:3},{id:35,n:"Habakkuk",c:3},{id:36,n:"Zephaniah",c:3},
+  {id:37,n:"Haggai",c:2},{id:38,n:"Zechariah",c:14},{id:39,n:"Malachi",c:4},
+  {id:40,n:"Matthew",c:28},{id:41,n:"Mark",c:16},{id:42,n:"Luke",c:24},{id:43,n:"John",c:21},
+  {id:44,n:"Acts",c:28},{id:45,n:"Romans",c:16},{id:46,n:"1 Corinthians",c:16},{id:47,n:"2 Corinthians",c:13},
+  {id:48,n:"Galatians",c:6},{id:49,n:"Ephesians",c:6},{id:50,n:"Philippians",c:4},{id:51,n:"Colossians",c:4},
+  {id:52,n:"1 Thessalonians",c:5},{id:53,n:"2 Thessalonians",c:3},{id:54,n:"1 Timothy",c:6},{id:55,n:"2 Timothy",c:4},
+  {id:56,n:"Titus",c:3},{id:57,n:"Philemon",c:1},{id:58,n:"Hebrews",c:13},{id:59,n:"James",c:5},
+  {id:60,n:"1 Peter",c:5},{id:61,n:"2 Peter",c:3},{id:62,n:"1 John",c:5},{id:63,n:"2 John",c:1},
+  {id:64,n:"3 John",c:1},{id:65,n:"Jude",c:1},{id:66,n:"Revelation",c:22}
+];
+/* Only the abbreviations a prefix match can't reach on its own. "1cor" already
+   matches "1corinthians" by prefix; "jn" does not match "john". */
+var BB_ALIAS={mt:"matthew",matt:"matthew",mk:"mark",mr:"mark",lk:"luke",jn:"john",jhn:"john",
+  jas:"james",php:"philippians",phlm:"philemon",phm:"philemon",sos:"songofsolomon",
+  song:"songofsolomon",songofsongs:"songofsolomon",canticles:"songofsolomon",
+  psalm:"psalms",dt:"deuteronomy",
+  gn:"genesis",ex:"exodus",lv:"leviticus",nm:"numbers",jg:"judges",rv:"revelation",
+  apocalypse:"revelation",ac:"acts",rm:"romans",hb:"hebrews",jd:"jude",
+  /* The numbered books need their own entries: "1cor" reaches 1 Corinthians by
+     prefix, but "1jn" can never prefix-match "1john". */
+  "1jn":"1john","2jn":"2john","3jn":"3john","1jo":"1john","2jo":"2john","3jo":"3john",
+  "1pt":"1peter","2pt":"2peter","1kgs":"1kings","2kgs":"2kings",
+  "1sm":"1samuel","2sm":"2samuel","1chr":"1chronicles","2chr":"2chronicles"};
+/* Every async thing that writes the stage takes a ticket first and throws its
+   result away if a newer one has since been issued. Without this, a search
+   started before you clicked a result would land AFTER the chapter loaded and
+   replace it with the result list you had already moved on from. A plain
+   "busy" flag can't fix that - it would block the navigation instead, which
+   just trades a wrong render for a dead click. */
+var bbSeq=0;
+
+function bbBook(id){
+  for(var i=0;i<BB_BOOKS.length;i++)if(BB_BOOKS[i].id===+id)return BB_BOOKS[i];
+  return BB_BOOKS[0];
+}
+function bbAt(){
+  var p=String(S.bibleAt||"43:1").split(":");
+  var b=bbBook(+p[0]||43), c=+p[1]||1;
+  if(c<1)c=1; if(c>b.c)c=b.c;
+  return {b:b,c:c};
+}
+function bbSetAt(bid,ch){ S.bibleAt=(+bid)+":"+(+ch); save(); }
+
+/* Verse text arrives as HTML. KJV carries inline Strong's numbers (<S>3778</S>)
+   which are noise in a reading view, and every translation can carry <i>, <br>
+   and the like. Everything is stripped and then re-escaped, so nothing the API
+   sends can become live markup in this page. <mark> is the single exception,
+   carried across the escape on a sentinel because it is how search shows you
+   what it matched. */
+function bbClean(html,keepMark){
+  var s=String(html==null?"":html);
+  /* Both of these are dropped WITH their contents, unlike every other tag.
+     <S> is a Strong's concordance number and <sup> is a translator's marginal
+     note ("comprehended: or, did not admit, or, receive" sits inside John 1:5
+     that way). Stripping only the tags would splice both straight into the
+     sentence, where they read as if they were scripture. */
+  s=s.replace(/<S>[\s\S]*?<\/S>/gi,"").replace(/<sup>[\s\S]*?<\/sup>/gi,"");
+  /* Placeholders, not control characters: they have to survive both the
+     generic tag strip and esc() without being mistaken for either, and an
+     invisible byte in source is a trap for whoever reads this next. */
+  if(keepMark)s=s.replace(/<mark>/gi,"@@MKO@@").replace(/<\/mark>/gi,"@@MKC@@");
+  s=s.replace(/<[^>]*>/g,"");
+  s=s.replace(/&nbsp;/gi," ").replace(/&quot;/gi,'"').replace(/&#39;/g,"'")
+     .replace(/&lt;/gi,"<").replace(/&gt;/gi,">").replace(/&amp;/gi,"&");
+  s=esc(s);
+  if(keepMark)s=s.replace(/@@MKO@@/g,"<mark>").replace(/@@MKC@@/g,"</mark>");
+  return s.replace(/\s+/g," ").trim();
+}
+
+function bbCacheRead(){
+  try{return JSON.parse(localStorage.getItem(BB_CACHE_KEY))||{};}catch(e){return {};}
+}
+function bbCacheGet(k){
+  var c=bbCacheRead();
+  return (c[k]&&c[k].v)?c[k].v:null;
+}
+/* If the cache ever competes with the board for quota, the board wins - it is
+   the user's data and this is a copy of a public text that a network call can
+   always fetch again. So a failed write drops the whole cache rather than
+   fighting for room. */
+function bbCachePut(k,v){
+  try{
+    var c=bbCacheRead();
+    c[k]={t:Date.now(),v:v};
+    var keys=Object.keys(c);
+    if(keys.length>BB_CACHE_MAX){
+      keys.sort(function(a,b){return (c[a].t||0)-(c[b].t||0);});
+      keys.slice(0,keys.length-BB_CACHE_MAX).forEach(function(x){delete c[x];});
+    }
+    localStorage.setItem(BB_CACHE_KEY,JSON.stringify(c));
+  }catch(e){
+    try{localStorage.removeItem(BB_CACHE_KEY);}catch(e2){}
+  }
+}
+
+function bbStage(html){ wgEl("bbStage").innerHTML=html; }
+function bbNote(txt,warn){
+  return '<div class="wg-msg'+(warn?" warn":"")+'">'+esc(txt)+'</div>';
+}
+function bbCrumbs(){
+  var at=bbAt();
+  wgEl("bbBookBtn").textContent=at.b.n;
+  wgEl("bbChapBtn").textContent=String(at.c);
+}
+function bbSizeSync(){
+  wgEl("bbSizeSeg").querySelectorAll("[data-bsize]").forEach(function(b){
+    b.classList.toggle("on",b.getAttribute("data-bsize")===S.bibleSize);
+  });
+  wgEl("bbVerSeg").querySelectorAll("[data-bver]").forEach(function(b){
+    b.classList.toggle("on",b.getAttribute("data-bver")===S.bibleVer);
+  });
+}
+
+function bbShowBooks(){
+  var at=bbAt(), h='<div class="bb-eyebrow">Old Testament</div><div class="bb-grid">';
+  BB_BOOKS.forEach(function(b,i){
+    if(i===39)h+='</div><div class="bb-eyebrow">New Testament</div><div class="bb-grid">';
+    h+='<button data-bb="'+b.id+'"'+(b.id===at.b.id?' class="on"':"")+'>'+esc(b.n)+'</button>';
+  });
+  h+='</div>';
+  bbStage(h);
+  wgEl("bbStage").querySelectorAll("[data-bb]").forEach(function(b){
+    b.addEventListener("click",function(){
+      bbSetAt(+b.getAttribute("data-bb"),1);
+      bbCrumbs();bbShowChapters();
+    });
+  });
+}
+function bbShowChapters(){
+  var at=bbAt(), h='<div class="bb-eyebrow">'+esc(at.b.n)+' · '+at.b.c+' chapters</div><div class="bb-grid bb-ch">',i;
+  for(i=1;i<=at.b.c;i++)h+='<button data-bc="'+i+'"'+(i===at.c?' class="on"':"")+'>'+i+'</button>';
+  h+='</div>';
+  bbStage(h);
+  wgEl("bbStage").querySelectorAll("[data-bc]").forEach(function(b){
+    b.addEventListener("click",function(){ bbGo(at.b.id,+b.getAttribute("data-bc"),0); });
+  });
+}
+
+function bbFetchChapter(ver,b,c,cb){
+  var k=ver+":"+b+":"+c, hit=bbCacheGet(k);
+  if(hit){cb(null,hit);return;}
+  fetch(BB_API+"/get-chapter/"+encodeURIComponent(ver)+"/"+(+b)+"/"+(+c)+"/")
+    .then(function(r){ if(!r.ok)throw new Error("HTTP "+r.status); return r.json(); })
+    .then(function(j){
+      if(!j||!j.length)throw new Error("empty");
+      // Only what we render is kept - the API's pk ids and cross-reference
+      // commentary would triple the cache for nothing.
+      var slim=j.map(function(v){return {verse:+v.verse,text:String(v.text==null?"":v.text)};});
+      bbCachePut(k,slim);
+      cb(null,slim);
+    })
+    .catch(function(e){ cb(e,null); });
+}
+
+/* The only navigation entry point. Everything - crumbs, chapter grid, pager,
+   a search hit - lands here, so "where am I" has exactly one answer. */
+function bbGo(bid,ch,verse){
+  var b=bbBook(bid);
+  if(ch<1)ch=1; if(ch>b.c)ch=b.c;
+  bbSetAt(b.id,ch);
+  bbCrumbs();
+  var my=++bbSeq;
+  bbStage(bbNote("Loading "+b.n+" "+ch+"…"));
+  bbFetchChapter(S.bibleVer,b.id,ch,function(err,verses){
+    if(my!==bbSeq)return;
+    if(err||!verses){
+      bbStage(bbNote(navigator.onLine===false
+        ? "You're offline. Chapters you've already opened are still available — this one isn't cached yet."
+        : "Couldn't load "+b.n+" "+ch+" just now. It'll work again once you're back online.",true));
+      return;
+    }
+    bbPaint(b,ch,verses,verse);
+  });
+}
+
+function bbPaint(b,ch,verses,verse){
+  var h='<div class="bb-read bb-size-'+esc(S.bibleSize)+'">'+
+    '<h4 class="bb-ref">'+esc(b.n+" "+ch)+'</h4><div class="bb-txt">';
+  verses.forEach(function(v){
+    h+='<span class="bb-verse" id="bbv'+(+v.verse)+'">'+
+       '<span class="bb-n">'+(+v.verse)+'</span>'+bbClean(v.text,false)+'</span> ';
+  });
+  h+='</div><div class="bb-cite">'+esc(S.bibleVer==="NKJV"
+      ? "New King James Version · © Thomas Nelson. Text served by bolls.life."
+      : "King James Version · public domain. Text served by bolls.life.")+'</div></div>'+
+    '<div class="bb-pager">'+
+      '<button data-bprev'+(b.id===1&&ch===1?" disabled":"")+'>&#8592; Previous</button>'+
+      '<button data-bnext'+(b.id===66&&ch===b.c?" disabled":"")+'>Next &#8594;</button>'+
+    '</div>';
+  bbStage(h);
+  var st=wgEl("bbStage");
+  st.querySelector("[data-bprev]").addEventListener("click",function(){
+    if(ch>1)bbGo(b.id,ch-1,0);
+    else if(b.id>1){var p=bbBook(b.id-1);bbGo(p.id,p.c,0);}
+  });
+  st.querySelector("[data-bnext]").addEventListener("click",function(){
+    if(ch<b.c)bbGo(b.id,ch+1,0);
+    else if(b.id<66)bbGo(b.id+1,1,0);
+  });
+  if(verse){
+    var el=wgEl("bbv"+verse);
+    if(el){
+      el.classList.add("hit");
+      try{el.scrollIntoView({block:"center"});}catch(e){el.scrollIntoView();}
+    }
+  }
+}
+
+/* "John 3:16", "1 cor 13", "ps 23" - if the query names a place, offer to go
+   there instead of making someone read search results to find it. */
+function bbParseRef(q){
+  var m=/^\s*((?:[1-3]\s*)?[A-Za-z][A-Za-z\s]*?)\s*\.?\s*(\d+)\s*(?::\s*(\d+))?\s*$/.exec(q||"");
+  if(!m)return null;
+  var raw=m[1].toLowerCase().replace(/[\s.]/g,"");
+  if(BB_ALIAS[raw])raw=BB_ALIAS[raw];
+  var hit=null,i,norm;
+  for(i=0;i<BB_BOOKS.length;i++){
+    norm=BB_BOOKS[i].n.toLowerCase().replace(/\s/g,"");
+    if(norm===raw){hit=BB_BOOKS[i];break;}
+  }
+  if(!hit)for(i=0;i<BB_BOOKS.length;i++){
+    norm=BB_BOOKS[i].n.toLowerCase().replace(/\s/g,"");
+    if(norm.indexOf(raw)===0){hit=BB_BOOKS[i];break;}
+  }
+  if(!hit||raw.length<2)return null;
+  var ch=+m[2];
+  if(ch<1||ch>hit.c)return null;
+  return {b:hit,c:ch,v:m[3]?+m[3]:0};
+}
+
+function bbSearch(q){
+  q=String(q||"").trim();
+  if(!q)return;
+  var ref=bbParseRef(q);
+  var head=ref
+    ? '<button class="bb-hit" data-bref="'+ref.b.id+":"+ref.c+":"+ref.v+'">'+
+      '<span class="bb-hit-ref">Go to</span><div class="bb-hit-tx">'+
+      esc(ref.b.n+" "+ref.c+(ref.v?":"+ref.v:""))+'</div></button>'
+    : "";
+  var my=++bbSeq;
+  bbStage(head+bbNote("Searching "+S.bibleVer+" for “"+q+"”…"));
+  bbBind();
+
+  fetch(BB_API+"/v2/find/"+encodeURIComponent(S.bibleVer)+"?search="+encodeURIComponent(q)+
+        "&match_case=false&match_whole=false&limit=40&page=1")
+    .then(function(r){ if(!r.ok)throw new Error("HTTP "+r.status); return r.json(); })
+    .then(function(j){
+      if(my!==bbSeq)return;
+      // The index also covers apocryphal books, which are in neither KJV nor
+      // NKJV as this widget presents them. Anything past 66 is dropped.
+      var hits=((j&&j.results)||[]).filter(function(x){return +x.book>=1&&+x.book<=66;});
+      if(!hits.length){ bbStage(head+bbNote("No results for “"+q+"” in "+S.bibleVer+".")); bbBind(); return; }
+      var h=head+'<div class="bb-eyebrow">'+hits.length+' result'+(hits.length===1?"":"s")+
+        ' · '+esc(S.bibleVer)+'</div>';
+      hits.forEach(function(x){
+        var bk=bbBook(x.book);
+        h+='<button class="bb-hit" data-bref="'+bk.id+":"+(+x.chapter)+":"+(+x.verse)+'">'+
+           '<span class="bb-hit-ref">'+esc(bk.n+" "+x.chapter+":"+x.verse)+'</span>'+
+           '<div class="bb-hit-tx">'+bbClean(x.text,true)+'</div></button>';
+      });
+      bbStage(h);bbBind();
+    })
+    .catch(function(){
+      if(my!==bbSeq)return;
+      bbStage(head+bbNote(navigator.onLine===false
+        ? "Search needs a connection. Book and chapter browsing still works offline, and so do chapters you've already read."
+        : "Search couldn't reach the server just now. Try again in a moment.",true));
+      bbBind();
+    });
+}
+function bbBind(){
+  wgEl("bbStage").querySelectorAll("[data-bref]").forEach(function(b){
+    b.addEventListener("click",function(){
+      var p=b.getAttribute("data-bref").split(":");
+      wgEl("bbQ").value="";
+      bbGo(+p[0],+p[1],+p[2]);
+    });
+  });
+}
+
+function bbMount(){
+  bbCrumbs();bbSizeSync();
+  var at=bbAt();
+  bbGo(at.b.id,at.c,0);
+}
+function bbUnmount(){ /* nothing running to stop - kept so the registry shape holds */ }
+
+wgEl("bbBookBtn").addEventListener("click",bbShowBooks);
+wgEl("bbChapBtn").addEventListener("click",bbShowChapters);
+wgEl("bbFind").addEventListener("submit",function(e){ e.preventDefault(); bbSearch(wgEl("bbQ").value); });
+wgEl("bbVerSeg").querySelectorAll("[data-bver]").forEach(function(b){
+  b.addEventListener("click",function(){
+    var v=b.getAttribute("data-bver");
+    if(S.bibleVer===v)return;
+    S.bibleVer=v;save();bbSizeSync();
+    var at=bbAt();bbGo(at.b.id,at.c,0);
+  });
+});
+wgEl("bbSizeSeg").querySelectorAll("[data-bsize]").forEach(function(b){
+  b.addEventListener("click",function(){
+    S.bibleSize=b.getAttribute("data-bsize");save();bbSizeSync();
+    // Re-tag the surface in place rather than re-fetching the chapter.
+    var r=wgEl("bbStage").querySelector(".bb-read");
+    if(r)r.className="bb-read bb-size-"+S.bibleSize;
+  });
 });
 
 // console hooks:  dfDebug.dayBlocks("2026-08-15")  ·  dfDebug.state()

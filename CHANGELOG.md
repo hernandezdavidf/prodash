@@ -2,6 +2,139 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-06 — App Widgets: World Clocks and Bible (v4.0)
+
+A **Widgets** button in the header opens a dock that floats over whatever tab is
+open. Two widgets ship in it: multiple time zones, and a Bible reader.
+
+**It is a dock, not an eighth tab, and not a modal.** The entire point is to
+check a clock or a verse *without* leaving what you were doing, so at its normal
+size it draws no backdrop and the board underneath stays clickable. Only the
+expanded size dims the page, because at that size it has taken over the screen
+anyway. It never calls `setView()`, never touches the `view-*` body classes and
+never reads the tab strip — opening a widget cannot cost you your place.
+
+The dock markup is a sibling of `#profModal`, deliberately **outside**
+`.viewpanel`. The comment at the top of the stylesheet explains why: a
+transform, filter or `contain` on `.viewpanel` traps a `position:fixed`
+descendant inside it. That is a trap this file has fallen into before.
+
+### The registry is the feature list
+
+```js
+var WG_LIST=[
+  {id:"clocks",name:"World Clocks",mount:wcMount,unmount:wcUnmount},
+  {id:"bible", name:"Bible",       mount:bbMount, unmount:bbUnmount}
+];
+```
+
+Chips, panel routing and lifecycle all read from this array and nothing else
+enumerates widgets, so a third one is a `<section class="wg-panel">` plus one
+entry. `wgShow()` always unmounts the outgoing widget before mounting the next,
+which is what stops the clock's one-second interval from surviving a switch to
+the Bible and ticking against a panel nobody is looking at.
+
+### World Clocks
+
+Up to four zones, plus **your own time pinned at the top** — tinted, badged
+`Local`, not removable, and not counted against the four. It is the anchor every
+other row is read against, so it should be findable without reading.
+
+**No time zone database ships with this.** `Intl` has the whole IANA set built
+into the browser, so the widget costs no bytes and no network and gets DST right
+for free. Offsets are derived by formatting the same instant in two zones and
+diffing the readings, rather than by keeping a table this file would then have
+to maintain. Each row carries the time, the date, the offset, and — only when
+the calendar date differs from yours — a `Tomorrow` or `Yesterday` chip in the
+attention colour. When your shifts run 2PM–7AM, "it is already tomorrow there"
+is the fact that actually bites.
+
+**Reordering is arrow buttons, not drag.** For four items with a phone as a
+first-class target, `↑`/`↓` are reliable; HTML5 drag on a touchscreen is not.
+
+**The tick does not rebuild the list.** `wcRender()` rewrites the rows only when
+the list itself changes; `wcTick()` writes just the text that moved. Rebuilding
+`innerHTML` every second destroys the focus ring, which would take the Move-up
+button out from under a keyboard user's finger once a second. It falls back to a
+full rebuild only when the row count drifts or a day-difference chip has to
+appear, which is at most once a day per zone.
+
+### Bible
+
+King James and New King James, from **bolls.life** — free, no key, no account,
+CORS-open, and it carries both translations plus real full-text search. Their
+API docs ask explicitly that `get-chapter` not be used to pull whole
+translations, so this fetches **one chapter on demand** and caches it. No
+prefetching, no background warming.
+
+**The 66-book table is hardcoded rather than fetched.** It is about 2KB, both
+translations share the same canon and chapter counts, and it means book and
+chapter browsing work with **no network at all** — only the verse text needs
+one. Their own books endpoint is a 1MB JSON file; that would have been the lazy
+choice and a worse one.
+
+**Verse text is sanitised, not trusted.** It arrives as HTML. KJV carries inline
+Strong's numbers (`<S>3778</S>`) and translators' marginal notes in `<sup>` —
+John 1:5 ends `<sup>comprehended: or, did not admit, or, receive</sup>`, which
+splices straight into the sentence and reads as if it were scripture if you strip
+only the tags. Both are dropped **with their contents**; everything else is
+stripped and re-escaped through the existing `esc()`, so nothing the API sends
+can become live markup. `<mark>` is the single exception, carried across the
+escape on a placeholder because it is how search shows what it matched.
+
+**Search takes a phrase or a reference.** `faith without works` returns ranked
+verses with the match highlighted; `John 3:16`, `1 cor 13`, `ps 23`, `1jn 4:8`
+offer a *Go to* row instead of making you read results to find a place you
+already named. Results past book 66 are dropped — the index also covers
+apocryphal books, which are in neither translation as presented here.
+
+**Offline is a first-class path, not an error case.** Chapters already read
+render from cache; an unread one says so plainly and honestly; search says it
+needs a connection; and all 66 books stay browsable regardless. Nothing throws,
+nothing blocks a render, nothing signs anyone out.
+
+### Details that would have been bugs
+
+- **The chapter text never enters `S`.** It is per-device cache under its own
+  unnamespaced key — scripture is not the user's data, and pushing megabytes of
+  it through the sync document on mobile data would be indefensible. The cache
+  is LRU-capped at 80 chapters, and a quota failure **drops the whole cache**
+  rather than fighting the board for room. The board is the user's data; this is
+  a copy of a public text a network call can always fetch again.
+
+- **Escape runs on the capture phase.** The modals register their Escape
+  handlers earlier in the file, so in the bubble phase they run first and have
+  already set `hidden=true` by the time a guard could look — which let one press
+  close the modal *and* the dock behind it. Capture means the guard sees the
+  modal while it is still open. Escape now steps back exactly one level:
+  expanded → docked → closed.
+
+- **Async stage writes take a ticket.** Submitting a search and then clicking its
+  *Go to* row raced: the slower search response landed after the chapter and
+  replaced it with the list you had already moved on from. A `busy` flag would
+  have blocked the navigation instead — trading a wrong render for a dead click.
+  A sequence token lets the newest action win, which is what the user meant.
+
+- **`WC_MAX` is declared above `norm()`**, not with the widget code. `norm()`
+  clamps `s.zones` against it and runs at `load()`; a `var` further down would
+  hoist as `undefined` and the clamp would quietly never fire.
+
+- **The header row now wraps on phones.** It was already about 28px past the
+  header's inner width before Widgets joined it — `header` has `overflow:hidden`,
+  so *Sign out* was being silently clipped rather than wrapping. `flex-shrink:0`
+  on `.hdr-user` is right on a desktop where the row fits; below 620px the group
+  now wraps, and the Widgets button drops its label to an icon.
+
+### Sync
+
+`zones` joins `KEYED` — two devices that each add a zone while offline keep
+both, rather than one silently winning. `bibleVer`, `bibleAt`, `bibleSize` and
+`wgLast` join `SCALARS`, where last-write-wins is the right rule for "which
+translation, how big, where I stopped reading". `adopt()` normalises the remote
+document first, so a board saved before this release defaults the new keys
+instead of tripping over their absence.
+
+
 ## 2026-09-06 — Recurring Subscriptions (v3.9)
 
 A new tab for things billed on a schedule. Add a service with an amount, a
