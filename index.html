@@ -413,7 +413,18 @@
 *{box-sizing:border-box}
 body{margin:0;background:var(--ivory);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
 .wrap{max-width:1200px;margin:0 auto;padding:20px 20px 60px}
-h1,h2,h3{font-family:var(--serif);font-weight:700;margin:0}
+/* Section headings went sans on 2026-09-08. Georgia stays on exactly one thing
+   in the chrome - the h1 greeting - and that is the point: one serif voice at
+   the top of the page reads as a signature, the same face repeated down every
+   card just reads as a font choice. Sans headings also sit better beside the
+   sans body text they introduce, which is what a section header is for.
+   Weight and a little negative tracking do the work the serif was doing: at
+   these sizes 800 gives a sans heading the presence Georgia had at 700, and
+   without the tightening a sans line sets noticeably wider than the serif it
+   replaced and pushes the count chips along the row. */
+h1,h2,h3{margin:0}
+h1{font-family:var(--serif);font-weight:700}
+h2,h3{font-family:var(--sans);font-weight:800;letter-spacing:-.2px}
 button{font-family:var(--sans);cursor:pointer;border:none;background:none;color:inherit;font-size:inherit}
 input,textarea{font-family:var(--sans);font-size:14px;color:var(--ink)}
 
@@ -769,7 +780,10 @@ span.apt{background:var(--terra);color:var(--on-warm);font-size:9px;font-weight:
    full-width row the browser now finds the spaces first and only breaks inside
    a word when that word genuinely cannot fit. */
 .lane-h h3{font-size:14px;flex:1;min-width:0;line-height:1.3}
-.lane-name-edit{flex:1;min-width:0;font-family:var(--serif);font-weight:700;font-size:14px;
+/* Must track .lane-h h3 exactly - same face, weight, size and tracking - or
+   the name visibly jumps the moment you click it to rename. It followed the
+   heading into sans on 2026-09-08 for that reason, not as a style choice. */
+.lane-name-edit{flex:1;min-width:0;font-family:var(--sans);font-weight:800;letter-spacing:-.2px;font-size:14px;
   border:1px solid var(--olive);border-radius:6px;padding:2px 6px;background:var(--paper);
   color:var(--ink);outline:none}
 .lane-n{font-size:11px;color:var(--muted);background:var(--ivory);border-radius:999px;padding:1px 7px;border:1px solid var(--line);flex:none;margin-top:2px}
@@ -2024,7 +2038,11 @@ return {
   .chk-inner{position:relative;z-index:1}
 
   .chk-head{display:flex;align-items:center;gap:9px;height:var(--rl);padding:0 14px 0 68px;
-    color:#fff;font-family:var(--serif);font-weight:700;font-size:14px;letter-spacing:.2px;
+    /* The lane band on the checklist page is the same object as .lane-h h3 in
+       Classic view, so it followed the headings into sans. Its POSITIVE
+       tracking is kept, unlike the other headings: this is small white text on
+       a dark colour wash, where a little air helps and tightening hurts. */
+    color:#fff;font-family:var(--sans);font-weight:800;font-size:14px;letter-spacing:.2px;
     /* A flat 28% black wash over whatever hue the lane carries. Lane colours
        range from dark indigo to bright cyan, and white text fails on the
        lighter end; this floors every one of them past 4.5:1 without needing
@@ -2085,7 +2103,10 @@ return {
   .chk-row .tnote-add{line-height:var(--rl);padding:0;font-family:var(--serif);font-size:13px}
 
   .chk-top{display:flex;flex-wrap:wrap;gap:14px;align-items:baseline;margin-bottom:12px}
-  .chk-title{font-family:var(--serif);font-size:19px;color:var(--forest-ink)}
+  /* Sans with the other section headers. The RULED TEXT below it (.chk-t,
+     .tnote-*) deliberately stays Georgia - that is the notebook the page is
+     imitating, and the heading is the app talking, not the notebook. */
+  .chk-title{font-family:var(--sans);font-weight:800;font-size:17px;letter-spacing:-.2px;color:var(--forest-ink)}
   .chk-sum{font-size:12.5px;color:var(--muted)}
   .chk-empty{padding:0 14px 0 68px;height:var(--rl);line-height:var(--rl);
     font-family:var(--serif);font-size:14px;color:var(--muted);font-style:italic}
@@ -2234,7 +2255,7 @@ return {
   .cal-nav{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
   .cal-add{background:var(--forest);color:var(--on-brand);border-color:var(--forest)}
   .cal-add:hover{background:var(--forest-dk)}
-  .cal-title{font-family:var(--serif);font-size:20px;color:var(--forest-ink);margin:6px 0 12px}
+  .cal-title{font-family:var(--sans);font-weight:800;font-size:18px;letter-spacing:-.2px;color:var(--forest-ink);margin:6px 0 12px}
 
   .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
   .cal-dow{background:var(--ivory);padding:7px 6px;font-size:11px;font-weight:700;text-align:center;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
@@ -2336,7 +2357,9 @@ return {
   .th-p[aria-checked="true"] .th-n{color:var(--forest-ink)}
   .am-card{width:100%;max-width:470px;background:var(--paper);border:1px solid var(--line);
     border-radius:13px;padding:22px;box-shadow:0 14px 50px rgba(var(--shadow-rgb),.34)}
-  .am-card h3{margin:0 0 14px;font-family:var(--serif);font-size:19px;color:var(--forest-ink)}
+  /* A dialog title is a section header; it goes sans with the rest of them.
+     The rule has to say so explicitly because it overrides the h3 default. */
+  .am-card h3{margin:0 0 14px;font-family:var(--sans);font-size:17px;letter-spacing:-.2px;color:var(--forest-ink)}
   .am-row{display:flex;gap:10px}
   .am-row>.ag-f{flex:1;min-width:0}
   .am-check{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink);margin-bottom:12px;cursor:pointer}
@@ -3862,7 +3885,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="4.9";
+var APP_VERSION="4.9.1";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -3873,6 +3896,7 @@ var APP_VERSION="4.9";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-08T06:15:00+08:00",text:"Section headings are now in the ordinary text face instead of the serif one -- \"What does my day look like?\", \"Non-negotiables & Goals\", \"My Personal Calendar\", \"Expense Tracker\", \"User & Role Management\", the title on every panel that opens over the page, and your lane names on both the Classic board and the Consolidated Checklist. Same change as the count in the Still to do bar. The greeting at the top of the page keeps the serif: one line of it reads as the app's signature, the same face repeated down every card just looked like a font. Nothing moved and nothing changed size beyond the headings themselves. Two places deliberately keep the serif for their own reasons: the ruled Consolidated Checklist page, where the serif is the notebook it is imitating, and the Bible reader, where it is there to be read at length."},
   {ts:"2026-09-08T04:30:00+08:00",text:"A nickname now survives a refresh. Saving one already changed the heading straight away, but the next time you loaded the page it went back to a random silly name -- while the Nickname box still showed what you had saved, which made it look like the app had two different opinions about your name. It did. When the page loads it asks the server who you are, and the server was answering from your sign-in token rather than from the account sheet. Your token was issued before you set the nickname, so it kept reporting that you had none, and that empty answer overwrote the good one. The server now reads your nickname from the sheet, which is where it actually lives, so it is correct from the moment you save it until you change it again -- no signing out, no thirty-day wait. This one needs the Worker redeployed; until it is, the User & Role Management screen will say so. Also, the count in the Still to do bar is now in the ordinary text face instead of the serif one -- that serif was borrowed from the Now bar to make the two look related, and once the bar moved out of the header it just read as a second headline competing with the first."},
   {ts:"2026-09-08T03:20:00+08:00",text:"Eight new colour schemes: Blue eclipse, Chili spice, Ink wash, Burnt sienna, Lavender fields, Hydrangea, Retro sunset and Yacht club, alongside the original green which is now called Forest. The button in the header that used to say Theme: auto now names your colours and opens a picker with all nine as swatches, plus Auto, Light and Dark. The two choices are separate: every scheme has a light form and a dark form, so you can run Hydrangea light by day and Hydrangea dark at 3am. Your choice follows you to your other devices the same way the rest of the board does. Two colours never change, whichever scheme you pick: orange still means an appointment you agreed to attend, and red still means must-attend or overdue. A red scheme would otherwise make a must-attend appointment look like every other one, and the point of those two colours is that you can read them without thinking. Lane colours are also left alone, since a lane colour tells you whose time it is. Separately, the Still to do bar has moved out of the green header and become its own card just below it, the same width, and it now follows you onto every tab instead of living only on the Board. And the nickname now works properly: saving one updates the heading and the browser tab immediately instead of waiting until the next time you sign in. If the greeting still will not change, the User & Role Management screen will now tell you why -- your Worker needs redeploying, and it can finally say so instead of failing with a confusing error."},
   {ts:"2026-09-08T01:45:00+08:00",text:"The notification strip in the green header is gone -- every one of those flagged lines. In its place sits a single bar for what you still owe today: the words Still to do, then how many are left, then each outstanding non-negotiable and goal as a chip you can tap to tick it off. Ticking it there is the same as ticking it on the card further down, so the count, the streak and the percentage at the top all move together. A goal with a weekly target shows where it stands, like Exercise 0/3, and disappears from the bar once you have hit that target for the week. When the last one is ticked the whole bar disappears and the header gets its height back. It has moved out of the Now bar, which now answers one question again: what am I in. Three things went with the strip and are worth knowing about. All-day activities -- the ones you set with no start or end time -- used to announce themselves there, and the strip was the only place on the Board they ever appeared; they now show only in your Calendar tab. Nothing warns you before an appointment starts any more: an appointment first appears at the minute it begins, in the Now bar. And the count of tasks left open three or more days is no longer shown anywhere. Your data is untouched -- the reminder lead time is still saved on every activity, and every task still records the day you added it -- so any of the three can be brought back if you miss it."},

@@ -2,6 +2,45 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-08 — Section headings go sans (v4.9.1)
+
+Follows the same call made for `.ngbar .ng-l b` in 4.9, applied to the headings
+proper.
+
+`h1,h2,h3{font-family:var(--serif)}` splits: **`h1` keeps Georgia**, `h2,h3`
+take `--sans` at weight 800 with `-.2px` tracking. One serif line at the top of
+the page reads as a signature; the same face repeated down every card reads as a
+font choice. Sans headings also sit better beside the sans body text they
+introduce, which is the job.
+
+The 800 and the negative tracking are not decoration. At these sizes 800 gives a
+sans heading the presence Georgia had at 700, and without the tightening a sans
+line sets noticeably wider than the serif it replaced — enough to push the count
+chips (`.card h2 .cnt`) along the row.
+
+Rules changed alongside, because each overrides the `h3` default or has to match
+one:
+
+- **`.lane-name-edit`** — must track `.lane-h h3` exactly in face, weight, size
+  and tracking, or the lane name visibly jumps the moment you click to rename
+  it. This one is correctness, not taste.
+- **`.chk-head`** — the lane band on the Consolidated Checklist is the same
+  object as `.lane-h h3` in Classic view. Its **positive** tracking is kept,
+  unlike the other headings: small white text on a dark colour wash wants air,
+  not tightening.
+- **`.am-card h3`** (dialog titles), **`.chk-title`**, **`.cal-title`** — all
+  section headers, all previously setting `--serif` explicitly.
+
+Serif deliberately retained where it is doing a job rather than decorating:
+`h1`, `.nowbar .nt` (content, not a header), the ruled checklist page
+(`.chk-t`, `.tnote-*` — the serif *is* the notebook being imitated, and the
+heading above it is the app talking, not the notebook), the Bible reader
+(`.bb-txt` et al, set for reading at length), and the numeric display faces
+(`.stat b`, `.rep-totals b`, `.xsum-c b`, `.wc-time`).
+
+Verified: `h1` Georgia 700, `.card h2` sans 800/15px, `.lane-h h3` sans 800/14px,
+`.chk-title` and `.am-card h3` sans 800/17px.
+
 ## 2026-09-08 — /auth/me reads the nickname from the sheet, not the token (v4.9)
 
 ### The bug
