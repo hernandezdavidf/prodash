@@ -2,6 +2,22 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-07 — Remove the inline quick-add appointment form (v4.5.1)
+
+The `+ Appointment` button shipped in v4.5 made the form under the day list
+redundant, so the form is gone. Removed: the `.apt-add` markup (`aptN`, `aptD`,
+`aptS`, `aptE`, `aptL`, `aptM`, `aptBtn`), `addApt()` and its two listeners,
+`renderAptLaneOptions()` and its call in `renderAll()`, the `aptD` boot default,
+and the `.apt-add`/`.apt-row`/`.apt-dash`/`.apt-must`/`#aptBtn` rules plus the
+mobile touch-target rule that sized its checkbox.
+
+`.nudge.apt-must` is a **different** class — the must-attend notification tier —
+and stays.
+
+Adding an appointment from the Board is now the same single `openActivity()`
+call the Calendar tab makes: one creation path, one store, and the repeat /
+category / reminder / notes fields the small form never had.
+
 ## 2026-09-07 — "What does my day look like?", and the end of the 07:00 roll (v4.5)
 
 The Shift timeline is renamed, and the shift model underneath it is gone. A day

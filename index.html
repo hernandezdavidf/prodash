@@ -417,7 +417,7 @@ span.apt.must{background:var(--alert-lt);color:var(--alert-ink)}
 .rit-target{width:58px;flex-shrink:0;text-align:center}
 
 /* Weekly targets, merged into the same card as Non-negotiables - same divider
-   idiom already used for apt-add (a sub-form appended after a list). */
+   idiom used by .rit-add (a sub-form appended after a list). */
 .subhead{font-size:13px;margin-bottom:2px}
 
 .wk{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px dashed var(--line)}
@@ -483,17 +483,10 @@ span.apt.must{background:var(--alert-lt);color:var(--alert-ink)}
    every other nudge spoke normally. The badge is always a <span>, the tier is
    always a <div>, so the element name is the honest way to tell them apart. */
 span.apt{background:var(--terra);color:var(--on-warm);font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border-radius:4px;padding:1px 5px}
-.apt-add{margin-top:11px;padding-top:11px;border-top:1px dashed var(--line);display:flex;flex-direction:column;gap:7px}
-.apt-add input,.apt-add select{border:1px solid var(--line);border-radius:7px;padding:6px 9px;background:var(--ivory);color:var(--ink);outline:none;min-width:0}
-.apt-add input:focus,.apt-add select:focus{border-color:var(--olive);background:var(--paper)}
-.apt-add>input{width:100%}
-.apt-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-.apt-row input[type=time]{width:104px}
-.apt-row input[type=date]{width:140px}
-.apt-dash{color:var(--muted);font-size:12px}
-.apt-must{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted);white-space:nowrap}
-.apt-must input{width:14px;height:14px;padding:0}
-#aptBtn{background:var(--forest);color:var(--on-brand);border-radius:7px;padding:7px 13px;font-weight:700;margin-left:auto}
+/* .apt-add / .apt-row / .apt-dash / .apt-must / #aptBtn all styled the inline
+   quick-add form under the day list and went with it on 2026-09-07. Note that
+   .nudge.apt-must further down is a DIFFERENT class (the must-attend
+   notification tier) and is still very much in use. */
 
 .lanes{display:grid;grid-template-columns:repeat(auto-fit,minmax(224px,1fr));gap:13px}
 .lane{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:13px;
@@ -977,7 +970,6 @@ body.reports-only .board-only:not(.bview):not(#view-reports){display:none}
   .tnote-add{padding:9px 0}
   .swatch{width:28px;height:28px}
   .wk-add{padding:7px 12px}
-  .apt-must input,.aptM{width:20px;height:20px}
 }
 </style>
 </head>
@@ -1840,20 +1832,12 @@ return {
         <div class="sub" id="rollSub"></div>
         <div id="timeline"></div>
         <div id="hiddenList"></div>
-        <div class="apt-add">
-          <input id="aptN" placeholder="Quick appointment — what and where">
-          <div class="apt-row">
-            <input id="aptD" type="date" title="Date">
-            <input id="aptS" type="time" value="10:00" title="Start">
-            <span class="apt-dash">→</span>
-            <input id="aptE" type="time" value="11:00" title="End">
-          </div>
-          <div class="apt-row">
-            <select id="aptL" title="Which part of your life"></select>
-            <label class="apt-must"><input type="checkbox" id="aptM"> must attend</label>
-            <button id="aptBtn">Add</button>
-          </div>
-        </div>
+        <!-- The inline quick-add form that used to sit here was removed on
+             2026-09-07. "+ Appointment" in the heading opens the Personal
+             Calendar's own editor, which does everything the little form did
+             and the things it could not (repeat, category, reminder, notes),
+             so keeping both meant two ways to create the same record and one
+             of them was worse. -->
       </div>
 
       <div class="card">
@@ -3474,7 +3458,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="4.5";
+var APP_VERSION="4.5.1";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -3485,6 +3469,7 @@ var APP_VERSION="4.5";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-07T22:30:00+08:00",text:"The small appointment form under \"What does my day look like?\" is gone -- the name box, the two time pickers, the lane dropdown and the Add button. The + Appointment button in the corner of the card does the same job and more: it opens the full activity editor, so you can set a repeat, a category, a reminder time and notes, none of which the little form could do. Having both meant two ways to create the same appointment and one of them was worse. Nothing you have already booked is affected, and the card is shorter for it."},
   {ts:"2026-09-07T21:30:00+08:00",text:"The Shift timeline is now \"What does my day look like?\", and the 7am day roll is gone with the old name. Your day is an ordinary calendar day, 12:00am to 11:59pm, the same day everything else in the app already used. The one thing that genuinely changes for you: work you do between midnight and 7am now files on the date it happens, not on the previous day. Your night therefore lands on two dates instead of one, and today's checkmarks reset at midnight rather than at 7am. Nothing already recorded was altered. In exchange, activities that cross midnight are handled properly for the first time -- an 11pm to 2:30am block used to be drawn as already finished all day long, and now it shows as running, with the time left counted correctly. Anything still going from the night before leads the list marked \"from yesterday\", and anything running past midnight is marked \"into tomorrow\". The three routine blocks that start in the small hours (the 2:30am low ebb, the 6am writeup and the 6:30am EOD) moved to Tuesday-to-Saturday, because that is when they actually happen: Friday night's work now finishes on Saturday morning where it belongs, and Monday no longer shows a 2:30am block for a Sunday night you did not work. You can add an appointment straight from the card with the + Appointment button, which opens the same editor the Calendar tab uses, and tapping any appointment in the list opens it for editing or deleting -- one calendar, one record, whichever screen you started from. Ticking an activity off in the Calendar now shows it as done on the Board too, and it stops claiming to be happening now. The Now bar's orange runs the full width of the bar instead of fading out two thirds across, with a matching band underneath for what is coming, and appointment reminders no longer SHOUT IN CAPITAL LETTERS -- a stylesheet rule meant for the small orange badge had been landing on the whole notification."},
   {ts:"2026-09-07T17:45:00+08:00",text:"The Now bar at the top of the Board now tells you about appointments as well as routine blocks. When what you are in is an actual commitment from your calendar rather than a block of your routine, the whole bar takes the same soft orange the Shift timeline uses and the label changes to Happening now, so a school run no longer arrives looking exactly like Wake + prep. Underneath it, a second line shows what is coming: the next activity you have not done yet, with the time it runs and a countdown, and it flips to Also now with the time remaining once that one starts too. Anything that has finished drops off by itself and the next one steps up. Must-attend items are marked in red rather than pushed to the front, so the order still matches your day. On a shift with nothing booked the second line is not there at all and the bar looks exactly as it always did. This is the Board only -- your Calendar tab is unchanged."},
   {ts:"2026-09-07T16:10:00+08:00",text:"Removed the reminder that said your company didn't get its hour. It had no end time, so it appeared at 2pm and then simply stayed for the rest of the shift -- at 5am it was still telling you that Day Client was about to take the 1-2pm slot, hours after Day Client had finished. Your \"My company -- 30 min\" non-negotiable is unchanged and still on the list; it just no longer puts a banner at the top of the board."},
@@ -5366,7 +5351,6 @@ function renderAll(){
   // is showing, which is why the separate "if we are on the reports view"
   // re-render that used to sit below is gone.
   setBoardView(S.boardView);
-  renderAptLaneOptions();
   applyTheme();
 }
 
@@ -5377,45 +5361,18 @@ document.querySelectorAll("[data-bview]").forEach(function(b){
 document.getElementById("ritAddBtn").addEventListener("click",addRitual);
 ["ritName","ritTag","ritTarget"].forEach(function(id){
   document.getElementById(id).addEventListener("keydown",function(e){if(e.key==="Enter")addRitual();});});
-// ---------- appointments ----------
-// Rebuilt on every renderAll() (not just once) so a lane added after boot
-// shows up as a choice immediately. Preserves whatever was already picked.
-function renderAptLaneOptions(){
-  var sel=document.getElementById("aptL"),prev=sel.value;
-  sel.innerHTML='<option value="">No lane</option>'+S.lanes.map(function(L){
-    return '<option value="'+L.id+'">'+esc(L.name)+'</option>';}).join("");
-  if(S.lanes.some(function(L){return L.id===prev;}))sel.value=prev;
-}
-document.getElementById("aptD").value=today();
+/* ---------- appointments ----------
+   renderAptLaneOptions() lived here and rebuilt the quick-add form's lane
+   <select> on every renderAll(). It went with the form: openActivity() builds
+   its own lane list from the same S.lanes each time it opens, so a lane added
+   after boot is still offered as a choice. */
 document.getElementById("lanes").addEventListener("dragover",laneDragOver);
 document.getElementById("lanes").addEventListener("drop",laneDrop);
-function addApt(){
-  var n=document.getElementById("aptN"),s=document.getElementById("aptS"),
-      e=document.getElementById("aptE"),l=document.getElementById("aptL"),
-      m=document.getElementById("aptM"),d=document.getElementById("aptD");
-  var title=n.value.trim();
-  if(!title){n.focus();return;}
-  if(!s.value||!e.value){alert("An appointment needs a start and an end time.");return;}
-  if(s.value===e.value){alert("Start and end are the same time.");return;}
-  /* Written straight into S.events - the Personal Calendar's own store - with
-     the same shape amSave() produces, so a quick-added appointment is not a
-     lesser record: it opens in the activity editor, ticks done per date, and
-     appears in every calendar view immediately. There is deliberately no
-     second appointment store to reconcile. */
-  S.events.push({id:"evt_"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
-    n:title, d:"", s:s.value, e:e.value, lane:l.value||null,
-    must:m.checked, ev:true, date:d.value||today(),
-    cat:"personal", remind:120, allDay:false, rr:null, done:{}, ex:[]});
-  n.value="";m.checked=false;
-  save();renderAll();
-  if(typeof renderCalendar==="function")renderCalendar();
-  stamp("Appointment added to your calendar");
-}
-document.getElementById("aptBtn").addEventListener("click",addApt);
-// The full editor, opened from the Board on today's date. Same function the
-// Calendar tab's "+ New activity" calls, so there is one appointment flow.
+/* addApt() and its two listeners were removed with the quick-add form. Adding an
+   appointment from the Board is now the same single call the Calendar tab makes,
+   so there is one creation path writing one store - which is what the form was
+   already careful to do, just with a second set of inputs to keep correct. */
 document.getElementById("tlAdd").addEventListener("click",function(){openActivity(null,today());});
-document.getElementById("aptN").addEventListener("keydown",function(ev){if(ev.key==="Enter")addApt();});
 
 document.getElementById("themeBtn").addEventListener("click",function(){
   S.theme = S.theme==="auto" ? "dark" : (S.theme==="dark" ? "light" : "auto");
