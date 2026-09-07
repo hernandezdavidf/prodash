@@ -2,6 +2,64 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-07 — Now bar: rotate concurrent appointments, drop Upcoming, add the outstanding row (v4.6)
+
+**`Upcoming` / `Also now` removed.** `pendingItems()` and the whole `.nowup`
+row are gone. The bar no longer looks forward at all — advance warning is the
+nudge strip's job, and `appt-soon` already does it with a per-activity lead
+time. Two features answering "what's next" with different rules was one too
+many.
+
+**Concurrent appointments rotate.** `nowSpans()` returns *every* running,
+un-ticked appointment rather than just the one that won the headline. Order is
+must-attend first, then chronological — a deliberate divergence from the day
+view below, which stays purely chronological because down there you read a
+sequence and up here you are told what to walk into. `Array.sort` is stable, so
+equal-priority items keep their `daySpans()` order.
+
+Rotation is **8 seconds**, driven by **one permanent `setInterval`** rather than
+a timer started and cleared inside `renderNow()`. That matters: `renderNow()`
+also runs on the 60s tick and on every `save()`, and a per-render timer would
+restart its 8 seconds each time, so a busy minute could stall the rotation
+indefinitely. The ticker owns the clock; `renderNow()` only reads the index.
+
+Rotation state (`nowRotIdx`, `nowRotKey`, `nowRotPin`) is module-level so it
+survives `renderAll()`. It is keyed by the **set of `id@start` pairs**, not the
+count — ticking one appointment off must reset the index and the pin, because
+"hold the second one" stops meaning anything once the list changes underneath
+it. Same class of bug as a nudge dismissal keyed by array index.
+
+**Dots are the pause control.** Rendered only at 2+ items (a lone dot controls
+nothing). Clicking the active dot toggles the hold; clicking another jumps *and*
+holds, because you only reach for a dot when the rotation took away what you
+were reading. This is what satisfies WCAG 2.2.2 on a headline that changes
+itself on a timer.
+
+The button is **20px with an 8px `::after`**, not an 8px button with a
+transparent `box-shadow` ring — `box-shadow` paints, it does not extend the hit
+area. Size the element, shrink the paint. Negative margin cancels the padding so
+adding dots doesn't move the label row.
+
+**New second row: what you still owe today.** Same slot the Upcoming line used,
+opposite tense. `pendingRituals()` filters the live `S.rituals` — the same list
+the card below renders, so there is no second store — dropping anything ticked
+today and any goal whose `weeklyCount()` has already met its `target`. A 2×/week
+goal therefore stops nagging on days it isn't behind. Shows a count plus a chip
+per item: **`r.l` only, never `r.tag`** — the subject, not the note under it.
+
+Deliberately **not** orange. Orange means "a commitment you agreed to attend"
+across the timeline, the nudges and the headline band; a non-negotiable is a
+promise to yourself. It takes the sage/ivory treatment the old neutral Upcoming
+row used, so the two can never be confused at a glance.
+
+`dfDebug.nowSpans()` and `dfDebug.pendingRituals()` expose both lists.
+
+Verified in the browser at desktop, mobile (375px, coarse pointer) and dark:
+three overlapping appointments rotate and reorder correctly, ticking one resets
+the pin and index, one appointment shows no dots, zero appointments falls back
+to the routine block, and a met weekly target drops out of the row across a
+reload.
+
 ## 2026-09-07 — Editable lane notes; drop the stale manifest description (v4.5.2)
 
 **Lane notes.** The caption under each lane name (`L.ritual`) is now editable in

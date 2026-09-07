@@ -264,28 +264,53 @@ header h1{font-size:26px;letter-spacing:.3px}
 .nowbar.must::before{background:linear-gradient(90deg,var(--alert),rgba(229,57,53,.25))}
 .nowbar.ev .nt{color:var(--terra-ink)}
 .nowbar.must{border-left-color:var(--alert)}
-/* Upcoming is a quieter SECOND ROW, not a second colour: one thing is
-   happening and one thing is coming, and they must not compete for the same
-   glance. flex-basis:100% is what drops it onto its own line inside the
-   wrapping .nowbar. The 3px left bar echoes .blk-b in the timeline. */
-/* Matches the headline band: full-width wash, not a 72% fade. The .ev class is
-   what earns the orange - an upcoming ROUTINE block uses the same row with a
-   neutral ground, so orange keeps meaning "a commitment", nothing else. */
-.nowup{flex-basis:100%;display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;
+/* ---- rotation dots --------------------------------------------------
+   Only rendered when two or more appointments are running at once, which is
+   also the only time the headline changes on its own. They sit on the label
+   line rather than under the name so the tallest thing in the bar is still
+   the name: the dots are navigation, not content.
+
+   The BUTTON is 20px and the dot inside it is an 8px ::after. A target this
+   small has to be thumbable at 3am on a phone, and the obvious shortcut - an
+   8px button wearing a transparent box-shadow ring - does not work: box-shadow
+   paints, it does not extend the hit area. Size the element and shrink the
+   paint, never the reverse. The negative margin cancels the padding the bigger
+   target adds, so adding dots does not move the label row. */
+.nprow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.nowdots{display:flex;align-items:center;gap:0;margin:-6px 0 -6px -6px}
+.nowdots[hidden]{display:none}
+.nowdots button{width:20px;height:20px;padding:0;border:0;background:none;cursor:pointer;
+  display:grid;place-items:center;border-radius:50%}
+.nowdots button::after{content:"";width:8px;height:8px;border-radius:50%;
+  background:var(--line);transition:background .15s}
+.nowdots button.on::after{background:var(--terra)}
+.nowdots button.on.must::after{background:var(--alert)}
+.nowdots button:hover::after{background:var(--sage)}
+.nowdots button:focus-visible{outline:2px solid var(--terra-ink);outline-offset:-2px}
+/* Pinned: the rotation is stopped, so the dots stop being a progress readout
+   and become a selector. The ring says "this is held", not "this is next". */
+.nowdots.pinned button.on::after{box-shadow:0 0 0 3px var(--terra-lt)}
+
+/* ---- what is still outstanding today --------------------------------
+   Deliberately NOT orange. Orange means "a commitment you agreed to attend"
+   everywhere else in this app - the timeline, the nudges, the headline band
+   above - and a non-negotiable is a promise to yourself, not an appointment.
+   It gets the sage/ivory treatment the old neutral Upcoming row used, so the
+   two rows can never be confused at a glance. flex-basis:100% is what drops
+   it onto its own line inside the wrapping .nowbar. */
+.nowng{flex-basis:100%;display:flex;align-items:center;gap:7px;flex-wrap:wrap;
   margin-top:11px;padding:8px 11px;border-radius:8px;border-left:3px solid var(--sage);
   background:var(--ivory)}
-.nowup.ev{border-left-color:var(--terra);
-  background:linear-gradient(90deg,rgba(251,140,0,.14),rgba(251,140,0,.05))}
-.nowup:not(.ev) .nu-l,.nowup:not(.ev) .nu-c{color:var(--forest-ink)}
 /* display:flex beats the UA [hidden] rule, so without this the row keeps its
-   box and its orange wash on every day that has no pending activity. */
-.nowup[hidden]{display:none}
-.nowup .nu-l{font-size:9.5px;text-transform:uppercase;letter-spacing:1.1px;font-weight:800;color:var(--terra-ink)}
-.nowup .nu-n{font-size:12.5px;font-weight:700;overflow-wrap:anywhere;min-width:0}
-.nowup .nu-m{font-size:11.5px;color:var(--muted)}
-.nowup .nu-c{font-size:11.5px;font-weight:700;color:var(--terra-ink);font-variant-numeric:tabular-nums}
-.nowup.must{border-left-color:var(--alert);background:linear-gradient(90deg,rgba(229,57,53,.13),rgba(229,57,53,.05))}
-.nowup.must .nu-l,.nowup.must .nu-c{color:var(--alert-ink)}
+   box on every day the list is already clear. */
+.nowng[hidden]{display:none}
+.nowng .ng-l{font-size:9.5px;text-transform:uppercase;letter-spacing:1.1px;font-weight:800;
+  color:var(--forest-ink);font-variant-numeric:tabular-nums;flex-shrink:0}
+.nowng .ng-c{font-size:11.5px;font-weight:600;color:var(--ink);background:var(--paper);
+  border:1px solid var(--line);border-radius:999px;padding:3px 9px;overflow-wrap:anywhere;min-width:0}
+/* A weekly goal says where it stands; a daily non-negotiable has nothing to
+   count, so it just names itself. */
+.nowng .ng-n{font-weight:800;color:var(--forest-ink);font-variant-numeric:tabular-nums}
 /* Same token pair as .cal-tag.must, and for the reason those two tokens exist:
    they FLIP together, so this reads as red type on a red tint in both themes.
    A solid --alert-ink ground is right in light (5.6:1 with white) but wrong in
@@ -1580,7 +1605,14 @@ return {
 
   <div class="nowbar board-only" id="nowbar">
     <div>
-      <div class="np" id="nowLbl">Now</div>
+      <!-- The dots only exist when two or more appointments overlap. They are
+           real buttons, not decoration: they are also the pause control for
+           the rotation, which is what keeps an auto-changing headline from
+           being something you can only stand and wait out. -->
+      <div class="nprow">
+        <div class="np" id="nowLbl">Now</div>
+        <div class="nowdots" id="nowDots" hidden></div>
+      </div>
       <div class="nt" id="nowName">—</div>
       <div class="nm" id="nowMeta"></div>
     </div>
@@ -1602,13 +1634,17 @@ return {
         <div class="synced-note" id="cloudNote"></div>
       </div>
     </div>
-    <!-- The second commitment line. Empty and hidden whenever there is nothing
-         pending, so a quiet day looks exactly as it did before this existed.
-         It sits INSIDE .nowbar rather than under it because "what you are in"
-         and "what is coming" are one answer to one question - and .nowbar
-         already wraps, so flex-basis:100% drops this onto its own line
-         underneath both the block description and the sync pair. -->
-    <div class="nowup" id="nowUp" hidden></div>
+    <!-- The second row. It used to hold "what is coming" (the Upcoming /
+         Also now line, removed 2026-09-07); it now holds what is still
+         OUTSTANDING - the non-negotiables and goals not yet ticked today.
+         Same slot, opposite tense: the bar stopped predicting and started
+         nagging. Empty and hidden the moment the list is clear, so finishing
+         the day is visible as the row disappearing.
+         It sits INSIDE .nowbar rather than under it because "what I am in"
+         and "what I still owe today" are one answer to one question - and
+         .nowbar already wraps, so flex-basis:100% drops this onto its own
+         line underneath both the block description and the sync pair. -->
+    <div class="nowng" id="nowNg" hidden></div>
   </div>
 
   <style>
@@ -3479,7 +3515,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="4.5.2";
+var APP_VERSION="4.6";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -3490,6 +3526,7 @@ var APP_VERSION="4.5.2";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-08T00:30:00+08:00",text:"The Now bar has stopped looking ahead and started dealing with what is actually on you right now. The \"Upcoming\" line underneath it -- the one that named the next thing and counted down to it -- is gone. When two or three appointments run at the same time, the bar no longer picks one for the headline and demotes the rest to a smaller line: it now shows each of them in turn at full size, one every eight seconds, with a row of small dots beside the \"Happening now\" label so you can see how many there are. Tap a dot to hold that one on screen and stop the rotation; tap it again to let it carry on. Must-attend items come first in the cycle, then the rest in start order, so the thing you cannot skip is the thing you see first -- the day list below stays in plain clock order, which is what it is for. When only one appointment is running there are no dots and nothing moves, exactly as before. In the space the old Upcoming line used, the bar now shows what you still owe today: a count and then every non-negotiable and goal you have not ticked, straight from your Non-negotiables & Goals list -- just the name, not the note underneath it. A goal with a weekly target shows where it stands, like Exercise 2/3, and drops off the row entirely once you have hit that target for the week, so it only nags you on the days you are actually behind. The whole row disappears the moment the list is clear."},
   {ts:"2026-09-07T23:15:00+08:00",text:"The small grey line under each lane name -- \"10:30pm-6:30am, write tomorrow's to-dos\" and the like -- can now be edited. Click it, type, press Enter. Clear it and press Enter to remove the line altogether; where a lane has none, a faint \"+ add a note\" sits in its place so you can always put one back. Escape cancels without saving, and clicking away saves. Nothing else about the lanes changed. Separately, the app's install description has been removed: it still described ProDash as a tracker for a 2pm-7am shift schedule, which stopped being true when the shift timing came out earlier today."},
   {ts:"2026-09-07T22:30:00+08:00",text:"The small appointment form under \"What does my day look like?\" is gone -- the name box, the two time pickers, the lane dropdown and the Add button. The + Appointment button in the corner of the card does the same job and more: it opens the full activity editor, so you can set a repeat, a category, a reminder time and notes, none of which the little form could do. Having both meant two ways to create the same appointment and one of them was worse. Nothing you have already booked is affected, and the card is shorter for it."},
   {ts:"2026-09-07T21:30:00+08:00",text:"The Shift timeline is now \"What does my day look like?\", and the 7am day roll is gone with the old name. Your day is an ordinary calendar day, 12:00am to 11:59pm, the same day everything else in the app already used. The one thing that genuinely changes for you: work you do between midnight and 7am now files on the date it happens, not on the previous day. Your night therefore lands on two dates instead of one, and today's checkmarks reset at midnight rather than at 7am. Nothing already recorded was altered. In exchange, activities that cross midnight are handled properly for the first time -- an 11pm to 2:30am block used to be drawn as already finished all day long, and now it shows as running, with the time left counted correctly. Anything still going from the night before leads the list marked \"from yesterday\", and anything running past midnight is marked \"into tomorrow\". The three routine blocks that start in the small hours (the 2:30am low ebb, the 6am writeup and the 6:30am EOD) moved to Tuesday-to-Saturday, because that is when they actually happen: Friday night's work now finishes on Saturday morning where it belongs, and Monday no longer shows a 2:30am block for a Sunday night you did not work. You can add an appointment straight from the card with the + Appointment button, which opens the same editor the Calendar tab uses, and tapping any appointment in the list opens it for editing or deleting -- one calendar, one record, whichever screen you started from. Ticking an activity off in the Calendar now shows it as done on the Board too, and it stops claiming to be happening now. The Now bar's orange runs the full width of the bar instead of fading out two thirds across, with a matching band underneath for what is coming, and appointment reminders no longer SHOUT IN CAPITAL LETTERS -- a stylesheet rule meant for the small orange badge had been landing on the whole notification."},
@@ -4506,24 +4543,66 @@ function renderHeader(){
    to test for a wrap: a span's st and en are already real minute coordinates on
    the day in view, negative or past 1440 where that is the truth. The old
    apptSpan() and its roll-wrap special case are gone with the roll. */
-/* What has not started yet, or is running alongside the headline. Appointments
-   first, because a commitment outranks routine; the next routine block is
-   offered only when nothing is booked, so the row always answers "what's
-   coming" instead of going blank on an ordinary day. */
-function pendingItems(){
-  var n=nowDm(),k=today(),cur=currentSpan(),appts=[],routine=[];
+/* Every appointment happening RIGHT NOW, not just the one that won the
+   headline. This replaced pendingItems() on 2026-09-07: the bar no longer
+   looks ahead at all. "Upcoming" and "Also now" are gone, and with them the
+   asymmetry where the second-place overlapping appointment got a smaller,
+   quieter row than the first - three simultaneous commitments are three
+   equal commitments, and the bar now rotates through them at full weight
+   instead of ranking two of them into a footnote.
+
+   Order is must-attend first, then chronological. That is a deliberate
+   departure from the day view below, which stays purely chronological: down
+   there you are reading a sequence, up here you are being told what to walk
+   into, and the thing you cannot skip should be the thing you see first.
+   Array.prototype.sort is stable in every browser this app targets, so
+   equal-priority items keep their daySpans() start order. */
+function nowSpans(){
+  var n=nowDm(),out=[];
   daySpans().forEach(function(sp){
-    if(n>=sp.en)return;                            // over: drops out on its own
-    if(cur&&sp.b===cur.b)return;                   // already the headline
-    if(sp.b.ev){
-      if(isDone(sp.b,sp.carry?shift(k,-1):k))return;   // ticked off in the Calendar
-      appts.push(sp);
-    }else if(sp.st>n) routine.push(sp);            // upcoming routine only
+    if(!sp.b.ev)return;                            // appointments only
+    if(n<sp.st||n>=sp.en)return;                   // not this minute
+    if(spanDone(sp))return;                        // ticked off in the Calendar
+    out.push(sp);
   });
-  return appts.length?appts:routine.slice(0,1);    // both already start-sorted
+  return out.sort(function(a,b){
+    return (b.b.must?1:0)-(a.b.must?1:0) || a.st-b.st;
+  });
 }
+/* Still owed today. A plain non-negotiable is outstanding until it is ticked;
+   a goal carrying a weekly target is outstanding only while the week is still
+   short of that target, so a 2x/week goal stops nagging on the days it is not
+   actually behind. Both are the SAME S.rituals list the card below renders -
+   there is no second store and nothing to keep in step. */
+function pendingRituals(){
+  var l=day();
+  return (S.rituals||[]).filter(function(r){
+    if(l[r.id])return false;                                       // done today
+    if(+r.target>0&&weeklyCount(r.id)>=+r.target)return false;      // pace met
+    return true;
+  });
+}
+
+/* Rotation state, module-level so it survives the re-render that renderAll()
+   fires on every save. Keyed by the SET of ids rather than the count: if an
+   appointment ends or is ticked off, the index and the pin reset, because
+   "hold the second one" stops meaning anything once the list changes under
+   it. Without the key, ticking one item off would silently pin a different
+   one - the same class of bug as the nudge dismissal keyed by array index. */
+var nowRotIdx=0,nowRotKey="",nowRotPin=false;
 function renderNow(){
-  var sp=currentSpan(),b=sp?sp.b:null,bar=document.getElementById("nowbar");
+  /* The headline is whichever running appointment the rotation is currently
+     holding; currentSpan() is the fallback for the ordinary case where none
+     is running, and it answers with the routine block (or null) because the
+     appointment branch inside it tests exactly the same conditions nowSpans()
+     does - if nowSpans() is empty, currentSpan() cannot return an appointment.
+     The two can never disagree about whether you are in a commitment. */
+  var live=nowSpans();
+  var key=live.map(function(s){return s.b.id+"@"+s.st;}).join("|");
+  if(key!==nowRotKey){nowRotKey=key;nowRotIdx=0;nowRotPin=false;}
+  if(nowRotIdx>=live.length)nowRotIdx=0;
+  var sp=live.length?live[nowRotIdx]:currentSpan(),b=sp?sp.b:null;
+  var bar=document.getElementById("nowbar");
   var onEv=!!(b&&b.ev);
   bar.className="nowbar board-only"+(b&&b.sleep?" sleep":"")+
     (onEv?" ev":"")+(onEv&&b.must?" must":"");
@@ -4546,30 +4625,51 @@ function renderNow(){
     document.getElementById("nowMeta").textContent="";
   }
 
-  /* The second row. Ordering is chronological rather than must-attend-first:
-     a calendar is a sequence, and promoting a 4pm must-attend over a 9am one
-     would be lying about what happens next. Must-attend is marked instead of
-     re-ordered. Two overlapping activities are why "Also now" exists - the
-     headline can only hold one, and silently dropping the other would be the
-     same class of bug as the nudge that never ended. */
-  var up=pendingItems(),el=document.getElementById("nowUp");
-  if(!up.length){el.hidden=true;el.innerHTML="";return;}
-  var u=up[0],e=u.b,n=nowDm(),started=n>=u.st;
-  var gap=started?(u.en-n):(u.st-n);
-  var dur=gap>=60?Math.floor(gap/60)+"h "+(gap%60)+"m":gap+" min";
-  el.hidden=false;
-  // Orange is reserved for commitments. An upcoming ROUTINE block gets the same
-  // row without the wash, so "this is something you agreed to attend" keeps
-  // meaning exactly one thing across the Now bar, the day view and the nudges.
-  el.className="nowup"+(e.ev?" ev":"")+(e.must?" must":"");
-  el.innerHTML=
-    '<span class="nu-l">'+(started?"Also now":"Upcoming")+'</span>'+
-    '<span class="nu-n">'+esc(e.n)+'</span>'+
-    (e.must?'<span class="apt must">must attend</span>':"")+
-    (e.rr?'<span class="apt">↻</span>':"")+
-    '<span class="nu-m">'+fmt(e.s)+"–"+fmt(e.e)+'</span>'+
-    '<span class="nu-c">'+(started?dur+" left":"in "+dur)+'</span>'+
-    (up.length>1?'<span class="nu-m">+'+(up.length-1)+" more today</span>":"");
+  /* The dots. One per running appointment, and nothing at all when only one
+     is running - a lone dot would be a control that controls nothing. Clicking
+     a dot holds that appointment; clicking the held one lets the rotation go
+     again, which is the pause/resume WCAG asks for on anything that changes
+     itself on a timer. */
+  var dots=document.getElementById("nowDots");
+  dots.innerHTML="";
+  if(live.length<2){dots.hidden=true;dots.className="nowdots";}
+  else{
+    dots.hidden=false;
+    dots.className="nowdots"+(nowRotPin?" pinned":"");
+    live.forEach(function(s,i){
+      var d=document.createElement("button");
+      d.type="button";
+      d.className=(i===nowRotIdx?"on":"")+(s.b.must?" must":"");
+      d.setAttribute("aria-label",(i+1)+" of "+live.length+": "+s.b.n);
+      d.title=i===nowRotIdx
+        ? (nowRotPin?"Held — click to resume the rotation":"Showing now — click to hold it here")
+        : s.b.n;
+      d.addEventListener("click",function(){
+        // Clicking the current dot toggles the hold; clicking another moves to
+        // it AND holds, because you only reach for a dot when the rotation has
+        // taken away the one you were reading.
+        if(i===nowRotIdx)nowRotPin=!nowRotPin;
+        else{nowRotIdx=i;nowRotPin=true;}
+        renderNow();
+      });
+      dots.appendChild(d);
+    });
+  }
+
+  /* The second row: what you still owe today. It has nothing to do with the
+     rotation above it and does not rotate - the whole point is seeing how many
+     are left in one glance, which a one-at-a-time treatment would destroy.
+     A goal shows its pace (2/4); a daily non-negotiable has nothing to count
+     and just names itself. Only the subject line is shown, never the tag
+     underneath it - the card below is where the detail lives. */
+  var pend=pendingRituals(),ng=document.getElementById("nowNg");
+  if(!pend.length){ng.hidden=true;ng.innerHTML="";return;}
+  ng.hidden=false;
+  ng.innerHTML='<span class="ng-l">'+pend.length+" left today"+'</span>'+
+    pend.map(function(r){
+      var t=+r.target>0?' <span class="ng-n">'+weeklyCount(r.id)+"/"+r.target+'</span>':"";
+      return '<span class="ng-c">'+esc(r.l)+t+'</span>';
+    }).join("");
 }
 
 // In-memory only, resets on reload: dismissing a nudge hides that exact,
@@ -8371,6 +8471,9 @@ window.dfDebug={dayBlocks:dayBlocks,today:today,norm:norm,state:function(){retur
   // Midnight is the awkward case, so the span layer is inspectable:
   //   dfDebug.daySpans("2026-09-12")  ·  dfDebug.currentSpan()  ·  dfDebug.nowDm()
   daySpans:daySpans,currentSpan:currentSpan,nowDm:nowDm,
+  // Now bar: dfDebug.nowSpans() is the rotation list, dfDebug.pendingRituals()
+  // the outstanding row. Both are pure reads of state, safe to call anytime.
+  nowSpans:nowSpans,pendingRituals:pendingRituals,
   xlsxBlob:xlsxBlob,buildZip:buildZip,crc32:crc32,
   // Board History hooks: dfDebug.hist() · dfDebug.stateAt("rev_…") · dfDebug.devices()
   hist:function(){return S.hist;}, devices:function(){return S.devices;},
@@ -8430,6 +8533,20 @@ restore();
 // boot-time attempt.
 requestAnimationFrame(function(){requestAnimationFrame(function(){renderTimeline(true);});});
 setInterval(function(){renderHeader();renderNow();renderTimeline();renderLanes();renderNudges();},60000);
+/* The Now bar rotation. ONE permanent 8s interval rather than a timer started
+   and cleared inside renderNow(): renderNow() runs on the 60s tick and again
+   on every save, and a timer rebuilt on each of those would restart its 8
+   seconds each time, so a busy minute could stall the rotation indefinitely.
+   This ticker owns the clock; renderNow() only reads the index it sets.
+   It costs nothing on an ordinary day - nowSpans() returns 0 or 1 item and the
+   callback exits without touching the DOM. */
+setInterval(function(){
+  if(nowRotPin)return;                        // the user is holding one
+  var L=nowSpans();
+  if(L.length<2)return;                       // nothing to rotate through
+  nowRotIdx=(nowRotIdx+1)%L.length;
+  renderNow();
+},8000);
 setInterval(function(){if(fileHandle&&!document.hidden)readFile();},120000);
 setInterval(function(){if(cloudUrl&&!document.hidden)cloudPull();},120000);
 
