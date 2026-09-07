@@ -17,7 +17,7 @@
 //   - static assets (icons): cache-first. They never change without also
 //     changing CACHE_VERSION, so there's nothing to gain by re-fetching them
 //     every load, and it's one less network round-trip before the icon paints.
-const CACHE_VERSION = "prodash-v8";
+const CACHE_VERSION = "prodash-v9";
 
 const APP_SHELL = [
   "./",
