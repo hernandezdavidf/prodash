@@ -2,6 +2,67 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-08 — Delete the nudge strip; the outstanding bar moves into the header (v4.7)
+
+**`renderNudges()` deleted in full**, along with `dismissedNudges`, `#nudges`,
+every `.nudge*` rule and `@keyframes nudgeIn`. Gone with it: the sleep-window
+and circadian-low advice, the school-fetch and Night Client A EOD window checks,
+all-day activity announcements, `appt-soon` / `appt-now` reminders, tomorrow's
+first commitment, and the stale-task count.
+
+Three consequences are deliberate, documented at their sites, and worth naming
+because each will read as a bug to a future maintainer:
+
+1. **All-day activities no longer appear on the Board at all.** `dayBlocks()`
+   excludes them (no start/end minute to lay out) and the strip was their only
+   other renderer. Calendar tab only now. Noted at the exclusion in
+   `dayBlocks()`, which is the line to revisit if they should come back.
+2. **Nothing warns before an appointment starts.** `appt-soon` was the last
+   reader of an activity's `remind` lead time; the field is still stored and
+   still editable in the Calendar editor, but nothing consumes it. Noted at the
+   head of `renderNow()`.
+3. **The stale-task signal is unrendered.** `t.added` is still written on every
+   task, so it is recoverable.
+
+Dead code removed with the last caller: `ageOf()` (only the stale-task nudge
+used it) and `dm()` (a `mins()` alias whose only callers were the time-window
+nudges). `dmEnd()` is also unreferenced but was **already** dead before this
+change, so it was left alone rather than widening the diff.
+
+**The outstanding row moved from the Now bar to the header** as `#ngbar`,
+occupying the exact lane the strip held — same `margin-top`/divider, same
+`z-index:1`, so the header still grows to fit and collapses when empty. The Now
+bar is back to answering one question: what am I in.
+
+Shape is the Now bar's at small — coloured left rule, tiny uppercase label, the
+count in `--serif` underneath. Colour is **olive, not terracotta**: orange means
+"a commitment you agreed to attend" in the Now bar, the day view and the `.apt`
+badges, and spending it on a promise-to-yourself would make the one loud colour
+in the palette mean two things. Text stays uniform on-brand with the colour on
+the rule — the contrast rule the old strip established, kept because it is what
+keeps white safe on the header green.
+
+**It does not rotate**, unlike the bar it echoes. Seeing five outstanding items
+at once *is* the mechanism; a rotation would hide four fifths of the pressure at
+any moment. The Now bar rotates only because one headline can hold one thing.
+
+**Chips are buttons.** Clicking one writes through the same `day()`/`save()`
+path the Non-negotiables card uses, so the bar, the card, the streak and the
+RITUALS percentage can never disagree. 34px tall with an empty ring that fills
+with a tick on hover — the affordance says "this completes it" without a word of
+instruction.
+
+One CSS trap worth recording: the label used `opacity:.72` with `opacity:1` on
+the count inside it. `opacity` creates a group, so the child can never be
+brighter than its parent and that override silently did nothing. Alpha now lives
+in `color`, and the count is full `--on-brand`. Measured on the header green:
+label ~4.7:1, count ~6:1, chip text ~6:1.
+
+Verified in the browser at desktop, mobile (375px) and dark: the bar renders and
+wraps, a chip click ticks through to the card and the header stats, the bar
+disappears when the list is clear, weekly goals at target stay out, and the bar
+is correctly hidden on the Calendar / Expenses / History tabs via `.board-only`.
+
 ## 2026-09-07 — Now bar: rotate concurrent appointments, drop Upcoming, add the outstanding row (v4.6)
 
 **`Upcoming` / `Also now` removed.** `pendingItems()` and the whole `.nowup`

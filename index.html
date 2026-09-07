@@ -158,10 +158,9 @@
   --ln-x1:#F06292; --ln-x2:#9575CD; --ln-x3:#4FC3F7;
   --ln-x4:#A1887F; --ln-x5:#B0BEC5; --ln-x6:#80CBC4;
 }
-/* .nudge no longer needs a dark override of its own - it's var(--paper) with
-   a solid border now, not a translucent rgba wash, so both theme blocks
-   already repaint it correctly. Shadows still need a bump: a light-mode
-   shadow barely shows once the card it's cast on is already near-black. */
+/* Shadows need a bump in dark: a light-mode shadow barely shows once the card
+   it is cast on is already near-black. (This note used to also explain why
+   .nudge needed no dark override; the nudge strip was deleted on 2026-09-08.) */
 /* Both gradients below now read --glow-rgb, which each theme block already
    sets, so these two pairs no longer need per-theme copies of a hardcoded
    green. One less place for the light and dark halves to drift apart. */
@@ -248,7 +247,8 @@ header h1{font-size:26px;letter-spacing:.3px}
    block, the whole bar takes the same transparent orange wash the timeline
    already puts on .blk.ev - same rgba, deliberately, so "this is a commitment"
    looks identical in both places instead of being two dialects of orange.
-   Must-attend swaps the left rule to red, matching the .nudge.apt-must tier. */
+   Must-attend swaps the left rule to red - the one place red still appears in
+   fixed UI now that the notification tiers are gone. */
 /* The orange now runs the FULL width of the bar rather than fading out at 62%.
    A wash that stopped two thirds across read as a decorative corner; carried
    edge to edge it reads as a status band, which is what it is. Alpha stays low
@@ -291,26 +291,6 @@ header h1{font-size:26px;letter-spacing:.3px}
    and become a selector. The ring says "this is held", not "this is next". */
 .nowdots.pinned button.on::after{box-shadow:0 0 0 3px var(--terra-lt)}
 
-/* ---- what is still outstanding today --------------------------------
-   Deliberately NOT orange. Orange means "a commitment you agreed to attend"
-   everywhere else in this app - the timeline, the nudges, the headline band
-   above - and a non-negotiable is a promise to yourself, not an appointment.
-   It gets the sage/ivory treatment the old neutral Upcoming row used, so the
-   two rows can never be confused at a glance. flex-basis:100% is what drops
-   it onto its own line inside the wrapping .nowbar. */
-.nowng{flex-basis:100%;display:flex;align-items:center;gap:7px;flex-wrap:wrap;
-  margin-top:11px;padding:8px 11px;border-radius:8px;border-left:3px solid var(--sage);
-  background:var(--ivory)}
-/* display:flex beats the UA [hidden] rule, so without this the row keeps its
-   box on every day the list is already clear. */
-.nowng[hidden]{display:none}
-.nowng .ng-l{font-size:9.5px;text-transform:uppercase;letter-spacing:1.1px;font-weight:800;
-  color:var(--forest-ink);font-variant-numeric:tabular-nums;flex-shrink:0}
-.nowng .ng-c{font-size:11.5px;font-weight:600;color:var(--ink);background:var(--paper);
-  border:1px solid var(--line);border-radius:999px;padding:3px 9px;overflow-wrap:anywhere;min-width:0}
-/* A weekly goal says where it stands; a daily non-negotiable has nothing to
-   count, so it just names itself. */
-.nowng .ng-n{font-weight:800;color:var(--forest-ink);font-variant-numeric:tabular-nums}
 /* Same token pair as .cal-tag.must, and for the reason those two tokens exist:
    they FLIP together, so this reads as red type on a red tint in both themes.
    A solid --alert-ink ground is right in light (5.6:1 with white) but wrong in
@@ -395,13 +375,11 @@ span.apt.must{background:var(--alert-lt);color:var(--alert-ink)}
    version of this - it is the same bug, found once before in task titles. */
 .rit-l,.rit-tag,.tsk-l,.blk-n,.blk-d,.lane-h h3,.rep-lane-h h3,
 .cal-rn,.cal-rd,.chk-t,.rev-note,.tnote-b{min-width:0;overflow-wrap:anywhere}
-/* The nudge strip was missed the first time round. It sits in <header>, and the
-   sweep that checked the rest measured children AGAINST .nudge as a container -
-   so a nudge that overflowed the PAGE passed. overflow-wrap inherits, so one
-   declaration covers the inner div and the <b> the renderer emits; min-width:0
-   on the flex child is what actually lets it narrow. */
-.nudge{overflow-wrap:anywhere}
-.nudge>div{min-width:0}
+/* The outstanding bar sits in <header>, outside the sweep that checked the
+   rest of the app: the header is its own layout context and a long
+   non-negotiable name would otherwise push the whole lane sideways. */
+.ngbar,.ngbar .ng-c{overflow-wrap:anywhere}
+.ngbar .ng-list{min-width:0}
 /* The "now" bar, third member of this family. It only overflows while an
    appointment with a long name happens to BE the current block, which is why
    two earlier sweeps missed it - the bug is time-dependent, not layout-
@@ -501,17 +479,17 @@ span.apt.must{background:var(--alert-lt);color:var(--alert-ink)}
 .blk.ev .blk-n{color:var(--terra-ink)}
 .blk .x{color:var(--sage);font-size:15px;line-height:1;padding:0 4px;align-self:center}
 .blk .x:hover{color:var(--terra-ink)}
-/* span.apt, not .apt: "apt" is ALSO the tier class renderNudges() puts on a
-   whole notification (<div class="nudge apt">), so an unqualified rule handed
-   every appointment reminder the badge's 9px uppercase letter-spacing - which
-   is why they have been shouting "DENTIST IS HAPPENING NOW" in all caps while
-   every other nudge spoke normally. The badge is always a <span>, the tier is
-   always a <div>, so the element name is the honest way to tell them apart. */
+/* Kept qualified as span.apt even though the collision that forced it is gone.
+   "apt" used to be BOTH this badge and a nudge tier class (<div class="nudge
+   apt">), and the unqualified rule handed every appointment reminder the
+   badge's 9px uppercase letter-spacing - which is why they spent a while
+   shouting "DENTIST IS HAPPENING NOW" in all caps. The nudge strip was deleted
+   on 2026-09-08 and .nudge.apt-must with it, so nothing collides today; the
+   element qualifier stays because it costs nothing and the badge is always a
+   <span>, which is worth stating in the selector rather than in a comment. */
 span.apt{background:var(--terra);color:var(--on-warm);font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border-radius:4px;padding:1px 5px}
 /* .apt-add / .apt-row / .apt-dash / .apt-must / #aptBtn all styled the inline
-   quick-add form under the day list and went with it on 2026-09-07. Note that
-   .nudge.apt-must further down is a DIFFERENT class (the must-attend
-   notification tier) and is still very much in use. */
+   quick-add form under the day list and went with it on 2026-09-07. */
 
 .lanes{display:grid;grid-template-columns:repeat(auto-fit,minmax(224px,1fr));gap:13px}
 .lane{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:13px;
@@ -703,45 +681,61 @@ span.apt{background:var(--terra);color:var(--on-warm);font-size:9px;font-weight:
 .foot button{font-size:11.5px;color:var(--muted);border-bottom:1px solid transparent}
 .foot button:hover{color:var(--forest-ink);border-color:var(--olive)}
 .saved{text-align:center;font-size:11px;color:var(--olive);height:14px;margin-top:6px}
-/* Sub-header lane: nudges live inside the header itself, under the stats
-   row, instead of floating over the page. The header just grows to fit
-   however many are active, so nothing ever overlaps. :empty collapses the
-   divider/spacing entirely when there's nothing to show. Text sits on
-   --forest directly (via a translucent panel per bubble, not a wash on the
-   whole lane) so it needs its own contrast pass, not .nudge's old
-   var(--paper)-card styling. */
-#nudges{margin-top:14px;padding-top:12px;border-top:1px solid rgba(236,239,241,.20);
-  display:flex;flex-direction:column;gap:6px;position:relative;z-index:1}
-#nudges:empty{display:none;margin-top:0;padding-top:0;border-top:none}
-/* Flat translucent chip, not a bubble-card - a dark wash over the green
-   keeps var(--on-brand) comfortably above 4.5:1 (measured ~5.1:1) without
-   needing a separate text colour per theme. Colour-coding moves to the
-   left border only; body text stays uniform on-brand. */
-.nudge{background:rgba(0,0,0,.22);border:1px solid rgba(236,239,241,.20);
-  border-left:3px solid var(--terra);border-radius:8px;
-  padding:7px 30px 7px 10px;font-size:12px;color:var(--on-brand);
-  display:flex;gap:7px;align-items:flex-start;position:relative;
-  animation:nudgeIn .18s ease-out}
-@keyframes nudgeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
-.nudge b{color:inherit}
-.nudge.cool{border-left-color:var(--night-ink)}
-/* The one nudge tier that is allowed to raise a pulse: something is overdue,
-   not merely pending. Red on the left edge only - a red-filled nudge among
-   five others would spend the colour on decoration. */
-.nudge.urgent{border-left-color:var(--alert);border-left-width:4px}
-.nudge.urgent b{color:#FFCDD2}
-/* Appointments get their own tier, distinct from the default "you're behind
-   on something" orange - they're neutral facts, not a warning, so a calmer
-   accent fits. Must-attend escalates past that into --ln-x1 (unused
-   elsewhere in fixed UI, only offered as a custom-lane swatch choice, so
-   repurposing it here for "priority" doesn't collide with any lane's
-   established meaning) - deliberately its own hue rather than just a bolder
-   orange, so it reads as a distinct tier at a glance, not a shade of the same one. */
-.nudge.apt{border-left-color:var(--olive)}
-.nudge.apt-must{border-left-color:var(--alert)}
-.nudge .x{position:absolute;top:4px;right:4px;color:var(--on-brand);opacity:.75;font-size:15px;line-height:1;
-  padding:4px 7px;border-radius:7px}
-.nudge .x:hover{opacity:1;background:rgba(236,239,241,.16)}
+/* ---- the outstanding bar --------------------------------------------
+   Replaced the nudge strip on 2026-09-08. It occupies the same sub-header
+   lane - inside <header>, under the stats row - and keeps that lane's two
+   rules, which were the good part of the thing it replaced: the header grows
+   to fit so nothing ever overlaps, and [hidden] collapses the divider and
+   spacing entirely when there is nothing to say.
+
+   Shape is the Now bar's, at small: a coloured left rule, a small uppercase
+   label, content to the right. Colour is OLIVE, not terracotta. Orange means
+   "a commitment you agreed to attend" in the Now bar, the day view and the
+   activity badges; a non-negotiable is a promise to yourself, and giving it
+   the same orange would spend the one loud colour this palette has on two
+   different ideas. The rule carries the colour and the text stays uniform
+   on-brand - the contrast rule the old strip established, kept because it is
+   what lets white sit safely on the green at every tier. */
+#ngbar{margin-top:14px;padding-top:12px;border-top:1px solid rgba(236,239,241,.20);
+  position:relative;z-index:1}
+#ngbar[hidden]{display:none}
+.ngbar{background:rgba(0,0,0,.22);border:1px solid rgba(236,239,241,.20);
+  border-left:4px solid var(--olive);border-radius:10px;padding:11px 13px;
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  animation:ngIn .18s ease-out}
+@keyframes ngIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+/* Alpha in the COLOUR, not `opacity` on the element. opacity creates a group,
+   so a child can never be brighter than its parent - `.ng-l b{opacity:1}` would
+   silently do nothing and the count would stay as dim as the label above it.
+   The literal white matches the rgba(236,239,241,...) borders already used on
+   this brand surface; --on-brand is the token wherever full strength is wanted.
+   Measured on the header green: label ~4.7:1, count ~6:1, both over AA. */
+.ngbar .ng-l{font-size:9.5px;text-transform:uppercase;letter-spacing:1.2px;font-weight:800;
+  color:rgba(255,255,255,.75);flex-shrink:0;line-height:1.35}
+/* Serif and sentence case, echoing .nowbar .nt - this is the small sibling of
+   the Now bar's headline, and the count is the thing it is announcing. Caps
+   are for the label above it; a whole line of them here would just shout. */
+.ngbar .ng-l b{display:block;font-family:var(--serif);font-size:17px;font-weight:700;
+  text-transform:none;letter-spacing:0;color:var(--on-brand);
+  font-variant-numeric:tabular-nums}
+.ngbar .ng-list{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+/* Chips are buttons: this is where you tick the thing off, not just where you
+   read that it is undone. Sized for a thumb rather than for density - 34px
+   tall, which clears the 24px minimum with room to spare on a phone at 3am. */
+.ngbar .ng-c{display:inline-flex;align-items:center;gap:8px;min-height:34px;
+  font-size:13px;font-weight:600;color:var(--on-brand);
+  background:rgba(236,239,241,.10);border:1px solid rgba(236,239,241,.28);
+  border-radius:999px;padding:6px 14px;cursor:pointer;text-align:left;
+  overflow-wrap:anywhere;min-width:0;transition:background .15s,border-color .15s}
+.ngbar .ng-c:hover{background:rgba(236,239,241,.20);border-color:rgba(236,239,241,.55)}
+.ngbar .ng-c:focus-visible{outline:2px solid var(--on-brand);outline-offset:2px}
+/* The ring is the affordance: an empty circle that fills with a tick on hover
+   says "clicking this completes it" without a word of instruction. */
+.ngbar .ng-c i{width:15px;height:15px;border-radius:50%;flex-shrink:0;
+  border:1.5px solid rgba(236,239,241,.55);display:grid;place-items:center;
+  font-size:10px;font-style:normal;line-height:1;color:transparent;transition:.15s}
+.ngbar .ng-c:hover i{background:var(--olive);border-color:var(--olive);color:var(--on-brand)}
+.ngbar .ng-c b{font-weight:800;font-variant-numeric:tabular-nums;opacity:.85}
 .dual{background:var(--night);color:var(--on-brand);font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border-radius:4px;padding:1px 5px}
 
 /* ---- main nav: layered document tabs -------------------------------------
@@ -1576,7 +1570,12 @@ return {
         <button class="hdr-out" id="signOutBtn">Sign out</button>
       </div>
     </div>
-    <div id="nudges" class="board-only"></div>
+    <!-- What you still owe today. This lane used to hold the nudge strip; the
+         strip was deleted on 2026-09-08 and this took its place, which is why
+         the spacing and the divider above it are inherited rather than new.
+         Hidden outright when the list is clear, so a finished day gives the
+         header its height back. -->
+    <div id="ngbar" class="board-only" hidden></div>
   </header>
 
   <!-- Layered document tabs. role="tablist" on the <nav> costs the navigation
@@ -1634,17 +1633,10 @@ return {
         <div class="synced-note" id="cloudNote"></div>
       </div>
     </div>
-    <!-- The second row. It used to hold "what is coming" (the Upcoming /
-         Also now line, removed 2026-09-07); it now holds what is still
-         OUTSTANDING - the non-negotiables and goals not yet ticked today.
-         Same slot, opposite tense: the bar stopped predicting and started
-         nagging. Empty and hidden the moment the list is clear, so finishing
-         the day is visible as the row disappearing.
-         It sits INSIDE .nowbar rather than under it because "what I am in"
-         and "what I still owe today" are one answer to one question - and
-         .nowbar already wraps, so flex-basis:100% drops this onto its own
-         line underneath both the block description and the sync pair. -->
-    <div class="nowng" id="nowNg" hidden></div>
+    <!-- The Now bar has no second row any more. It held "what is coming" (the
+         Upcoming / Also now line, removed 2026-09-07), then briefly held the
+         outstanding non-negotiables, which moved up to #ngbar in the header on
+         2026-09-08. The bar answers one question again: what am I in. -->
   </div>
 
   <style>
@@ -2089,8 +2081,8 @@ return {
 
   <!-- ===================== MY PERSONAL CALENDAR =====================
        Activities live in S.events - the same array appointments have always
-       used - so everything here reaches the Shift Timeline and the nudge strip
-       through dayBlocks(), with no second store to keep in step. -->
+       used - so everything here reaches "What does my day look like?" and the
+       Now bar through dayBlocks(), with no second store to keep in step. -->
   <div id="view-cal" hidden>
     <div class="card">
       <h2>My Personal Calendar <span class="cnt" id="calCount">0 activities</span></h2>
@@ -3515,7 +3507,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="4.6";
+var APP_VERSION="4.7";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -3526,6 +3518,7 @@ var APP_VERSION="4.6";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-08T01:45:00+08:00",text:"The notification strip in the green header is gone -- every one of those flagged lines. In its place sits a single bar for what you still owe today: the words Still to do, then how many are left, then each outstanding non-negotiable and goal as a chip you can tap to tick it off. Ticking it there is the same as ticking it on the card further down, so the count, the streak and the percentage at the top all move together. A goal with a weekly target shows where it stands, like Exercise 0/3, and disappears from the bar once you have hit that target for the week. When the last one is ticked the whole bar disappears and the header gets its height back. It has moved out of the Now bar, which now answers one question again: what am I in. Three things went with the strip and are worth knowing about. All-day activities -- the ones you set with no start or end time -- used to announce themselves there, and the strip was the only place on the Board they ever appeared; they now show only in your Calendar tab. Nothing warns you before an appointment starts any more: an appointment first appears at the minute it begins, in the Now bar. And the count of tasks left open three or more days is no longer shown anywhere. Your data is untouched -- the reminder lead time is still saved on every activity, and every task still records the day you added it -- so any of the three can be brought back if you miss it."},
   {ts:"2026-09-08T00:30:00+08:00",text:"The Now bar has stopped looking ahead and started dealing with what is actually on you right now. The \"Upcoming\" line underneath it -- the one that named the next thing and counted down to it -- is gone. When two or three appointments run at the same time, the bar no longer picks one for the headline and demotes the rest to a smaller line: it now shows each of them in turn at full size, one every eight seconds, with a row of small dots beside the \"Happening now\" label so you can see how many there are. Tap a dot to hold that one on screen and stop the rotation; tap it again to let it carry on. Must-attend items come first in the cycle, then the rest in start order, so the thing you cannot skip is the thing you see first -- the day list below stays in plain clock order, which is what it is for. When only one appointment is running there are no dots and nothing moves, exactly as before. In the space the old Upcoming line used, the bar now shows what you still owe today: a count and then every non-negotiable and goal you have not ticked, straight from your Non-negotiables & Goals list -- just the name, not the note underneath it. A goal with a weekly target shows where it stands, like Exercise 2/3, and drops off the row entirely once you have hit that target for the week, so it only nags you on the days you are actually behind. The whole row disappears the moment the list is clear."},
   {ts:"2026-09-07T23:15:00+08:00",text:"The small grey line under each lane name -- \"10:30pm-6:30am, write tomorrow's to-dos\" and the like -- can now be edited. Click it, type, press Enter. Clear it and press Enter to remove the line altogether; where a lane has none, a faint \"+ add a note\" sits in its place so you can always put one back. Escape cancels without saving, and clicking away saves. Nothing else about the lanes changed. Separately, the app's install description has been removed: it still described ProDash as a tracker for a 2pm-7am shift schedule, which stopped being true when the shift timing came out earlier today."},
   {ts:"2026-09-07T22:30:00+08:00",text:"The small appointment form under \"What does my day look like?\" is gone -- the name box, the two time pickers, the lane dropdown and the Add button. The + Appointment button in the corner of the card does the same job and more: it opens the full activity editor, so you can set a repeat, a category, a reminder time and notes, none of which the little form could do. Having both meant two ways to create the same appointment and one of them was worse. Nothing you have already booked is affected, and the card is shorter for it."},
@@ -4002,7 +3995,9 @@ function day(k){k=k||today();if(!S.log[k])S.log[k]={};return S.log[k];}
    minutes out. Work that runs through midnight is handled by daySpans(), not
    by bending these. */
 function mins(hhmm){var p=hhmm.split(":");return (+p[0])*60+(+p[1]);}
-function dm(hhmm){return mins(hhmm);}
+// dm() was an alias for mins(), kept from the roll-era naming. Its only callers
+// were the time-window nudges ("past 4:15pm", "past 6:30am"), so it died with
+// the strip on 2026-09-08. Use mins() directly.
 function dmEnd(hhmm){var v=mins(hhmm);return v===0?1440:v;}      // 00:00 as an END means midnight
 function nowDm(){var d=new Date();return d.getHours()*60+d.getMinutes();}
 function fmt(hhmm){var p=hhmm.split(":"),h=+p[0],m=p[1],ap=h<12?"am":"pm",hh=h%12;if(hh===0)hh=12;return hh+":"+m+ap;}
@@ -4132,12 +4127,16 @@ function dayBlocks(k){
   var out=BLOCKS.filter(function(b){return (!b.days||b.days.indexOf(dow)>=0)&&hidden.indexOf(b.id)<0;});
   /* Calendar activities reach "What does my day look like?" through here, which
      is why there is no second scheduling store and nothing to keep in sync: the
-     day view, the Now bar and the nudges all read this one function, so a
-     recurring activity created in the Calendar tab simply appears in all three,
-     and so does an appointment added from the Board.
+     day view and the Now bar both read this one function, so a recurring
+     activity created in the Calendar tab simply appears in both, and so does an
+     appointment added from the Board.
      All-day items are deliberately excluded - the day view is laid out by
      start/end minute and something spanning the whole day has no position in
-     it. They surface in the Calendar and in nudges instead. */
+     it. KNOWN GAP as of 2026-09-08: the nudge strip used to announce them, and
+     with the strip gone an all-day activity now appears ONLY in the Calendar
+     tab. Nothing on the Board shows it. That was a deliberate call when the
+     strip was removed, not an oversight - but if all-day items are ever to
+     return to the Board, this exclusion is the line to revisit. */
   S.events.forEach(function(e){
     if(!occursOn(e,k))return;
     if(e.allDay||!e.s||!e.e)return;
@@ -4220,11 +4219,11 @@ function weeklyCount(id){
   var c=0;for(var i=0;i<7;i++){var l=S.log[shift(today(),-i)];if(l&&l[id])c++;}
   return c;
 }
-function ageOf(t){
-  if(!t.added)return 0;
-  var a=new Date(t.added),b=new Date(today());
-  return Math.max(0,Math.round((b-a)/864e5));
-}
+/* ageOf() was deleted on 2026-09-08. Its last caller was the stale-task nudge
+   ("33 tasks have been open 3+ days"), which went with the rest of the strip,
+   and the per-task age badge it originally fed had already gone. t.added is
+   still written on every new task, so the signal is recoverable if a future
+   view wants it - only the unused reader is gone. */
 function esc(s){return String(s).replace(/[&<>"']/g,function(c){
   return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
 
@@ -4521,7 +4520,10 @@ function renderHeader(){
 }
 
 /* ---------- the Now bar --------------------------------------------------
-   It answers two questions, not one: what am I in, and what is coming.
+   It answers ONE question: what am I in. It briefly answered two, and then
+   three, and each extra answer made the first one harder to read - "what is
+   coming" went on 2026-09-07 and "what do I still owe today" moved up to
+   #ngbar in the header on 2026-09-08.
 
    "Ongoing" needed no new lookup - currentBlock() has always preferred an
    appointment over the routine block it sits inside, so the bar was already
@@ -4529,16 +4531,17 @@ function renderHeader(){
    appointment and "Wake + prep" arrived with identical weight. It now wears
    the same transparent orange as .blk.ev in the timeline.
 
-   "Upcoming" was missing outright. The only warning about a commitment that
-   had not started yet was the appt-soon nudge, which is capped by that
-   activity's own lead time (2h by default, and 0 means never) - so anything
-   further out was invisible on the Board until it began.
+   NOTHING WARNS YOU BEFORE AN APPOINTMENT STARTS any more. The appt-soon nudge
+   was the last thing that did, and it went with the strip on 2026-09-08; an
+   activity's `remind` lead time is still stored and still editable but has no
+   reader. An appointment now first appears at the minute it begins. That is
+   the intended behaviour as of this version, not a regression - but it is the
+   single biggest thing a future reader will assume is a bug, so: it isn't.
 
    Timed activities only. An all-day one has no start to count down to and no
-   end to pass, so it has no upcoming -> ongoing -> over transition to show;
-   it keeps announcing itself in the nudge strip, which is the right shape for
-   it. This is a Board change: .nowbar is board-only and the Calendar tab's
-   own rendering is untouched - the calendar is only where the data lives. */
+   end to pass, so it has no upcoming -> ongoing -> over transition to show.
+   This is a Board change: .nowbar is board-only and the Calendar tab's own
+   rendering is untouched - the calendar is only where the data lives. */
 /* Crossing midnight is now handled once, in spanOf(), so nothing down here has
    to test for a wrap: a span's st and en are already real minute coordinates on
    the day in view, negative or past 1440 where that is the truth. The old
@@ -4588,7 +4591,7 @@ function pendingRituals(){
    appointment ends or is ticked off, the index and the pin reset, because
    "hold the second one" stops meaning anything once the list changes under
    it. Without the key, ticking one item off would silently pin a different
-   one - the same class of bug as the nudge dismissal keyed by array index. */
+   one - the same class of bug as keying a dismissal by array index. */
 var nowRotIdx=0,nowRotKey="",nowRotPin=false;
 function renderNow(){
   /* The headline is whichever running appointment the rotation is currently
@@ -4656,112 +4659,58 @@ function renderNow(){
     });
   }
 
-  /* The second row: what you still owe today. It has nothing to do with the
-     rotation above it and does not rotate - the whole point is seeing how many
-     are left in one glance, which a one-at-a-time treatment would destroy.
-     A goal shows its pace (2/4); a daily non-negotiable has nothing to count
-     and just names itself. Only the subject line is shown, never the tag
-     underneath it - the card below is where the detail lives. */
-  var pend=pendingRituals(),ng=document.getElementById("nowNg");
-  if(!pend.length){ng.hidden=true;ng.innerHTML="";return;}
-  ng.hidden=false;
-  ng.innerHTML='<span class="ng-l">'+pend.length+" left today"+'</span>'+
-    pend.map(function(r){
-      var t=+r.target>0?' <span class="ng-n">'+weeklyCount(r.id)+"/"+r.target+'</span>':"";
-      return '<span class="ng-c">'+esc(r.l)+t+'</span>';
-    }).join("");
 }
 
-// In-memory only, resets on reload: dismissing a nudge hides that exact,
-// still-ongoing occurrence for the rest of the session, not forever. Needs a
-// stable key per condition (not just an array index) since the whole list
-// gets rebuilt from scratch on every render - without a key, "dismissed
-// item #2" would silently dismiss whatever happens to be in that slot next.
-var dismissedNudges={};
-function renderNudges(){
-  var out=[],l=day(),n=nowDm(),b=currentBlock();
+/* ---------- the outstanding bar ------------------------------------------
+   What you still owe today, in the header lane the nudge strip used to hold.
+   It briefly lived as a second row inside the Now bar; it was moved out on
+   2026-09-08 so the Now bar answers one question again.
 
-  if(b&&b.sleep)
-    out.push(["cool","sleep-window","<b>This is your sleep window.</b> It's the only one in the 24 hours. Anything you do now is borrowed against tomorrow's judgment, not found time."]);
-  if(b&&b.nadir)
-    out.push(["","circadian-low","<b>2:30–6am is your circadian low.</b> Mechanical work only — tickets, logs, routine tasks. Don't send anything you can't unsend, and don't make calls you'd want to revisit."]);
-  // The "company-hour" nudge was removed on 2026-09-07. Its condition was
-  // n > 14:00 && !l.biz, with no upper bound - so once the day passed
-  // 2pm it stayed on screen for the remaining seventeen hours, still claiming
-  // at 5am that Day Client was about to take the 1-2pm slot. Don't re-add it
-  // without an end time. The "My company - 30 min" non-negotiable is untouched;
-  // it just no longer raises a nudge of its own.
-  /* Both of these now carry an explicit END, which they did not need under the
-     07:00 roll: "past 4:15pm" used to expire on its own when the day rolled at
-     7am, and on a midnight day it would instead reappear at 00:00 and sit there
-     unread. Every time-of-day nudge in this function wants a window, not a
-     floor - that is the lesson the company-hour nudge above already taught. */
-  if(n>=dm("16:15")&&n<dm("23:00")&&!l.fetch)
-    out.push(["","school-fetch","<b>School fetch unchecked</b> — it's past 4:15pm."]);
-  if(n>=dm("06:30")&&n<dm("08:00")&&!l.nightclienta)
-    out.push(["","nighta-eod","<b>Night Client A EOD report still open</b> — it's past 6:30am."]);
-  // Every upcoming appointment gets a heads-up, not just must-attend ones -
-  // but must-attend still gets its own more emphatic tier (apt-must) so it
-  // doesn't blend in with an appointment that's fine to run a few minutes late on.
-  /* Reminders are DERIVED from the calendar every time this runs, never stored
-     alongside it. That is the whole reason editing, rescheduling or deleting an
-     activity keeps its reminders correct with no separate bookkeeping: there is
-     nothing to update, because the reminder was never a separate thing. A
-     recurring activity notifies on each occurrence for the same reason. */
-  var tk=today();
-  // All-day activities have no start minute to count down to, so they announce
-  // themselves once, up front, as the frame for the day.
-  (S.events||[]).forEach(function(e){
-    if(!e.allDay||!occursOn(e,tk)||isDone(e,tk))return;
-    out.push(["","allday-"+e.id,"<b>"+esc(e.n)+"</b> — all day today"+
-      (e.rr?" · "+esc(rruleText(e)):"")+(e.d?". "+esc(e.d):"")]);
-  });
-  /* Spans, not raw start/end strings: an appointment that runs 11:30pm-12:30am
-     is "happening now" at 11:50pm AND at 12:10am, and only a span can say both.
-     A carry-over occurrence belongs to yesterday's date, so its done-flag is
-     looked up under yesterday's key - ticking it must silence it either side
-     of midnight. */
-  daySpans().forEach(function(sp){
-    var b=sp.b;
-    if(!b.ev)return;
-    if(isDone(b,sp.carry?shift(tk,-1):tk))return;   // already ticked off
-    var cls=b.must?"apt-must":"apt";
-    var away=sp.st-n;
-    // Per-activity lead time, set in the Calendar editor. 120 minutes stays the
-    // default so every appointment that predates this feature warns exactly as
-    // it used to; 0 means the user asked for no advance warning at all.
-    var lead=(b.remind===undefined||b.remind===null)?120:+b.remind;
-    var rep=b.rr?' <span class="apt">↻</span>':'';
-    if(lead>0&&away>0&&away<=lead)
-      out.push([cls,"appt-soon-"+b.id,"<b>"+esc(b.n)+rep+" at "+fmt(b.s)+" — in "+
-        (away>=60?Math.floor(away/60)+"h "+(away%60)+"m":away+" min")+".</b> "+
-        (b.must?"You marked this one must-attend. Start closing down what you're on now.":"")]);
-    else if(n>=sp.st&&n<sp.en)
-      out.push([cls,"appt-now-"+b.id,"<b>"+esc(b.n)+rep+" is happening now</b> — until "+fmt(b.e)+"."]);
-  });
-  // Tomorrow's first commitment, once the evening is winding down. 8pm, not the
-  // old 4am: under a midnight day, 4am IS tomorrow, so the old threshold would
-  // have announced today's own first item as if it were tomorrow's.
-  if(n>=dm("20:00")){
-    var tm=activitiesOn(shift(tk,1)).filter(function(e){return !e.allDay&&e.s;})[0];
-    if(tm)out.push(["","tomorrow-first","<b>First up tomorrow: "+esc(tm.n)+" at "+fmt(tm.s)+".</b>"]);
-  }
-  var stale=S.tasks.filter(function(t){return !t.done&&ageOf(t)>=3;}).length;
-  // Overdue, not just pending - this is the one that gets the adrenaline tier.
-  if(stale)out.push(["urgent","stale-tasks","<b>"+stale+" task"+(stale>1?"s have":" has")+" been open 3+ days.</b> Do it, delegate it, or delete it."]);
+   It does NOT rotate, unlike the bar it borrows its shape from. Seeing five
+   outstanding things at once is the entire mechanism - a rotation would hide
+   four fifths of the pressure at any given moment, which is the opposite of
+   what this row is for. The Now bar rotates because only one thing can be the
+   headline; here everything can be on screen, so everything is.
 
-  var visible=out.filter(function(x){return !dismissedNudges[x[1]];});
-  var c=document.getElementById("nudges");
-  c.innerHTML=visible.map(function(x){
-    return '<div class="nudge '+x[0]+'" data-key="'+esc(x[1])+'"><div>⚑</div><div>'+x[2]+'</div>'+
-      '<button class="x" data-act="dismiss" aria-label="Dismiss">&times;</button></div>';
-  }).join("");
-  c.querySelectorAll("[data-act=dismiss]").forEach(function(btn){
-    btn.addEventListener("click",function(){
-      dismissedNudges[btn.closest(".nudge").dataset.key]=true;
-      renderNudges();
+   The chips are BUTTONS. A reminder you cannot act on where you read it sends
+   you scrolling to the card below to do the one thing the reminder asked for,
+   so ticking happens here too - through the same day()/save() path the card
+   uses, which is why the two can never disagree about what is done. */
+function renderNgBar(){
+  var host=document.getElementById("ngbar"),pend=pendingRituals();
+  host.innerHTML="";
+  if(!pend.length){host.hidden=true;return;}   // clear list, no bar at all
+  host.hidden=false;
+  var bar=document.createElement("div");
+  bar.className="ngbar";
+  // Count first and large: "how much is left" is the question this answers,
+  // and the individual names are the detail underneath that headline.
+  var lbl=document.createElement("div");
+  lbl.className="ng-l";
+  lbl.innerHTML="Still to do<b>"+pend.length+" left today</b>";
+  bar.appendChild(lbl);
+  var list=document.createElement("div");
+  list.className="ng-list";
+  pend.forEach(function(r){
+    var c=document.createElement("button");
+    c.type="button";
+    c.className="ng-c";
+    // Subject only, never r.tag - the note under a non-negotiable is detail for
+    // the card, not for a chip that has to stay readable at a glance.
+    // A goal states its pace; a daily non-negotiable has nothing to count.
+    c.innerHTML='<i>✓</i>'+esc(r.l)+
+      (+r.target>0?" <b>"+weeklyCount(r.id)+"/"+r.target+"</b>":"");
+    c.setAttribute("aria-label","Tick off "+r.l);
+    c.title="Tick off — "+r.l;
+    c.addEventListener("click",function(){
+      // Same write the card below performs, so a tick here shows up there and
+      // in the streak and in Reports without any second bookkeeping.
+      var d=day();d[r.id]=true;save();renderAll();
     });
+    list.appendChild(c);
   });
+  bar.appendChild(list);
+  host.appendChild(bar);
 }
 
 /* ---------- the day window ----------
@@ -5214,9 +5163,6 @@ function renderLanes(){
             ' title="Click to edit this line. Clear it to remove it.">'+
             (L.ritual?esc(L.ritual):'+ add a note')+'</div>');
     var body=mine.length
-      // The per-task age badge ("21d") is gone. ageOf() stays, because the
-      // stale-task nudge still uses it - the signal was worth keeping, the
-      // permanent column of orange numbers next to every task was not.
       ? mine.slice().sort(function(a,b){return (a.done?1:0)-(b.done?1:0);}).map(function(t){
           // The notes panel is the last child of .tsk itself, not a sibling -
           // .tsk wraps, so it lands on its own full-width line directly under
@@ -5524,7 +5470,7 @@ function applyTheme(){
 }
 
 function renderAll(){
-  renderHeader();renderNow();renderNudges();renderRituals();
+  renderHeader();renderNow();renderNgBar();renderRituals();
   renderRoll();renderTimeline();renderHiddenBlocks();renderLanes();renderWeek();
   // Both Board layouts re-render together. The checklist is cheap (one pass
   // over S.tasks) and this way a change made in either one is reflected in the
@@ -8532,7 +8478,7 @@ restore();
 // guarantee both layout AND paint have completed) rather than trusting the
 // boot-time attempt.
 requestAnimationFrame(function(){requestAnimationFrame(function(){renderTimeline(true);});});
-setInterval(function(){renderHeader();renderNow();renderTimeline();renderLanes();renderNudges();},60000);
+setInterval(function(){renderHeader();renderNow();renderNgBar();renderTimeline();renderLanes();},60000);
 /* The Now bar rotation. ONE permanent 8s interval rather than a timer started
    and cleared inside renderNow(): renderNow() runs on the 60s tick and again
    on every save, and a timer rebuilt on each of those would restart its 8
