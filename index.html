@@ -543,7 +543,18 @@ span.apt{background:var(--terra);color:var(--on-warm);font-size:9px;font-weight:
 .lane-edit:hover{color:var(--forest-ink);background:var(--olive-lt)}
 .lane-del{font-size:16px;font-weight:700}
 .lane-del:hover{color:var(--terra-ink);background:var(--terra-lt)}
-.lane-s{font-size:10.5px;color:var(--muted);margin-bottom:9px;min-height:14px}
+/* Editable in place. The affordance is deliberately quiet - it is a caption,
+   read far more often than changed - so it announces itself on hover and focus
+   rather than carrying a permanent border or pencil. */
+.lane-s{font-size:10.5px;color:var(--muted);margin-bottom:9px;min-height:14px;
+  cursor:text;border-radius:4px;padding:1px 3px;margin-left:-3px;transition:.12s}
+.lane-s:hover,.lane-s:focus-visible{background:var(--ivory);color:var(--ink);outline:none}
+.lane-s:focus-visible{box-shadow:0 0 0 2px var(--olive)}
+/* Removed, not broken: the prompt is what makes deleting the line reversible. */
+.lane-s.none{opacity:.45;font-style:italic}
+.lane-s-edit{width:100%;box-sizing:border-box;font:inherit;font-size:10.5px;
+  color:var(--ink);background:var(--paper);border:1px solid var(--olive);
+  border-radius:5px;padding:2px 5px;margin:0 0 9px;outline:none}
 .lane.active{box-shadow:0 0 0 2px var(--forest-ink),var(--lift)}
 .lane.pinned.active{box-shadow:inset 0 3px 0 var(--olive),0 0 0 2px var(--forest-ink),var(--lift)}
 /* dragging a lane to reorder the board */
@@ -970,6 +981,9 @@ body.reports-only .board-only:not(.bview):not(#view-reports){display:none}
   .tnote-add{padding:9px 0}
   .swatch{width:28px;height:28px}
   .wk-add{padding:7px 12px}
+  /* 10.5px of caption is a poor thumb target, so the tap area grows without
+     the line moving: the padding is cancelled by an equal negative margin. */
+  .lane-s{padding:7px 3px;margin-top:-6px;margin-bottom:4px}
 }
 </style>
 </head>
@@ -3153,6 +3167,13 @@ function norm(s){
   if(!s.plans||typeof s.plans!=="object")s.plans={};
   if(!Array.isArray(s.lanes)||!s.lanes.length)
     s.lanes=DEFAULT_LANES.map(function(L){return {id:L.id,name:L.name,color:L.color,ritual:L.ritual};});
+  /* A lane's note is optional and removable, so "" and absent must be the same
+     thing - diffOps() compares by JSON.stringify, and two boards that agreed
+     the note was gone would otherwise look different forever. The add-lane form
+     can still produce an empty string; this is where it gets folded away. */
+  s.lanes.forEach(function(L){
+    if(L&&typeof L==="object"&&(typeof L.ritual!=="string"||!L.ritual.trim()))delete L.ritual;
+  });
   if(!Array.isArray(s.rituals))
     s.rituals=DEFAULT_RITUALS.map(function(r){return {id:r.id,l:r.l,tag:r.tag};});
   if(["auto","dark","light"].indexOf(s.theme)<0)s.theme="auto";
@@ -3458,7 +3479,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="4.5.1";
+var APP_VERSION="4.5.2";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -3469,6 +3490,7 @@ var APP_VERSION="4.5.1";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-07T23:15:00+08:00",text:"The small grey line under each lane name -- \"10:30pm-6:30am, write tomorrow's to-dos\" and the like -- can now be edited. Click it, type, press Enter. Clear it and press Enter to remove the line altogether; where a lane has none, a faint \"+ add a note\" sits in its place so you can always put one back. Escape cancels without saving, and clicking away saves. Nothing else about the lanes changed. Separately, the app's install description has been removed: it still described ProDash as a tracker for a 2pm-7am shift schedule, which stopped being true when the shift timing came out earlier today."},
   {ts:"2026-09-07T22:30:00+08:00",text:"The small appointment form under \"What does my day look like?\" is gone -- the name box, the two time pickers, the lane dropdown and the Add button. The + Appointment button in the corner of the card does the same job and more: it opens the full activity editor, so you can set a repeat, a category, a reminder time and notes, none of which the little form could do. Having both meant two ways to create the same appointment and one of them was worse. Nothing you have already booked is affected, and the card is shorter for it."},
   {ts:"2026-09-07T21:30:00+08:00",text:"The Shift timeline is now \"What does my day look like?\", and the 7am day roll is gone with the old name. Your day is an ordinary calendar day, 12:00am to 11:59pm, the same day everything else in the app already used. The one thing that genuinely changes for you: work you do between midnight and 7am now files on the date it happens, not on the previous day. Your night therefore lands on two dates instead of one, and today's checkmarks reset at midnight rather than at 7am. Nothing already recorded was altered. In exchange, activities that cross midnight are handled properly for the first time -- an 11pm to 2:30am block used to be drawn as already finished all day long, and now it shows as running, with the time left counted correctly. Anything still going from the night before leads the list marked \"from yesterday\", and anything running past midnight is marked \"into tomorrow\". The three routine blocks that start in the small hours (the 2:30am low ebb, the 6am writeup and the 6:30am EOD) moved to Tuesday-to-Saturday, because that is when they actually happen: Friday night's work now finishes on Saturday morning where it belongs, and Monday no longer shows a 2:30am block for a Sunday night you did not work. You can add an appointment straight from the card with the + Appointment button, which opens the same editor the Calendar tab uses, and tapping any appointment in the list opens it for editing or deleting -- one calendar, one record, whichever screen you started from. Ticking an activity off in the Calendar now shows it as done on the Board too, and it stops claiming to be happening now. The Now bar's orange runs the full width of the bar instead of fading out two thirds across, with a matching band underneath for what is coming, and appointment reminders no longer SHOUT IN CAPITAL LETTERS -- a stylesheet rule meant for the small orange badge had been landing on the whole notification."},
   {ts:"2026-09-07T17:45:00+08:00",text:"The Now bar at the top of the Board now tells you about appointments as well as routine blocks. When what you are in is an actual commitment from your calendar rather than a block of your routine, the whole bar takes the same soft orange the Shift timeline uses and the label changes to Happening now, so a school run no longer arrives looking exactly like Wake + prep. Underneath it, a second line shows what is coming: the next activity you have not done yet, with the time it runs and a countdown, and it flips to Also now with the time remaining once that one starts too. Anything that has finished drops off by itself and the next one steps up. Must-attend items are marked in red rather than pushed to the front, so the order still matches your day. On a shift with nothing booked the second line is not there at all and the bar looks exactly as it always did. This is the Board only -- your Calendar tab is unchanged."},
@@ -5006,6 +5028,11 @@ var laneFormOpen=false, laneDraft={name:"",ritual:"",color:LANE_PALETTE[0]};
 // survives a renderLanes() rebuild triggered by something unrelated (ticking
 // a task in a different lane, the 60s tick, a file sync landing).
 var laneRenamingId=null, laneRenamingDraft="";
+// ...and the same again for the line UNDER the lane name (L.ritual). Separate
+// state from the rename, not a shared "editing" flag, because the two are
+// independent: nothing should stop you fixing the note while a rename is open,
+// and a shared flag would make one silently cancel the other.
+var laneNoteId=null, laneNoteDraft="";
 
 /* Display order for lanes: pinned first, everything else after, each group
    keeping the order you arranged it in. This is a SORT rather than a physical
@@ -5040,7 +5067,7 @@ function renderLanes(){
     el.draggable=true;
     el.dataset.id=L.id;
     el.dataset.pinned=L.pinned?"1":"0";
-    var renaming=laneRenamingId===L.id;
+    var renaming=laneRenamingId===L.id, editingNote=laneNoteId===L.id;
     // Ends are measured against this lane's own group, not the whole board, so
     // the last pinned lane shows "down" disabled rather than offering a move
     // that would silently do nothing.
@@ -5075,7 +5102,17 @@ function renderLanes(){
         '<button class="lane-del" data-lact="delete" title="Remove lane" aria-label="Remove lane">&times;</button>')+
         '</div>'+
       '</div>'+
-      '<div class="lane-s">'+esc(L.ritual)+'</div>';
+      /* The lane's note. Click it to edit, clear it to remove it - and when it
+         IS empty a faint prompt takes its place, because a note you can delete
+         but never get back is a one-way door. Same reason the hidden-blocks
+         drawer exists under the day list. */
+      (editingNote
+        ? '<input class="lane-s-edit" id="lsEdit" value="'+esc(laneNoteDraft)+
+            '" placeholder="Leave empty to remove this line" '+
+            'aria-label="Note for the '+esc(L.name)+' lane">'
+        : '<div class="lane-s'+(L.ritual?'':' none')+'" data-lact="note" role="button" tabindex="0"'+
+            ' title="Click to edit this line. Clear it to remove it.">'+
+            (L.ritual?esc(L.ritual):'+ add a note')+'</div>');
     var body=mine.length
       // The per-task age badge ("21d") is gone. ageOf() stays, because the
       // stale-task nudge still uses it - the signal was worth keeping, the
@@ -5101,6 +5138,9 @@ function renderLanes(){
         if(la==="rename"){
           laneRenamingId=L.id;laneRenamingDraft=L.name;renderLanes();
           var lnI=document.getElementById("lnEdit");if(lnI){lnI.focus();lnI.select();}
+        }else if(la==="note"){
+          laneNoteId=L.id;laneNoteDraft=L.ritual||"";renderLanes();
+          var lsI=document.getElementById("lsEdit");if(lsI){lsI.focus();lsI.select();}
         }else if(la==="delete")deleteLane(L.id);
         else if(la==="up")moveLane(L.id,-1);
         else if(la==="down")moveLane(L.id,1);
@@ -5138,6 +5178,25 @@ function renderLanes(){
         else if(e.key==="Escape")cancelRename();
       });
       lnEdit.addEventListener("blur",function(){if(laneRenamingId===L.id)commitRename(L.id);});
+    }
+    // role="button" without a key handler is a lie to a screen-reader user, so
+    // the note opens on Enter/Space as well as on click.
+    var noteBtn=el.querySelector('.lane-s[data-lact="note"]');
+    if(noteBtn)noteBtn.addEventListener("keydown",function(e){
+      if(e.key==="Enter"||e.key===" "){
+        e.preventDefault();
+        laneNoteId=L.id;laneNoteDraft=L.ritual||"";renderLanes();
+        var f=document.getElementById("lsEdit");if(f){f.focus();f.select();}
+      }
+    });
+    if(editingNote){
+      var lsEdit=el.querySelector("#lsEdit");
+      lsEdit.addEventListener("input",function(){laneNoteDraft=this.value;});
+      lsEdit.addEventListener("keydown",function(e){
+        if(e.key==="Enter")commitNote(L.id);
+        else if(e.key==="Escape")cancelNote();
+      });
+      lsEdit.addEventListener("blur",function(){if(laneNoteId===L.id)commitNote(L.id);});
     }
     var inp=el.querySelector(".addrow input"),btn=el.querySelector(".addrow button");
     function add_(){
@@ -5231,6 +5290,29 @@ function commitRename(id){
 }
 function cancelRename(){
   laneRenamingId=null;laneRenamingDraft="";
+  renderLanes();
+}
+
+/* The note under the lane name. Unlike the name, EMPTY is a legitimate value:
+   clearing the field is how you remove the line, so there is no "if(v)" guard
+   swallowing the change the way commitRename() deliberately does for a name.
+   The key is deleted rather than set to "", because diffOps() compares by
+   JSON.stringify and an absent key must not read as different from an empty
+   one - the same rule t.notes follows in norm(). */
+function commitNote(id){
+  var v=laneNoteDraft.trim();
+  var L=S.lanes.filter(function(x){return x.id===id;})[0];
+  var changed=false;
+  if(L&&(L.ritual||"")!==v){
+    if(v)L.ritual=v; else delete L.ritual;
+    save();changed=true;
+  }
+  laneNoteId=null;laneNoteDraft="";
+  renderAll();
+  if(changed)stamp(v?'Note updated on "'+L.name+'"':'Note removed from "'+L.name+'"');
+}
+function cancelNote(){
+  laneNoteId=null;laneNoteDraft="";
   renderLanes();
 }
 

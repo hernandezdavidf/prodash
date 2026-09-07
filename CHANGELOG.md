@@ -2,6 +2,34 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-07 — Editable lane notes; drop the stale manifest description (v4.5.2)
+
+**Lane notes.** The caption under each lane name (`L.ritual`) is now editable in
+place: click it, Enter or blur commits, Escape cancels. Clearing it removes the
+line, and an empty lane shows a faint `+ add a note` in its place so removal
+stays reversible — the same reasoning as the hidden-blocks drawer under the day
+list.
+
+Mirrors the existing rename idiom rather than inventing a second one:
+`laneNoteId`/`laneNoteDraft` alongside `laneRenamingId`/`laneRenamingDraft`, kept
+separate so neither editor cancels the other. `role="button"` comes with a real
+Enter/Space handler, and the coarse-pointer rule grows the tap target with
+padding cancelled by an equal negative margin, so the line doesn't move.
+
+Unlike `commitRename()`, `commitNote()` has **no** `if(value)` guard — empty is a
+legitimate value here, it's how you delete the line. The key is `delete`d rather
+than set to `""`, and `norm()` folds any empty string away, because `diffOps()`
+compares by `JSON.stringify` and two boards that agreed the note was gone would
+otherwise look permanently different.
+
+**manifest.json:** `description` removed. It read "Personal shift, task and habit
+tracker for the 2pm-7am schedule" — untrue since v4.5 took the shift model out.
+Dropped rather than rewritten, as asked.
+
+`"id": "./dayflow.html"` is deliberately left alone. It points at a file that no
+longer exists, but `id` is only the install identity string — changing it makes
+the phone treat ProDash as a different app and install a second icon.
+
 ## 2026-09-07 — Remove the inline quick-add appointment form (v4.5.1)
 
 The `+ Appointment` button shipped in v4.5 made the form under the day list

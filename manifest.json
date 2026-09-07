@@ -1,7 +1,6 @@
 {
   "name": "How's our Dave looking? — ProDash",
   "short_name": "ProDash",
-  "description": "Personal shift, task and habit tracker for the 2pm-7am schedule.",
   "start_url": "./",
   "id": "./dayflow.html",
   "scope": "./",
