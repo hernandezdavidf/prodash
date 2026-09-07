@@ -249,16 +249,34 @@ header h1{font-size:26px;letter-spacing:.3px}
    already puts on .blk.ev - same rgba, deliberately, so "this is a commitment"
    looks identical in both places instead of being two dialects of orange.
    Must-attend swaps the left rule to red, matching the .nudge.apt-must tier. */
-.nowbar.ev{background:linear-gradient(90deg,rgba(251,140,0,.14),var(--paper) 62%)}
+/* The orange now runs the FULL width of the bar rather than fading out at 62%.
+   A wash that stopped two thirds across read as a decorative corner; carried
+   edge to edge it reads as a status band, which is what it is. Alpha stays low
+   (.16 -> .07) precisely so it can be full-width without competing with the
+   text sitting on it - the name, the times and the countdown all keep their own
+   contrast. The 3px rail along the top is the sharp edge that makes the band
+   deliberate; --terra is the same token .blk.ev and .apt already use, so no new
+   colour enters the system. */
+.nowbar.ev{position:relative;overflow:hidden;
+  background:linear-gradient(90deg,rgba(251,140,0,.16),rgba(251,140,0,.07))}
+.nowbar.ev::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;
+  background:linear-gradient(90deg,var(--terra),rgba(251,140,0,.25))}
+.nowbar.must::before{background:linear-gradient(90deg,var(--alert),rgba(229,57,53,.25))}
 .nowbar.ev .nt{color:var(--terra-ink)}
 .nowbar.must{border-left-color:var(--alert)}
 /* Upcoming is a quieter SECOND ROW, not a second colour: one thing is
    happening and one thing is coming, and they must not compete for the same
    glance. flex-basis:100% is what drops it onto its own line inside the
    wrapping .nowbar. The 3px left bar echoes .blk-b in the timeline. */
+/* Matches the headline band: full-width wash, not a 72% fade. The .ev class is
+   what earns the orange - an upcoming ROUTINE block uses the same row with a
+   neutral ground, so orange keeps meaning "a commitment", nothing else. */
 .nowup{flex-basis:100%;display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;
-  margin-top:11px;padding:8px 11px;border-radius:8px;border-left:3px solid var(--terra);
-  background:linear-gradient(90deg,rgba(251,140,0,.13),transparent 72%)}
+  margin-top:11px;padding:8px 11px;border-radius:8px;border-left:3px solid var(--sage);
+  background:var(--ivory)}
+.nowup.ev{border-left-color:var(--terra);
+  background:linear-gradient(90deg,rgba(251,140,0,.14),rgba(251,140,0,.05))}
+.nowup:not(.ev) .nu-l,.nowup:not(.ev) .nu-c{color:var(--forest-ink)}
 /* display:flex beats the UA [hidden] rule, so without this the row keeps its
    box and its orange wash on every day that has no pending activity. */
 .nowup[hidden]{display:none}
@@ -266,13 +284,13 @@ header h1{font-size:26px;letter-spacing:.3px}
 .nowup .nu-n{font-size:12.5px;font-weight:700;overflow-wrap:anywhere;min-width:0}
 .nowup .nu-m{font-size:11.5px;color:var(--muted)}
 .nowup .nu-c{font-size:11.5px;font-weight:700;color:var(--terra-ink);font-variant-numeric:tabular-nums}
-.nowup.must{border-left-color:var(--alert);background:linear-gradient(90deg,rgba(229,57,53,.11),transparent 72%)}
+.nowup.must{border-left-color:var(--alert);background:linear-gradient(90deg,rgba(229,57,53,.13),rgba(229,57,53,.05))}
 .nowup.must .nu-l,.nowup.must .nu-c{color:var(--alert-ink)}
 /* Same token pair as .cal-tag.must, and for the reason those two tokens exist:
    they FLIP together, so this reads as red type on a red tint in both themes.
    A solid --alert-ink ground is right in light (5.6:1 with white) but wrong in
    dark, where --alert-ink is itself a light red meant to BE the text. */
-.apt.must{background:var(--alert-lt);color:var(--alert-ink)}
+span.apt.must{background:var(--alert-lt);color:var(--alert-ink)}
 .pill{border:1px solid var(--line);border-radius:999px;padding:7px 15px;font-size:12.5px;font-weight:600;background:var(--paper);color:var(--forest-ink);transition:.15s}
 .pill:hover{background:var(--olive-lt);border-color:var(--olive)}
 .pill.on{background:var(--forest);color:var(--on-brand);border-color:var(--forest-ink)}
@@ -427,6 +445,30 @@ header h1{font-size:26px;letter-spacing:.3px}
   text-transform:uppercase;color:var(--on-warm);background:var(--terra);
   padding:1.5px 6px;border-radius:999px;margin-left:5px;vertical-align:1px}
 .blk.past{opacity:.4}
+/* A row that belongs to the Personal Calendar opens its editor on tap. The
+   affordance is deliberately quiet - a cursor and a faint ground on hover -
+   because the list is read far more often than it is edited. */
+.blk.tappable{cursor:pointer;border-radius:6px}
+.blk.tappable:hover{background:var(--ivory)}
+.blk.ev.tappable:hover{background:linear-gradient(90deg,rgba(251,140,0,.20),rgba(251,140,0,.04))}
+/* "from yesterday" / "into tomorrow": the only place midnight is ever spoken
+   about in the UI. It sits under the times, in the row it qualifies, so a block
+   that crosses the boundary explains itself without a legend. */
+/* white-space:normal because .blk-t is nowrap (the time range must not break
+   mid-range) and this label is allowed to take two lines in that 84px column. */
+.blk-x{display:block;font-size:8.5px;text-transform:uppercase;letter-spacing:.5px;
+  font-weight:700;color:var(--terra-ink);opacity:.85;margin-top:1px;white-space:normal}
+.blk.carry .blk-b{opacity:.55}
+.done-badge{display:inline-block;font-size:8.5px;font-weight:800;letter-spacing:.6px;
+  text-transform:uppercase;background:var(--olive);color:var(--on-brand);
+  border-radius:4px;padding:1px 5px;vertical-align:1px}
+.blk.doneb .blk-n{text-decoration:line-through;text-decoration-thickness:1px}
+/* Card-header action. Sits on the h2's own row, pushed right by the flex the
+   heading already uses, so it needs no layout of its own. */
+.h2-add{margin-left:auto;font-size:11px;font-weight:700;color:var(--terra-ink);
+  background:var(--paper);border:1px solid var(--line);border-radius:999px;
+  padding:3px 10px;white-space:nowrap;transition:.15s}
+.h2-add:hover{border-color:var(--terra);background:rgba(251,140,0,.10)}
 .blk.sleepb .blk-n{color:var(--night-ink)}
 
 /* one-off appointments in the timeline */
@@ -434,7 +476,13 @@ header h1{font-size:26px;letter-spacing:.3px}
 .blk.ev .blk-n{color:var(--terra-ink)}
 .blk .x{color:var(--sage);font-size:15px;line-height:1;padding:0 4px;align-self:center}
 .blk .x:hover{color:var(--terra-ink)}
-.apt{background:var(--terra);color:var(--on-warm);font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border-radius:4px;padding:1px 5px}
+/* span.apt, not .apt: "apt" is ALSO the tier class renderNudges() puts on a
+   whole notification (<div class="nudge apt">), so an unqualified rule handed
+   every appointment reminder the badge's 9px uppercase letter-spacing - which
+   is why they have been shouting "DENTIST IS HAPPENING NOW" in all caps while
+   every other nudge spoke normally. The badge is always a <span>, the tier is
+   always a <div>, so the element name is the honest way to tell them apart. */
+span.apt{background:var(--terra);color:var(--on-warm);font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border-radius:4px;padding:1px 5px}
 .apt-add{margin-top:11px;padding-top:11px;border-top:1px dashed var(--line);display:flex;flex-direction:column;gap:7px}
 .apt-add input,.apt-add select{border:1px solid var(--line);border-radius:7px;padding:6px 9px;background:var(--ivory);color:var(--ink);outline:none;min-width:0}
 .apt-add input:focus,.apt-add select:focus{border-color:var(--olive);background:var(--paper)}
@@ -1782,12 +1830,18 @@ return {
   <div class="cols board-only" id="boardCols" role="tabpanel" aria-labelledby="bvClassic" tabindex="-1">
     <div>
       <div class="card timelinecard">
-        <h2>Shift timeline</h2>
+        <h2>What does my day look like?
+          <!-- Opens the Personal Calendar's own activity editor, not a second
+               form: full detail (repeat, category, reminder, notes) with the
+               Calendar as the single store. The quick row underneath stays for
+               the one-line case. -->
+          <button class="h2-add" id="tlAdd" title="Add an appointment to your Personal Calendar">+ Appointment</button>
+        </h2>
         <div class="sub" id="rollSub"></div>
         <div id="timeline"></div>
         <div id="hiddenList"></div>
         <div class="apt-add">
-          <input id="aptN" placeholder="Appointment — what and where">
+          <input id="aptN" placeholder="Quick appointment — what and where">
           <div class="apt-row">
             <input id="aptD" type="date" title="Date">
             <input id="aptS" type="time" value="10:00" title="Start">
@@ -1820,7 +1874,7 @@ return {
       <div class="lanes" id="lanes"></div>
 
       <div class="card" style="margin-top:14px">
-        <h2>Last 7 shifts</h2>
+        <h2>Last 7 days</h2>
         <div class="sub">Percent of non-negotiables cleared.</div>
         <div class="week" id="week"></div>
       </div>
@@ -2006,7 +2060,7 @@ return {
   <div id="view-cal" hidden>
     <div class="card">
       <h2>My Personal Calendar <span class="cnt" id="calCount">0 activities</span></h2>
-      <div class="sub">Your schedule, routines and long-term commitments. Anything with a start and end time also appears on the Board's Shift Timeline and in your daily reminders.</div>
+      <div class="sub">Your schedule, routines and long-term commitments. Anything with a start and end time also appears on the Board's "What does my day look like?" and in your daily reminders.</div>
 
       <div class="cal-bar">
         <div class="sub-tabs cal-views">
@@ -2909,7 +2963,7 @@ return {
   <div class="foot">
     <button id="exportBtn">Export backup</button>
     <button id="importBtn">Import backup</button>
-    <button id="resetBtn">Reset this shift</button>
+    <button id="resetBtn">Reset today</button>
   </div>
   <input type="file" id="fileIn" accept=".json" style="display:none">
 </div>
@@ -2966,17 +3020,13 @@ var GREETING=(function(){
    PDAuth.ns() also carries the single-user era's board over to the first
    account that signs in here. */
 var KEY=PDAuth.ns("dayflow.v2");
-/* When the logical day starts, in minutes past midnight. Read through rollM()
-   rather than held in a constant, because it is now editable and every date
-   calculation in the file depends on it - a cached copy would go stale the
-   moment it changed, and the failure would look like tasks silently landing on
-   the wrong day rather than like a settings bug. 420 = 07:00, the long-standing
-   default, used whenever S has no value yet. */
-function rollM(){
-  var r=(typeof S!=="undefined"&&S&&typeof S.roll==="number")?S.roll:420;
-  return (r>=0&&r<1440)?r:420;
-}
-function rollHHMM(){var m=rollM();return String(Math.floor(m/60)).padStart(2,"0")+":"+String(m%60).padStart(2,"0");}
+/* The 07:00 shift roll was removed on 2026-09-07. A day here is now an ordinary
+   calendar day, 12:00am to 11:59pm, and there is no rollM()/rollHHMM() any more:
+   a date key IS the wall-clock date, and a time's position on the day view IS
+   its minutes past midnight. Anything that needs to reason about work running
+   through midnight does it with SPANS (see daySpans), not by moving the day
+   boundary. S.roll may still exist in an older saved board; nothing reads it,
+   the same way the removed "focus" key sits inert. Do not reintroduce it. */
 
 // Blue = the three client jobs. Green = his own company. Yellow = learning.
 // Slate = low priority, drained of colour on purpose. Orange is reserved for
@@ -3003,6 +3053,16 @@ var LANE_PALETTE=["var(--ln-x1)","var(--ln-x2)","var(--ln-x3)","var(--ln-x4)","v
 // One-off appointments live in S.events and use these same field names, so
 // dayBlocks() can merge the two and every renderer treats them alike.
 var WD=[1,2,3,4,5];
+/* Mon-Fri NIGHTS, landing on Tue-Sat. These blocks start after midnight, so on
+   a 12:00am-11:59pm day they belong to the morning AFTER the weekday they were
+   worked - Friday's 11pm run ends at 6:30am on Saturday, and Monday has no
+   2:30am block because Sunday night was not worked.
+   They were tagged WD when the day rolled at 07:00, because back then "Monday"
+   ran Mon 7am to Tue 7am and the whole night sat inside one key. Removing the
+   roll without re-tagging them would have put an orphan 2:30am block on Monday
+   and left Saturday morning empty - the same fact filed one day early. The
+   BLOCKS array and its weekday filter are otherwise untouched. */
+var WDN=[2,3,4,5,6];
 // Each entry needs a stable id (never used for anything before now) so a
 // hidden placeholder can be tracked in S.hiddenBlocks by reference rather
 // than by array position, which would silently shift if this list is ever
@@ -3019,9 +3079,9 @@ var BLOCKS=[
  {id:"dayclient3",s:"19:30",e:"22:30",n:"Day Client",           d:"Clear the list, update to-complete",  lane:"dayclient", days:WD},
  {id:"handover",  s:"22:30",e:"23:00",n:"Day Client wrap + Night Client B open", d:"Handover — one switch", lane:"nightclientb", days:WD},
  {id:"dual1",     s:"23:00",e:"02:30",n:"Night Client A + Night Client B",       d:"Dual shift — both live", lane:"nightclienta", lane2:"nightclientb", dual:1, days:WD},
- {id:"dual2",     s:"02:30",e:"06:00",n:"Night Client A + Night Client B · low ebb", d:"Mechanical work only. Don't decide anything big.", lane:"nightclienta", lane2:"nightclientb", dual:1, nadir:1, days:WD},
- {id:"nbwriteup", s:"06:00",e:"06:30",n:"Night Client B to-do writeup", d:"Tomorrow's list, while it's fresh",   lane:"nightclientb", days:WD},
- {id:"naeod",     s:"06:30",e:"07:00",n:"Night Client A EOD + shutdown", d:"Send it, log the shift, then sleep",  lane:"nightclienta", days:WD}
+ {id:"dual2",     s:"02:30",e:"06:00",n:"Night Client A + Night Client B · low ebb", d:"Mechanical work only. Don't decide anything big.", lane:"nightclienta", lane2:"nightclientb", dual:1, nadir:1, days:WDN},
+ {id:"nbwriteup", s:"06:00",e:"06:30",n:"Night Client B to-do writeup", d:"Tomorrow's list, while it's fresh",   lane:"nightclientb", days:WDN},
+ {id:"naeod",     s:"06:30",e:"07:00",n:"Night Client A EOD + shutdown", d:"Send it, then sleep",  lane:"nightclienta", days:WDN}
 ];
 
 // Seed only - the live, editable list is S.rituals (see norm()). Same pattern
@@ -3042,13 +3102,10 @@ var DEFAULT_RITUALS=[
 // today" and "am I on pace this week" instead of splitting the same habits
 // across two lists that never agreed on which one owned a given item.
 
-// ---------- logical day (rolls at 07:00) ----------
+// ---------- the day (an ordinary calendar day, 12:00am - 11:59pm) ----------
 function key(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
-function today(){
-  var d=new Date();
-  if(d.getHours()*60+d.getMinutes() < rollM()) d.setDate(d.getDate()-1);
-  return key(d);
-}
+// No adjustment: midnight starts a new day, like every other calendar.
+function today(){ return key(new Date()); }
 function shift(k,n){var p=k.split("-");var d=new Date(+p[0],+p[1]-1,+p[2]);d.setDate(d.getDate()+n);return key(d);}
 
 /* Declared up here, not down with the rest of the widget code, because norm()
@@ -3115,11 +3172,13 @@ function norm(s){
   if(!Array.isArray(s.rituals))
     s.rituals=DEFAULT_RITUALS.map(function(r){return {id:r.id,l:r.l,tag:r.tag};});
   if(["auto","dark","light"].indexOf(s.theme)<0)s.theme="auto";
-  // When the logical day starts, in minutes past midnight. Synced like any
-  // other board scalar, so changing it on the PC moves the phone's day too -
-  // two devices disagreeing about when "today" begins would put the same
-  // 3am edit on two different dates.
-  if(typeof s.roll!=="number"||s.roll<0||s.roll>=1440)s.roll=420;
+  /* s.roll (the old 07:00 day-start, in minutes past midnight) is no longer
+     normalised or read - the shift roll was removed on 2026-09-07 and a day is
+     now an ordinary 12:00am-11:59pm calendar day. A board saved before that may
+     still carry the key; it stays in BOARD_KEYS/SCALARS on purpose so such a
+     board still round-trips through sync and history without every revision
+     showing a phantom change, exactly like the inert "focus" key above. Nothing
+     reads it. Do not reintroduce it. */
   // Which Board sub-view is showing. BOARD_VIEWS, not a literal list: see the
   // note on its declaration for what a second copy of this set cost us.
   if(!BOARD_VIEWS[s.boardView])s.boardView="classic";
@@ -3415,7 +3474,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="4.4";
+var APP_VERSION="4.5";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -3426,6 +3485,7 @@ var APP_VERSION="4.4";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-07T21:30:00+08:00",text:"The Shift timeline is now \"What does my day look like?\", and the 7am day roll is gone with the old name. Your day is an ordinary calendar day, 12:00am to 11:59pm, the same day everything else in the app already used. The one thing that genuinely changes for you: work you do between midnight and 7am now files on the date it happens, not on the previous day. Your night therefore lands on two dates instead of one, and today's checkmarks reset at midnight rather than at 7am. Nothing already recorded was altered. In exchange, activities that cross midnight are handled properly for the first time -- an 11pm to 2:30am block used to be drawn as already finished all day long, and now it shows as running, with the time left counted correctly. Anything still going from the night before leads the list marked \"from yesterday\", and anything running past midnight is marked \"into tomorrow\". The three routine blocks that start in the small hours (the 2:30am low ebb, the 6am writeup and the 6:30am EOD) moved to Tuesday-to-Saturday, because that is when they actually happen: Friday night's work now finishes on Saturday morning where it belongs, and Monday no longer shows a 2:30am block for a Sunday night you did not work. You can add an appointment straight from the card with the + Appointment button, which opens the same editor the Calendar tab uses, and tapping any appointment in the list opens it for editing or deleting -- one calendar, one record, whichever screen you started from. Ticking an activity off in the Calendar now shows it as done on the Board too, and it stops claiming to be happening now. The Now bar's orange runs the full width of the bar instead of fading out two thirds across, with a matching band underneath for what is coming, and appointment reminders no longer SHOUT IN CAPITAL LETTERS -- a stylesheet rule meant for the small orange badge had been landing on the whole notification."},
   {ts:"2026-09-07T17:45:00+08:00",text:"The Now bar at the top of the Board now tells you about appointments as well as routine blocks. When what you are in is an actual commitment from your calendar rather than a block of your routine, the whole bar takes the same soft orange the Shift timeline uses and the label changes to Happening now, so a school run no longer arrives looking exactly like Wake + prep. Underneath it, a second line shows what is coming: the next activity you have not done yet, with the time it runs and a countdown, and it flips to Also now with the time remaining once that one starts too. Anything that has finished drops off by itself and the next one steps up. Must-attend items are marked in red rather than pushed to the front, so the order still matches your day. On a shift with nothing booked the second line is not there at all and the bar looks exactly as it always did. This is the Board only -- your Calendar tab is unchanged."},
   {ts:"2026-09-07T16:10:00+08:00",text:"Removed the reminder that said your company didn't get its hour. It had no end time, so it appeared at 2pm and then simply stayed for the rest of the shift -- at 5am it was still telling you that Day Client was about to take the 1-2pm slot, hours after Day Client had finished. Your \"My company -- 30 min\" non-negotiable is unchanged and still on the list; it just no longer puts a banner at the top of the board."},
   {ts:"2026-09-07T15:30:00+08:00",text:"Two things left the app. The green progress bar across the bottom of the header is gone -- the one counting how far through the shift you were and how long until 7am. It measured the clock, not you, and a bar sitting at 95% at 5am was only ever telling you the day was nearly over. The shift start time is also no longer editable: the 7:00am chip on the Shift timeline and its time picker have been removed. Your day still rolls over at 7:00am exactly as before, and the line under the timeline still says so -- it just cannot be changed from the app any more."},
@@ -3890,11 +3950,17 @@ function reconnect(){
 }
 function day(k){k=k||today();if(!S.log[k])S.log[k]={};return S.log[k];}
 
-// ---------- shift-minute coordinates ----------
+/* ---------- day-minute coordinates ----------
+   Minutes past midnight, 0 = 12:00am and 1440 = the end of the day. These
+   replaced the old shift-minute pair (sm/smEnd/nowSm), which measured from the
+   07:00 roll; the names changed with the meaning on purpose, so any code still
+   written against the old model fails loudly instead of silently being 420
+   minutes out. Work that runs through midnight is handled by daySpans(), not
+   by bending these. */
 function mins(hhmm){var p=hhmm.split(":");return (+p[0])*60+(+p[1]);}
-function sm(hhmm){return (mins(hhmm)-rollM()+1440)%1440;}        // the roll time -> 0
-function smEnd(hhmm){var v=sm(hhmm);return v===0?1440:v;}        // 07:00 as an END means 1440
-function nowSm(){var d=new Date();return (d.getHours()*60+d.getMinutes()-rollM()+1440)%1440;}
+function dm(hhmm){return mins(hhmm);}
+function dmEnd(hhmm){var v=mins(hhmm);return v===0?1440:v;}      // 00:00 as an END means midnight
+function nowDm(){var d=new Date();return d.getHours()*60+d.getMinutes();}
 function fmt(hhmm){var p=hhmm.split(":"),h=+p[0],m=p[1],ap=h<12?"am":"pm",hh=h%12;if(hh===0)hh=12;return hh+":"+m+ap;}
 
 function dowOf(k){var p=k.split("-");return new Date(+p[0],+p[1]-1,+p[2]).getDay();}
@@ -3978,7 +4044,7 @@ function activitiesOn(k){
     .sort(function(a,b){
       if(!!a.allDay!==!!b.allDay)return a.allDay?-1:1;
       if(a.allDay&&b.allDay)return 0;
-      return sm(a.s||"00:00")-sm(b.s||"00:00");
+      return mins(a.s||"00:00")-mins(b.s||"00:00");
     });
 }
 function isDone(e,k){return !!(e.done&&e.done[k]);}
@@ -4012,17 +4078,20 @@ function rruleText(e){
   return s;
 }
 
-// The shift as actually lived: recurring blocks that apply to this weekday,
-// plus any one-off appointments booked for this date, in clock order.
+// The day as actually lived: recurring routine blocks that apply to this
+// weekday, plus any timed Personal Calendar activity landing on this date.
+// Unsorted - daySpans() below is what puts them in clock order, because the
+// order depends on resolved spans rather than on the raw start string.
 function dayBlocks(k){
   k=k||today();
   var dow=dowOf(k),hidden=S.hiddenBlocks||[];
   var out=BLOCKS.filter(function(b){return (!b.days||b.days.indexOf(dow)>=0)&&hidden.indexOf(b.id)<0;});
-  /* Calendar activities reach the Shift Timeline through here, which is why
-     there is no second scheduling store and nothing to keep in sync: the
-     timeline, the "now" bar and the nudges all read this one function, so a
-     recurring activity created in the Calendar tab simply appears in all three.
-     All-day items are deliberately excluded - the timeline is laid out by
+  /* Calendar activities reach "What does my day look like?" through here, which
+     is why there is no second scheduling store and nothing to keep in sync: the
+     day view, the Now bar and the nudges all read this one function, so a
+     recurring activity created in the Calendar tab simply appears in all three,
+     and so does an appointment added from the Board.
+     All-day items are deliberately excluded - the day view is laid out by
      start/end minute and something spanning the whole day has no position in
      it. They surface in the Calendar and in nudges instead. */
   S.events.forEach(function(e){
@@ -4030,16 +4099,56 @@ function dayBlocks(k){
     if(e.allDay||!e.s||!e.e)return;
     out.push(e);
   });
-  return out.sort(function(a,b){return sm(a.s)-sm(b.s);});
+  return out.sort(function(a,b){return mins(a.s)-mins(b.s);});
 }
 
-function currentBlock(){
-  var n=nowSm(),L=dayBlocks();
-  // an appointment wins over the routine block it sits inside
-  for(var i=0;i<L.length;i++){if(L[i].ev&&n>=sm(L[i].s)&&n<smEnd(L[i].e))return L[i];}
-  for(var j=0;j<L.length;j++){if(n>=sm(L[j].s)&&n<smEnd(L[j].e))return L[j];}
+/* ---------- spans: the one place midnight is reasoned about ----------
+   A span resolves one occurrence to real minute coordinates on the day being
+   viewed:
+     st  minutes past midnight, NEGATIVE when it started the previous day
+     en  minutes past midnight, >1440 when it runs into the next day
+   An end at or before its start means the item crosses midnight - the 11pm to
+   2:30am dual block is the obvious one, and it is why "en <= st" is a wrap and
+   not a data error. Every status question (upcoming / now / over) is answered
+   by comparing nowDm() against these two numbers, so no caller has to know
+   about midnight at all. */
+function spanOf(b,offset){
+  var st=mins(b.s),en=mins(b.e);
+  if(en<=st)en+=1440;
+  return {b:b,st:st+offset,en:en+offset,wraps:en>1440,carry:offset<0};
+}
+function daySpans(k){
+  k=k||today();
+  var out=dayBlocks(k).map(function(b){return spanOf(b,0);});
+  /* Anything that started YESTERDAY and is still running past midnight belongs
+     to this day as it is lived, so it LEADS the list with a negative start
+     instead of vanishing at 11:59pm. Without this an 11pm-2:30am block is
+     invisible at 1am - the hour it matters most - which is precisely the class
+     of bug the old 07:00 roll existed to paper over. Handling it as a span is
+     the honest fix: the day boundary stays where a calendar says it is. */
+  dayBlocks(shift(k,-1)).forEach(function(b){
+    var sp=spanOf(b,-1440);
+    if(sp.en>0)out.push(sp);
+  });
+  return out.sort(function(a,b){return a.st-b.st;});
+}
+/* The span covering this exact minute. An appointment wins over the routine
+   block it sits inside, exactly as before - unless it has been ticked off, in
+   which case the headline falls through to the routine underneath. Without that
+   check, marking a meeting done in the Calendar left the Board still announcing
+   it as "Happening now" until its end time, which is the one thing a completion
+   flag is supposed to stop. */
+function spanDone(sp){
+  return !!(sp.b.ev&&isDone(sp.b,sp.carry?shift(today(),-1):today()));
+}
+function currentSpan(){
+  var n=nowDm(),L=daySpans(),i;
+  for(i=0;i<L.length;i++)if(L[i].b.ev&&!spanDone(L[i])&&n>=L[i].st&&n<L[i].en)return L[i];
+  for(i=0;i<L.length;i++)if(!L[i].b.ev&&n>=L[i].st&&n<L[i].en)return L[i];
   return null;
 }
+// Kept as the name every other renderer already asks for.
+function currentBlock(){ var s=currentSpan(); return s?s.b:null; }
 
 // ---------- metrics ----------
 function streakOf(id){
@@ -4359,7 +4468,7 @@ function renderHeader(){
   var p=today().split("-");
   var d=new Date(+p[0],+p[1]-1,+p[2]);
   document.getElementById("hdrDate").textContent=
-    d.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"})+" shift · "+rollRange();
+    d.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"})+" · 12:00am → 11:59pm";
   var done=0,l=day();
   S.rituals.forEach(function(r){if(l[r.id])done++;});
   document.getElementById("sRit").textContent=(S.rituals.length?Math.round(done/S.rituals.length*100):0)+"%";
@@ -4386,31 +4495,28 @@ function renderHeader(){
    it keeps announcing itself in the nudge strip, which is the right shape for
    it. This is a Board change: .nowbar is board-only and the Calendar tab's
    own rendering is untouched - the calendar is only where the data lives. */
-/* An activity that crosses the roll - 6:45am to 7:30am, with the day starting
-   at 7:00 - has an END minute SMALLER than its start, because sm() measures
-   from the roll and wraps there. The rest of the app has always been loose
-   about this (renderTimeline draws such a block as "past" all day) and fixing
-   the shift model properly is a much bigger job than this row. What this row
-   must not do is silently swallow the activity, so the wrap is tested for
-   explicitly instead of being left to fall through the "already over" check. */
-function apptSpan(b){
-  var st=sm(b.s),en=smEnd(b.e);
-  return {st:st,en:en,wraps:en<=st};
-}
-function pendingAppts(){
-  var n=nowSm(),k=today(),cur=currentBlock(),out=[];
-  dayBlocks().forEach(function(b){
-    if(!b.ev)return;
-    if(isDone(b,k))return;                 // ticked off - no longer pending
-    var sp=apptSpan(b);
-    if(!sp.wraps&&n>=sp.en)return;         // over: drops out on its own, no cleanup
-    if(b===cur)return;                     // already the headline, don't say it twice
-    out.push(b);
+/* Crossing midnight is now handled once, in spanOf(), so nothing down here has
+   to test for a wrap: a span's st and en are already real minute coordinates on
+   the day in view, negative or past 1440 where that is the truth. The old
+   apptSpan() and its roll-wrap special case are gone with the roll. */
+/* What has not started yet, or is running alongside the headline. Appointments
+   first, because a commitment outranks routine; the next routine block is
+   offered only when nothing is booked, so the row always answers "what's
+   coming" instead of going blank on an ordinary day. */
+function pendingItems(){
+  var n=nowDm(),k=today(),cur=currentSpan(),appts=[],routine=[];
+  daySpans().forEach(function(sp){
+    if(n>=sp.en)return;                            // over: drops out on its own
+    if(cur&&sp.b===cur.b)return;                   // already the headline
+    if(sp.b.ev){
+      if(isDone(sp.b,sp.carry?shift(k,-1):k))return;   // ticked off in the Calendar
+      appts.push(sp);
+    }else if(sp.st>n) routine.push(sp);            // upcoming routine only
   });
-  return out;                              // dayBlocks() is already start-sorted
+  return appts.length?appts:routine.slice(0,1);    // both already start-sorted
 }
 function renderNow(){
-  var b=currentBlock(),bar=document.getElementById("nowbar");
+  var sp=currentSpan(),b=sp?sp.b:null,bar=document.getElementById("nowbar");
   var onEv=!!(b&&b.ev);
   bar.className="nowbar board-only"+(b&&b.sleep?" sleep":"")+
     (onEv?" ev":"")+(onEv&&b.must?" must":"");
@@ -4421,9 +4527,12 @@ function renderNow(){
     // user-typed and reaches this line straight from the Calendar editor.
     document.getElementById("nowName").innerHTML=esc(b.n)+
       (onEv?' <span class="apt'+(b.must?" must":"")+'">'+(b.must?"must attend":"appointment")+'</span>':"");
-    var rem=smEnd(b.e)-nowSm();
+    // sp.en, not the end string: a block that began yesterday has a span that
+    // already accounts for midnight, so "left" stays a positive number at 1am.
+    var rem=sp.en-nowDm();
     document.getElementById("nowMeta").textContent=
-      fmt(b.s)+"–"+fmt(b.e)+" · "+(rem>=60?Math.floor(rem/60)+"h "+(rem%60)+"m":rem+" min")+" left"+
+      fmt(b.s)+"–"+fmt(b.e)+(sp.carry?" (from yesterday)":(sp.wraps?" (into tomorrow)":""))+
+      " · "+(rem>=60?Math.floor(rem/60)+"h "+(rem%60)+"m":rem+" min")+" left"+
       (b.d?" · "+b.d:"");
   }else{
     document.getElementById("nowName").textContent="Unscheduled";
@@ -4436,23 +4545,24 @@ function renderNow(){
      re-ordered. Two overlapping activities are why "Also now" exists - the
      headline can only hold one, and silently dropping the other would be the
      same class of bug as the nudge that never ended. */
-  var up=pendingAppts(),el=document.getElementById("nowUp");
+  var up=pendingItems(),el=document.getElementById("nowUp");
   if(!up.length){el.hidden=true;el.innerHTML="";return;}
-  var e=up[0],n=nowSm(),sp=apptSpan(e),started=n>=sp.st;
-  // A wrapping activity that has started runs past the roll, so its remaining
-  // time is measured the long way round rather than as a negative number.
-  var gap=started?(sp.wraps?sp.en+1440-n:sp.en-n):sp.st-n;
+  var u=up[0],e=u.b,n=nowDm(),started=n>=u.st;
+  var gap=started?(u.en-n):(u.st-n);
   var dur=gap>=60?Math.floor(gap/60)+"h "+(gap%60)+"m":gap+" min";
   el.hidden=false;
-  el.className="nowup"+(e.must?" must":"");
+  // Orange is reserved for commitments. An upcoming ROUTINE block gets the same
+  // row without the wash, so "this is something you agreed to attend" keeps
+  // meaning exactly one thing across the Now bar, the day view and the nudges.
+  el.className="nowup"+(e.ev?" ev":"")+(e.must?" must":"");
   el.innerHTML=
-    '<span class="nu-l">'+(started?"Also now":"Up next")+'</span>'+
+    '<span class="nu-l">'+(started?"Also now":"Upcoming")+'</span>'+
     '<span class="nu-n">'+esc(e.n)+'</span>'+
     (e.must?'<span class="apt must">must attend</span>':"")+
     (e.rr?'<span class="apt">↻</span>':"")+
     '<span class="nu-m">'+fmt(e.s)+"–"+fmt(e.e)+'</span>'+
     '<span class="nu-c">'+(started?dur+" left":"in "+dur)+'</span>'+
-    (up.length>1?'<span class="nu-m">+'+(up.length-1)+" more this shift</span>":"");
+    (up.length>1?'<span class="nu-m">+'+(up.length-1)+" more today</span>":"");
 }
 
 // In-memory only, resets on reload: dismissing a nudge hides that exact,
@@ -4462,22 +4572,27 @@ function renderNow(){
 // item #2" would silently dismiss whatever happens to be in that slot next.
 var dismissedNudges={};
 function renderNudges(){
-  var out=[],l=day(),n=nowSm(),b=currentBlock();
+  var out=[],l=day(),n=nowDm(),b=currentBlock();
 
   if(b&&b.sleep)
     out.push(["cool","sleep-window","<b>This is your sleep window.</b> It's the only one in the 24 hours. Anything you do now is borrowed against tomorrow's judgment, not found time."]);
   if(b&&b.nadir)
     out.push(["","circadian-low","<b>2:30–6am is your circadian low.</b> Mechanical work only — tickets, logs, routine tasks. Don't send anything you can't unsend, and don't make calls you'd want to revisit."]);
   // The "company-hour" nudge was removed on 2026-09-07. Its condition was
-  // n > sm("14:00") && !l.biz, with no upper bound - so once the shift passed
+  // n > 14:00 && !l.biz, with no upper bound - so once the day passed
   // 2pm it stayed on screen for the remaining seventeen hours, still claiming
   // at 5am that Day Client was about to take the 1-2pm slot. Don't re-add it
   // without an end time. The "My company - 30 min" non-negotiable is untouched;
   // it just no longer raises a nudge of its own.
-  if(n>sm("16:15")&&!l.fetch)
+  /* Both of these now carry an explicit END, which they did not need under the
+     07:00 roll: "past 4:15pm" used to expire on its own when the day rolled at
+     7am, and on a midnight day it would instead reappear at 00:00 and sit there
+     unread. Every time-of-day nudge in this function wants a window, not a
+     floor - that is the lesson the company-hour nudge above already taught. */
+  if(n>=dm("16:15")&&n<dm("23:00")&&!l.fetch)
     out.push(["","school-fetch","<b>School fetch unchecked</b> — it's past 4:15pm."]);
-  if(n>sm("06:30")&&!l.nightclienta)
-    out.push(["","nighta-eod","<b>Night Client A EOD report still open</b> and the shift ends at 7am."]);
+  if(n>=dm("06:30")&&n<dm("08:00")&&!l.nightclienta)
+    out.push(["","nighta-eod","<b>Night Client A EOD report still open</b> — it's past 6:30am."]);
   // Every upcoming appointment gets a heads-up, not just must-attend ones -
   // but must-attend still gets its own more emphatic tier (apt-must) so it
   // doesn't blend in with an appointment that's fine to run a few minutes late on.
@@ -4494,31 +4609,39 @@ function renderNudges(){
     out.push(["","allday-"+e.id,"<b>"+esc(e.n)+"</b> — all day today"+
       (e.rr?" · "+esc(rruleText(e)):"")+(e.d?". "+esc(e.d):"")]);
   });
-  dayBlocks().forEach(function(b){
+  /* Spans, not raw start/end strings: an appointment that runs 11:30pm-12:30am
+     is "happening now" at 11:50pm AND at 12:10am, and only a span can say both.
+     A carry-over occurrence belongs to yesterday's date, so its done-flag is
+     looked up under yesterday's key - ticking it must silence it either side
+     of midnight. */
+  daySpans().forEach(function(sp){
+    var b=sp.b;
     if(!b.ev)return;
-    if(isDone(b,tk))return;                    // already ticked off today
+    if(isDone(b,sp.carry?shift(tk,-1):tk))return;   // already ticked off
     var cls=b.must?"apt-must":"apt";
-    var st=sm(b.s),mins=st-n;
+    var away=sp.st-n;
     // Per-activity lead time, set in the Calendar editor. 120 minutes stays the
     // default so every appointment that predates this feature warns exactly as
     // it used to; 0 means the user asked for no advance warning at all.
     var lead=(b.remind===undefined||b.remind===null)?120:+b.remind;
     var rep=b.rr?' <span class="apt">↻</span>':'';
-    if(lead>0&&mins>0&&mins<=lead)
+    if(lead>0&&away>0&&away<=lead)
       out.push([cls,"appt-soon-"+b.id,"<b>"+esc(b.n)+rep+" at "+fmt(b.s)+" — in "+
-        (mins>=60?Math.floor(mins/60)+"h "+(mins%60)+"m":mins+" min")+".</b> "+
+        (away>=60?Math.floor(away/60)+"h "+(away%60)+"m":away+" min")+".</b> "+
         (b.must?"You marked this one must-attend. Start closing down what you're on now.":"")]);
-    else if(n>=st&&n<smEnd(b.e))
+    else if(n>=sp.st&&n<sp.en)
       out.push([cls,"appt-now-"+b.id,"<b>"+esc(b.n)+rep+" is happening now</b> — until "+fmt(b.e)+"."]);
   });
-  // Tomorrow's first commitment, once today's shift is winding down.
-  if(n>sm("04:00")){
+  // Tomorrow's first commitment, once the evening is winding down. 8pm, not the
+  // old 4am: under a midnight day, 4am IS tomorrow, so the old threshold would
+  // have announced today's own first item as if it were tomorrow's.
+  if(n>=dm("20:00")){
     var tm=activitiesOn(shift(tk,1)).filter(function(e){return !e.allDay&&e.s;})[0];
     if(tm)out.push(["","tomorrow-first","<b>First up tomorrow: "+esc(tm.n)+" at "+fmt(tm.s)+".</b>"]);
   }
   var stale=S.tasks.filter(function(t){return !t.done&&ageOf(t)>=3;}).length;
   // Overdue, not just pending - this is the one that gets the adrenaline tier.
-  if(stale)out.push(["urgent","stale-tasks","<b>"+stale+" task"+(stale>1?"s have":" has")+" been open 3+ shifts.</b> Do it, delegate it, or delete it."]);
+  if(stale)out.push(["urgent","stale-tasks","<b>"+stale+" task"+(stale>1?"s have":" has")+" been open 3+ days.</b> Do it, delegate it, or delete it."]);
 
   var visible=out.filter(function(x){return !dismissedNudges[x[1]];});
   var c=document.getElementById("nudges");
@@ -4534,27 +4657,19 @@ function renderNudges(){
   });
 }
 
-/* ---------- the shift window ----------
-   The roll time is no longer editable from the UI - the chip and its time
-   picker were removed on 2026-09-07. It is still read from S.roll through
-   rollM(), so any value already stored keeps working and every date
-   calculation stays correct; only the way to change it from here is gone.
-   The caption is still generated from the value rather than written down, so
-   it cannot drift out of step with the shift window it describes. */
-function rollRange(){var h=fmt(rollHHMM());return h+" → "+h;}
+/* ---------- the day window ----------
+   The 07:00 shift roll was removed on 2026-09-07 along with rollM(), rollHHMM()
+   and rollRange(). A day is 12:00am to 11:59pm, so there is no window to
+   describe and nothing to keep the caption in step with - it is now a fixed
+   sentence about what the card contains. Kept as a render function rather than
+   inlined into the markup because renderAll() calls it and because work that
+   runs through midnight makes the carry-over line worth saying out loud. */
 function renderRoll(){
   var sub=document.getElementById("rollSub");
   if(!sub)return;
-  // Pick an example hour that actually falls inside the pre-roll window, so
-  // the sentence stays true at any roll time. Below 2am there is no room for
-  // one, so the clause is dropped rather than made up.
-  var rh=Math.floor(rollM()/60);
-  var ex = rh>=5 ? rh-4 : (rh>=2 ? rh-1 : null);
-  var exTxt = ex===null ? "" :
-    " — so "+fmt(String(ex).padStart(2,"0")+":00")+" work logs to the right shift";
-  sub.textContent = rollM()===0
-    ? "Your day rolls over at midnight, like an ordinary calendar."
-    : "Your day rolls over at "+fmt(rollHHMM())+", not midnight"+exTxt+".";
+  sub.textContent="Your routine and your Personal Calendar in one list, "+
+    "12:00am to 11:59pm. Anything that started yesterday and is still running "+
+    "leads the list.";
 }
 
 /* Ticking a task has to mean exactly the same thing in the Classic columns and
@@ -4798,10 +4913,10 @@ function addRitual(){
 // a task, the 60s clock tick) that happens to run while the same block is
 // still current. Only a real transition re-centers the scroll; re-centering
 // on every render would fight anyone who scrolled up to check an earlier
-// block mid-shift.
+// block mid-day.
 var lastNowKey=null;
 function renderTimeline(forceCenter){
-  var c=document.getElementById("timeline"),n=nowSm(),nowEl=null;
+  var c=document.getElementById("timeline"),n=nowDm(),nowEl=null;
   // c.innerHTML="" below throws away scroll position along with the old
   // DOM, every single render - so without saving it first, any render that
   // happens to run while "now" is unchanged (a task ticked elsewhere, the
@@ -4809,40 +4924,65 @@ function renderTimeline(forceCenter){
   // leaving it where centering (or the user) put it.
   var savedScroll=c.scrollTop;
   c.innerHTML="";
-  dayBlocks().forEach(function(b){
-    var st=sm(b.s),en=smEnd(b.e);
-    var isNow=n>=st&&n<en, isPast=n>=en;
+  var tk=today();
+  daySpans().forEach(function(sp){
+    var b=sp.b,st=sp.st,en=sp.en;
+    // Spans already carry midnight: a carry-over from yesterday has a negative
+    // start (so it is never "upcoming") and something running into tomorrow has
+    // an end past 1440 (so it is never "past" while it is still running). This
+    // is what fixes the old bug where a block crossing the boundary rendered as
+    // spent all day long.
+    // A calendar activity ticked off in the Calendar reads as done here too -
+    // one completion flag, shown in both places, no second store. Done outranks
+    // "now": a meeting you have finished early is completed, not ongoing.
+    var isDoneEv=!!(b.ev&&isDone(b,sp.carry?shift(tk,-1):tk));
+    var isNow=!isDoneEv&&n>=st&&n<en, isPast=n>=en;
     var lane=S.lanes.filter(function(L){return L.id===b.lane;})[0];
     var el=document.createElement("div");
-    el.className="blk"+(isNow?" now":"")+(isPast?" past":"")+(b.sleep?" sleepb":"")+(b.ev?" ev":"");
-    el.innerHTML='<div class="blk-t">'+fmt(b.s)+"–"+fmt(b.e)+'</div>'+
+    el.className="blk"+(isNow?" now":"")+(isPast||isDoneEv?" past":"")+
+      (b.sleep?" sleepb":"")+(b.ev?" ev":"")+(isDoneEv?" doneb":"")+
+      (sp.carry?" carry":"")+(b.ev?" tappable":"");
+    el.innerHTML='<div class="blk-t">'+fmt(b.s)+"–"+fmt(b.e)+
+        (sp.carry?'<span class="blk-x">from yesterday</span>'
+                 :(sp.wraps?'<span class="blk-x">into tomorrow</span>':''))+'</div>'+
       '<div class="blk-b" style="background:'+(b.sleep?"var(--night)":(lane?lane.color:"var(--sage)"))+'"></div>'+
       '<div style="flex:1;min-width:0"><div class="blk-n">'+esc(b.n)+
         (isNow?' <span class="now-badge">now</span>':'')+
         (b.dual?' <span class="dual">dual</span>':'')+
-        (b.ev?' <span class="apt">'+(b.must?"must attend":"appointment")+'</span>':'')+'</div>'+
+        (b.ev?' <span class="apt">'+(b.must?"must attend":"appointment")+'</span>':'')+
+        (isDoneEv?' <span class="done-badge">done</span>':'')+'</div>'+
       '<div class="blk-d">'+esc(b.d||"")+'</div></div>'+
       (b.ev?'<button class="x" title="Remove this appointment">&times;</button>'
            :'<button class="x" title="Remove this from your daily schedule">&times;</button>');
+    /* Tapping a calendar row opens the SAME activity editor the Calendar tab
+       uses (#actModal is fixed-position and lives outside .viewpanel, so it
+       opens cleanly from the Board). Edit and Delete therefore behave
+       identically wherever you started from, because it is one editor writing
+       one store - not a second flow that has to be kept in agreement. The
+       button check comes first so the × still means remove, not edit. */
+    if(b.ev) el.addEventListener("click",function(ev){
+      if(ev.target.closest(".x"))return;
+      openActivity(b.id, sp.carry?shift(tk,-1):tk);
+    });
     if(b.ev) el.querySelector(".x").addEventListener("click",function(){
       // A recurring activity has two possible meanings for "remove", and
       // guessing wrong destroys a whole series to cancel one day. Ask.
       if(b.rr){
-        var k=today();
-        var one=confirm('"'+b.n+'" repeats ('+rruleText(b)+').\n\nOK = remove only today\'s occurrence.\nCancel = leave it alone (delete the whole series from the Calendar tab).');
+        var k=sp.carry?shift(tk,-1):tk;
+        var one=confirm('"'+b.n+'" repeats ('+rruleText(b)+').\n\nOK = remove only this occurrence.\nCancel = leave it alone (delete the whole series from the Calendar tab).');
         if(!one)return;
         var ev=S.events.filter(function(x){return x.id===b.id;})[0];
         if(ev){ev.ex=(ev.ex||[]).concat([k]);}
       }else{
         S.events=S.events.filter(function(x){return x.id!==b.id;});
       }
-      save();renderAll();});
+      save();renderAll();if(typeof renderCalendar==="function")renderCalendar();});
     else el.querySelector(".x").addEventListener("click",function(){
       // Unlike an appointment (a single dated occurrence), this is a
       // recurring routine slot - removing it takes it off every day it
       // would otherwise appear on, not just today. There's no restore UI
       // yet, same as removing a lane or a non-negotiable - if unsure, leave it.
-      if(!confirm('Remove "'+b.n+'" from your daily schedule?\n\nThis takes it off every day it appears, not just today. You can put it back from the "Hidden from your schedule" row under the timeline.'))return;
+      if(!confirm('Remove "'+b.n+'" from your daily schedule?\n\nThis takes it off every day it appears, not just today. You can put it back from the "Hidden from your schedule" row under the list.'))return;
       S.hiddenBlocks=(S.hiddenBlocks||[]).concat([b.id]);
       save();renderAll();});
     if(isNow){ nowEl=el; }
@@ -5257,20 +5397,31 @@ function addApt(){
   if(!title){n.focus();return;}
   if(!s.value||!e.value){alert("An appointment needs a start and an end time.");return;}
   if(s.value===e.value){alert("Start and end are the same time.");return;}
+  /* Written straight into S.events - the Personal Calendar's own store - with
+     the same shape amSave() produces, so a quick-added appointment is not a
+     lesser record: it opens in the activity editor, ticks done per date, and
+     appears in every calendar view immediately. There is deliberately no
+     second appointment store to reconcile. */
   S.events.push({id:"evt_"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
     n:title, d:"", s:s.value, e:e.value, lane:l.value||null,
-    must:m.checked, ev:true, date:d.value||today()});
+    must:m.checked, ev:true, date:d.value||today(),
+    cat:"personal", remind:120, allDay:false, rr:null, done:{}, ex:[]});
   n.value="";m.checked=false;
   save();renderAll();
+  if(typeof renderCalendar==="function")renderCalendar();
+  stamp("Appointment added to your calendar");
 }
 document.getElementById("aptBtn").addEventListener("click",addApt);
+// The full editor, opened from the Board on today's date. Same function the
+// Calendar tab's "+ New activity" calls, so there is one appointment flow.
+document.getElementById("tlAdd").addEventListener("click",function(){openActivity(null,today());});
 document.getElementById("aptN").addEventListener("keydown",function(ev){if(ev.key==="Enter")addApt();});
 
 document.getElementById("themeBtn").addEventListener("click",function(){
   S.theme = S.theme==="auto" ? "dark" : (S.theme==="dark" ? "light" : "auto");
   save();applyTheme();});
 document.getElementById("resetBtn").addEventListener("click",function(){
-  if(!confirm("Clear this shift's checkmarks? Tasks are kept."))return;
+  if(!confirm("Clear today's checkmarks? Tasks are kept."))return;
   delete S.log[today()];save();renderAll();});
 document.getElementById("exportBtn").addEventListener("click",function(){
   var b=new Blob([JSON.stringify(S,null,2)],{type:"application/json"});
@@ -5465,7 +5616,7 @@ function closeProfile(){ pfEl("profModal").hidden=true; }
    contradicts what it can do. Overrides on it made by hand in the sheet are
    still preserved - see umOverrides. */
 var UM_PERMS=[
-  ["board","Board","Lanes, tasks, the shift timeline and the daily reminders, in Classic view and the Consolidated Checklist."],
+  ["board","Board","Lanes, tasks, the day view and the daily reminders, in Classic view and the Consolidated Checklist."],
   ["cal","My Personal Calendar","Month, week, day, year and agenda views, and recurring activities."],
   ["exp","Expense Tracker","Recording expenses, the Recurring Subscriptions section that files them, and every total and breakdown built from both."],
   ["reports","Board Reports","The Reports section of the Board: completion reports, lane breakdowns and the spreadsheet export. Granted on its own it opens the Board tab showing only this section."],
@@ -6201,15 +6352,16 @@ document.querySelector(".tabbar").addEventListener("keydown",function(e){
 /* ==================== MY PERSONAL CALENDAR: views ==========================
    Every view reads S.events through occursOn(); none of them keep their own
    copy of anything. Editing an activity therefore updates the month, the week,
-   the day plan, the Shift Timeline and the reminders in one save, because they
-   are six renderings of one array rather than six stores.
+   the day plan, "What does my day look like?" and the reminders in one save,
+   because they are six renderings of one array rather than six stores.
 
-   A note on dates that matters here: an activity's `date` is a SHIFT key, not
-   a wall-clock date, because that is what the Board has always used and what
-   dayBlocks() expects. The shift rolls at 07:00, so for anything scheduled
-   from 7am onward the two are identical; only a 00:00-06:59 activity belongs
-   to the previous day's shift. The editor says so out loud rather than quietly
-   filing a 3am session on the wrong day.                                    */
+   Dates here are now plain wall-clock dates. They used to be SHIFT keys - the
+   Board's day rolled at 07:00, so a 00:00-06:59 activity belonged to the
+   PREVIOUS day - and the editor had to warn about it. That roll was removed on
+   2026-09-07: an activity's `date` is the date it happens on, the same value
+   the Expense Tracker and every other dated record in this file already used.
+   Work that runs through midnight is expressed as a span, not as a shifted
+   date. See spanOf() / daySpans().                                          */
 var calView="month", calCursor=today();
 var MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
 var DOW=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
@@ -6604,11 +6756,15 @@ amEl("amDelete").addEventListener("click",amDelete);
 amEl("actModal").addEventListener("click",function(ev){if(ev.target===this)closeActivity();});
 document.addEventListener("keydown",function(ev){
   if(ev.key==="Escape"&&!amEl("actModal").hidden)closeActivity();});
-// Times before the 07:00 shift roll belong to the previous shift on the Board.
-// Say so at the moment it becomes relevant instead of filing it silently.
-amEl("amStart").addEventListener("change",function(){
-  var v=amEl("amStart").value;
-  if(v&&v<"07:00")amMsg("Heads up: your day rolls at 7am, so this sits in the previous day's shift on the Board.");
+/* The 07:00-roll warning that used to live here is gone with the roll: an
+   activity's date is now simply its date, so a 3am session files on the day it
+   actually happens and there is nothing to warn about. What IS worth saying is
+   the opposite case - an activity whose end is earlier than its start runs
+   through midnight, which is legal and handled (see spanOf), but is also what a
+   typo looks like. */
+amEl("amEnd").addEventListener("change",function(){
+  var s=amEl("amStart").value,e=amEl("amEnd").value;
+  if(s&&e&&e<s)amMsg("Heads up: this ends before it starts, so it runs through midnight into the next day.");
   else amMsg("");
 });
 
@@ -8173,6 +8329,9 @@ wgEl("bbSizeSeg").querySelectorAll("[data-bsize]").forEach(function(b){
 
 // console hooks:  dfDebug.dayBlocks("2026-08-15")  ·  dfDebug.state()
 window.dfDebug={dayBlocks:dayBlocks,today:today,norm:norm,state:function(){return S;},
+  // Midnight is the awkward case, so the span layer is inspectable:
+  //   dfDebug.daySpans("2026-09-12")  ·  dfDebug.currentSpan()  ·  dfDebug.nowDm()
+  daySpans:daySpans,currentSpan:currentSpan,nowDm:nowDm,
   xlsxBlob:xlsxBlob,buildZip:buildZip,crc32:crc32,
   // Board History hooks: dfDebug.hist() · dfDebug.stateAt("rev_…") · dfDebug.devices()
   hist:function(){return S.hist;}, devices:function(){return S.devices;},

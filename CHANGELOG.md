@@ -2,6 +2,87 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-07 — "What does my day look like?", and the end of the 07:00 roll (v4.5)
+
+The Shift timeline is renamed, and the shift model underneath it is gone. A day
+in ProDash is now an ordinary calendar day, 12:00am to 11:59pm.
+
+### The rename
+
+`Shift timeline` → **What does my day look like?**, plus every visible string
+that leaned on the old model: the header now reads `Monday, September 7 ·
+12:00am → 11:59pm`, `Last 7 shifts` is `Last 7 days`, `Reset this shift` is
+`Reset today`, and the stale-task nudge counts days. Version-history entries are
+left as written — they are a record of what happened, not documentation.
+
+### The time model
+
+`rollM()`, `rollHHMM()` and `rollRange()` are deleted. `sm()/smEnd()/nowSm()`
+(minutes from the 07:00 roll) are replaced by `dm()/dmEnd()/nowDm()` (minutes
+past midnight). The rename is deliberate: any code still written against the old
+model now fails loudly instead of being silently 420 minutes out.
+
+`S.roll` is no longer normalised or read. It stays in `BOARD_KEYS`/`SCALARS` so
+an older board still round-trips through sync and history without every revision
+showing a phantom change — the same treatment the removed `focus` key got.
+
+**The one behavioural cost, stated plainly:** work done between midnight and 7am
+now files on the date it happens rather than on the previous day. A night that
+used to sit under one date now spans two, and the day's checkmarks reset at
+midnight. Nothing already stored was rewritten.
+
+### Midnight, handled properly
+
+New `spanOf()` / `daySpans()`. A span resolves one occurrence to real minute
+coordinates on the day in view: `st` goes negative when it started yesterday,
+`en` goes past 1440 when it runs into tomorrow. Every status question is now
+answered by comparing `nowDm()` against those two numbers, so no caller reasons
+about midnight itself.
+
+That fixes the long-standing bug where a block crossing the day boundary was
+drawn as `past` all day long, and it adds carry-over rows: something still
+running from last night leads the list marked *from yesterday*, and something
+running past midnight is marked *into tomorrow*.
+
+`dual2`, `nbwriteup` and `naeod` moved from `WD` (Mon–Fri) to the new `WDN`
+(Tue–Sat). They start after midnight, so they belong to the morning *after* the
+weekday they were worked. Tagged `WD` under a 7am roll they were correct;
+carried over unchanged they would have put an orphan 2:30am block on Monday and
+left Saturday morning empty. `BLOCKS` and its weekday filter are otherwise
+untouched.
+
+Time-of-day nudges gained explicit end times. "Past 4:15pm" used to expire when
+the day rolled at 7am; on a midnight day it would have reappeared at 00:00 and
+sat there. Same lesson the company-hour nudge taught in v4.3.1.
+
+### Appointments, from the day view
+
+- **+ Appointment** in the card header opens the Personal Calendar's own
+  activity editor (`openActivity`), not a second form.
+- **Tapping any appointment row** opens it for editing or deleting. One editor,
+  one store, whichever screen you started from.
+- The quick-add row underneath is kept, and now writes the full activity shape
+  (category, reminder, `done`/`ex` maps) so a quick-added appointment is not a
+  lesser record.
+- Ticking an activity done in the Calendar now shows on the Board as `done` with
+  a strikethrough, and it stops claiming to be "Happening now".
+
+### Now bar
+
+The orange runs the full width of the bar (`.16 → .07`) with a 3px rail, rather
+than fading out at 62%. The second row is labelled **Upcoming**, gets the same
+full-width treatment, and now falls back to the next routine block when nothing
+is booked — orange still means "a commitment", so a routine block gets the row
+without the wash.
+
+### Fixed in passing
+
+`.apt` was both the badge class and the nudge tier class, so every appointment
+reminder inherited the badge's `text-transform:uppercase` and had been shouting
+`DENTIST IS HAPPENING NOW` while every other nudge spoke normally. Scoped to
+`span.apt`.
+
+
 ## 2026-09-07 — The Now bar carries appointments: Happening now / Up next (v4.4)
 
 A **Board** change, in the `.nowbar` strip above the view switcher. The
