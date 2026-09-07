@@ -2,6 +2,112 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-08 — Eight palettes on a second theme axis; the outstanding bar leaves the header; the nickname actually applies (v4.8)
+
+### The outstanding bar is its own card
+
+`#ngbar` moved out of `<header>` to a sibling directly below it, inside `.wrap`
+— so it inherits the 1200px max-width with no width plumbing of its own. It
+also lost `.board-only`: it now follows you onto every tab, because a
+non-negotiable does not stop being outstanding while you read the Calendar.
+
+Moving off the brand ground onto the page meant dropping the alpha-white
+literals it wore in the header; on the page there are real tokens for all of it
+(`--paper`, `--line`, `--lift`, `--ivory`, `--muted`) and they flip with the
+theme by themselves. That mattered more than it looked: those literals would
+have been eight palettes' worth of wrong.
+
+### Themes: a second, independent axis
+
+`data-theme` says light or dark. `data-palette` says which family of colours
+that is expressed in. Nine palettes (Forest plus the eight new swatch sets) ×
+three modes, chosen in a new picker panel — a cycling button could carry three
+states, it cannot carry nine palettes.
+
+**`auto` now resolves to an explicit `data-theme` in JS** rather than removing
+the attribute. This is the load-bearing change. Under the old scheme every
+theme needed writing twice — a `prefers-color-scheme` copy and a
+`[data-theme]` copy — with a standing comment warning the two must never drift.
+Eight more palettes would have made that eighteen blocks to hold in lockstep.
+Resolving in JS means each palette needs exactly one light block and one dark
+block. A `matchMedia` listener keeps `auto` honest when the OS flips
+mid-session. The forest media block survives as the pre-script paint.
+
+Every palette block is `[data-palette][data-theme]` — (0,3,0) — so it outranks
+both `:root` (0,1,0) and `:root[data-theme]` (0,2,0) regardless of source
+order. A palette's light and dark blocks must set the **same token list**: they
+are siblings of equal specificity, so light does not cascade into dark, and a
+token set in one and forgotten in the other falls back to forest and shows up
+as a stray charcoal in the middle of a purple theme. Verified in-browser that
+all nine × two set all twenty tokens.
+
+**`--terra*` and `--alert*` are off-limits to palettes**, as are the lane hues.
+Orange means "a commitment you agreed to attend" and red means "overdue or
+must-attend" across the Now bar, the day view, the activity badges and the lane
+rules; a palette repainting those would trade the thing the colours are *for*
+against prettiness, and on Chili spice it would make a must-attend appointment
+indistinguishable from an ordinary one. Lane colour answers "whose time is
+this", which is not decorative either. Asserted by test, not just by comment.
+
+`--hdr-a` / `--hdr-b` are new: the header gradient was two hardcoded charcoals,
+and a palette cannot own the app's most visible surface through a literal.
+
+Where a swatch could not carry white text at 4.5:1 the brand is a darker draw
+of the same hue and the swatch value survives as `--olive` — `#A0522D` (4.4:1),
+`#AD56C4` (3.6:1), `#069494` (3.7:1). Blue eclipse and Chili spice have no
+honest light form (four dark values each), so their light blocks tint toward
+the palette rather than pretending to be it. Retro sunset's brand is the teal
+because three of its four swatches are the endurance orange. Each case is named
+in its own comment.
+
+Audited in-browser across all eighteen combinations: fourteen contrast pairs
+each, all ≥ 4.5:1. **Pre-existing failure left alone:** the default Forest light
+`--forest-ink` on `--ivory` is 4.44:1, marginally under AA and untouched by
+this change — the palette comment's claim that "every -ink token clears 4.5:1"
+was already slightly false.
+
+`palette` joins `theme` in `BOARD_KEYS`/`SCALARS`, so the choice syncs. It is
+validated against the known list in `norm()` — the value arrives from other
+devices through sync and history, and an unknown id would stamp a
+`data-palette` no rule matches: a board that silently ignores your theme.
+
+### The nickname
+
+Two separate faults, one of which is not in this repo.
+
+**Client (fixed here):** `GREETING` was a one-shot IIFE computed at boot from
+the cached session, and nothing recomputed it. Even a *successful* save only
+showed up after signing out and back in — which is exactly what "the save
+didn't work" looks like. `applyGreeting()` is now re-runnable and listens for
+`pdauth:userchanged`; `PDAuth.mergeUser()` (the merge `/auth/me` already
+performed, exposed) writes the new nickname into the stored session, and
+`umPatch()` calls it when the account you edited is your own. Fed from
+`res.user`, not from what was typed, so the screen shows what the Worker
+actually stored after its clamp.
+
+The random pet name moved into `PET_FALLBACK`, drawn once per load. The old
+"picked once, into a variable" rule is unchanged — it just needs its own
+variable now that the thing reading it can run more than once, or any account
+change would rename you.
+
+**Server (cannot be fixed from here):** `"Nothing to change."` is thrown by the
+Worker when it recognises no field in the patch. `cloud-worker/worker.js` has
+handled `nickname` since `7419072`; the *deployed* Worker predates it. Workers
+deploy separately from Pages — paste, Deploy, then **promote to Active** — and
+there is no Node on this machine to run wrangler.
+
+So: `/health` now returns `{ok, version}` (`WORKER_VERSION`), the app carries
+`WORKER_MIN`, and User & Role Management shows a terracotta banner naming the
+running version and the promote step when the Worker is behind. `umPatch()`
+rewrites a bare "Nothing to change." into the same explanation as a fallback
+for when `/health` cannot be reached. Terracotta rather than red on purpose: a
+stale Worker is maintenance, not an emergency.
+
+Verified: saving updates the heading and `document.title` immediately; blanking
+falls back to the pet name; the pet name is stable across re-renders; the bar
+renders on Calendar and Admin; chips still tick through to the card and the
+header stats; picker works at desktop and 375px in both modes.
+
 ## 2026-09-08 — Delete the nudge strip; the outstanding bar moves into the header (v4.7)
 
 **`renderNudges()` deleted in full**, along with `dismissedNudges`, `#nudges`,

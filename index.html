@@ -103,6 +103,9 @@
      green, orange and red, which all carry meaning above. */
   --ln-x1:#D81B60; --ln-x2:#5E35B1; --ln-x3:#039BE5;
   --ln-x4:#6D4C41; --ln-x5:#546E7A; --ln-x6:#00695C;
+  /* Header gradient stops. Charcoal in the default palette, in both modes:
+     the header is the one lit thing on the page and its job is constant. */
+  --hdr-a:#263238; --hdr-b:#31424A;
   --serif:Georgia,"Times New Roman",serif;
   --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
 }
@@ -158,6 +161,244 @@
   --ln-x1:#F06292; --ln-x2:#9575CD; --ln-x3:#4FC3F7;
   --ln-x4:#A1887F; --ln-x5:#B0BEC5; --ln-x6:#80CBC4;
 }
+
+/* ---- PALETTES -------------------------------------------------------------
+   A second, independent axis. `data-theme` says light or dark; `data-palette`
+   says which family of colours light-or-dark is expressed in. Absent means the
+   forest/charcoal palette defined above, so nothing here runs for the default
+   look and a board that never opens this picker is byte-for-byte as it was.
+
+   WHAT A PALETTE MAY TOUCH: the brand (--forest*, --olive*), the header
+   gradient, the neutral spine (--ivory --paper --line --ink --muted --sage),
+   the tab stack, the sleep charcoal, and the shadow/glow triples.
+
+   WHAT IT MUST NOT TOUCH, EVER: --terra* and --alert*. Orange means "a
+   commitment you agreed to attend" and red means "overdue or must-attend"
+   everywhere in this app - the Now bar, the day view, the activity badges, the
+   lane rules. A palette that repainted those would be choosing prettiness over
+   the thing the colours are FOR, and on a red palette like Chili spice it would
+   make a must-attend appointment indistinguishable from an ordinary one. Lane
+   hues (--ln-*) are excluded for the same reason: colour there answers "whose
+   time is this", which is not a decorative question. Those tokens follow
+   light/dark only, which is why none of them appear below.
+
+   HOW THE SELECTORS WORK: every block is [data-palette][data-theme] - (0,3,0),
+   deliberately - so it outranks both `:root` (0,1,0) and `:root[data-theme]`
+   (0,2,0) whatever order this file ends up in. That is also why applyTheme()
+   now always STAMPS data-theme instead of removing it for "auto": with auto
+   resolved in JS there is a single code path, and a palette does not have to be
+   written three times (light, media-dark, attribute-dark) to cover the same
+   ground. The forest media-query block above stays as the pre-script fallback.
+
+   A palette's light and dark blocks MUST set the same token list. They are
+   siblings of equal specificity, so light does not cascade into dark - a token
+   set in one and forgotten in the other silently falls back to forest, which
+   looks like a stray charcoal in the middle of a purple theme.
+
+   Several of these swatch sets (Blue eclipse, Chili spice) have no honest light
+   form; they are four dark values. Their light blocks therefore TINT toward the
+   palette rather than pretending to be it - the brand and accents are the real
+   swatch colours, the surfaces are neutrals carrying that hue. Stated because
+   it is a judgement call, not an oversight. Where a swatch could not carry
+   white text at 4.5:1 the brand is a darker draw of the same hue and the
+   original value survives as --olive; each case is named in its own comment. */
+
+/* Blue eclipse - #272757 #8686AC #505081 #0F0E47 */
+:root[data-palette="eclipse"][data-theme="light"]{
+  --forest:#272757; --forest-dk:#0F0E47; --forest-ink:#272757;
+  --olive:#505081; --olive-lt:#E9E9F4;
+  --ivory:#EFEFF6; --paper:#FFFFFF;
+  --line:#C9C9DE; --ink:#1B1B33; --muted:#575775; --sage:#8686AC;
+  --night:#3A3A63; --night-ink:#505081;
+  --panel:#E3E3EF; --tab-face:#D2D2E4; --tab-ink:#494968;
+  --shadow-rgb:39,39,87; --glow-rgb:80,80,129;
+  --hdr-a:#272757; --hdr-b:#3B3B70;
+}
+:root[data-palette="eclipse"][data-theme="dark"]{
+  --forest:#272757; --forest-dk:#0F0E47; --forest-ink:#A9A9CE;
+  --olive:#8686AC; --olive-lt:#23234A;
+  --ivory:#0F0E47; --paper:#1E1E42;
+  --line:#39396B; --ink:#E8E8F4; --muted:#ABABCF; --sage:#8686AC;
+  --night:#3A3A63; --night-ink:#ABABCF;
+  --panel:#0B0A33; --tab-face:#070627; --tab-ink:#ABABCF;
+  --shadow-rgb:0,0,0; --glow-rgb:134,134,172;
+  --hdr-a:#0F0E47; --hdr-b:#272757;
+}
+
+/* Chili spice - #CD1C18 #FFA896 #9B1313 #38000A
+   The brand takes the DEEP maroon rather than the bright #CD1C18, precisely so
+   the header cannot be mistaken for the alert red it now sits beside. */
+:root[data-palette="chili"][data-theme="light"]{
+  --forest:#9B1313; --forest-dk:#38000A; --forest-ink:#9B1313;
+  --olive:#CD1C18; --olive-lt:#FDEAE8;
+  --ivory:#F8F0EE; --paper:#FFFFFF;
+  --line:#E2CBC7; --ink:#2B1512; --muted:#6D4842; --sage:#A07A74;
+  --night:#4A2A28; --night-ink:#6D4842;
+  --panel:#F0E3E0; --tab-face:#E2CFCB; --tab-ink:#5C3A36;
+  --shadow-rgb:56,0,10; --glow-rgb:205,28,24;
+  --hdr-a:#38000A; --hdr-b:#6E0F0F;
+}
+:root[data-palette="chili"][data-theme="dark"]{
+  --forest:#9B1313; --forest-dk:#38000A; --forest-ink:#FFA896;
+  --olive:#E8574F; --olive-lt:#3A1512;
+  --ivory:#170406; --paper:#2B1114;
+  --line:#4C2126; --ink:#F9EBE8; --muted:#D6AAA2; --sage:#B98980;
+  --night:#4C2126; --night-ink:#D6AAA2;
+  --panel:#110304; --tab-face:#0B0202; --tab-ink:#D6AAA2;
+  --shadow-rgb:0,0,0; --glow-rgb:232,87,79;
+  --hdr-a:#38000A; --hdr-b:#6E0F0F;
+}
+
+/* Ink wash - #4A4A4A #CBCBCB #FFFFE3 #6D8196
+   The cream is the PAGE and white the cards, which is the whole character of
+   the thing: paper stock under ink, with the slate as the one cool accent. */
+:root[data-palette="inkwash"][data-theme="light"]{
+  --forest:#454545; --forest-dk:#2E2E2E; --forest-ink:#3D3D3D;
+  --olive:#5E7386; --olive-lt:#E9EDF1;
+  --ivory:#FFFFE3; --paper:#FFFFFF;
+  --line:#D9D9C2; --ink:#2B2B2B; --muted:#585858; --sage:#8A8A80;
+  --night:#454545; --night-ink:#585858;
+  --panel:#F4F4D8; --tab-face:#E6E6C6; --tab-ink:#4A4A45;
+  --shadow-rgb:74,74,74; --glow-rgb:109,129,150;
+  --hdr-a:#3A3A3A; --hdr-b:#55636F;
+}
+:root[data-palette="inkwash"][data-theme="dark"]{
+  --forest:#4A4A4A; --forest-dk:#2E2E2E; --forest-ink:#CBCBCB;
+  --olive:#8FA3B8; --olive-lt:#243038;
+  --ivory:#131313; --paper:#242424;
+  --line:#3B3B3B; --ink:#EEEEE2; --muted:#B6B6B6; --sage:#8C8C8C;
+  --night:#3B3B3B; --night-ink:#B6B6B6;
+  --panel:#0D0D0D; --tab-face:#080808; --tab-ink:#B6B6B6;
+  --shadow-rgb:0,0,0; --glow-rgb:143,163,184;
+  --hdr-a:#2E2E2E; --hdr-b:#46545F;
+}
+
+/* Burnt sienna - #E35336 #F5F5DC #F4A460 #A0522D
+   #A0522D reaches only 4.4:1 against white, so the brand fill is one step
+   darker; the swatch value survives as --olive, which sits on light. */
+:root[data-palette="sienna"][data-theme="light"]{
+  --forest:#8B4626; --forest-dk:#5C2E17; --forest-ink:#8B4626;
+  --olive:#A0522D; --olive-lt:#F8EEE6;
+  --ivory:#F5F5DC; --paper:#FFFFFF;
+  --line:#DEDAC0; --ink:#2E2419; --muted:#685741; --sage:#9A8B72;
+  --night:#4A3A2A; --night-ink:#685741;
+  --panel:#EDEDD2; --tab-face:#DFDFC2; --tab-ink:#5A4934;
+  --shadow-rgb:46,36,25; --glow-rgb:227,83,54;
+  --hdr-a:#5C2E17; --hdr-b:#8B4626;
+}
+:root[data-palette="sienna"][data-theme="dark"]{
+  --forest:#8B4626; --forest-dk:#5C2E17; --forest-ink:#F4A460;
+  --olive:#E35336; --olive-lt:#3A2418;
+  --ivory:#141009; --paper:#241C14;
+  --line:#403327; --ink:#F6F1E5; --muted:#C7B79F; --sage:#9A8B72;
+  --night:#403327; --night-ink:#C7B79F;
+  --panel:#0F0B07; --tab-face:#090705; --tab-ink:#C7B79F;
+  --shadow-rgb:0,0,0; --glow-rgb:227,83,54;
+  --hdr-a:#2E1A0D; --hdr-b:#5C2E17;
+}
+
+/* Lavender fields - #FDFBD4 #BDB96A #C1BFFF #CF6DFC
+   Four light values, none able to carry white text. The brand is #CF6DFC
+   walked down until it clears AA and the swatch magenta stays as the accent.
+   The pale yellow is the page: lavender over a summer field is the image the
+   name is actually describing, and a purple-on-cream board is that. */
+:root[data-palette="lavender"][data-theme="light"]{
+  --forest:#6D2E8C; --forest-dk:#511F6B; --forest-ink:#6D2E8C;
+  --olive:#A855D6; --olive-lt:#F4E9FB;
+  --ivory:#FDFBD4; --paper:#FFFFFF;
+  --line:#E0DDB6; --ink:#2A2333; --muted:#5D5370; --sage:#8F86A0;
+  --night:#4A4060; --night-ink:#5D5370;
+  --panel:#F3F0C9; --tab-face:#E4E1B7; --tab-ink:#534964;
+  --shadow-rgb:42,35,51; --glow-rgb:207,109,252;
+  --hdr-a:#511F6B; --hdr-b:#7C3A9E;
+}
+:root[data-palette="lavender"][data-theme="dark"]{
+  --forest:#6D2E8C; --forest-dk:#4A1E60; --forest-ink:#DBA8F2;
+  --olive:#CF6DFC; --olive-lt:#2E1B3A;
+  --ivory:#131019; --paper:#221C2B;
+  --line:#3C324B; --ink:#F0ECDA; --muted:#BCB2CC; --sage:#9A90AA;
+  --night:#3C324B; --night-ink:#BCB2CC;
+  --panel:#0E0B12; --tab-face:#09070C; --tab-ink:#BCB2CC;
+  --shadow-rgb:0,0,0; --glow-rgb:207,109,252;
+  --hdr-a:#2C1339; --hdr-b:#511F6B;
+}
+
+/* Hydrangea - #FF8DA1 #FFC2BA #FF9CE9 #AD56C4
+   #AD56C4 carries white at only 3.6:1, so the brand is a darker draw of the
+   same hue and the swatch value becomes the accent. */
+:root[data-palette="hydrangea"][data-theme="light"]{
+  --forest:#8B3AA0; --forest-dk:#6B2A7C; --forest-ink:#8B3AA0;
+  --olive:#AD56C4; --olive-lt:#F7EAFA;
+  --ivory:#FDF0F2; --paper:#FFFFFF;
+  --line:#EFD4D9; --ink:#33202A; --muted:#6D525F; --sage:#A08A96;
+  --night:#4A3644; --night-ink:#6D525F;
+  --panel:#F6E5E9; --tab-face:#EBD3D9; --tab-ink:#5C4350;
+  --shadow-rgb:51,32,42; --glow-rgb:173,86,196;
+  --hdr-a:#6B2A7C; --hdr-b:#A3479C;
+}
+:root[data-palette="hydrangea"][data-theme="dark"]{
+  --forest:#8B3AA0; --forest-dk:#5E2470; --forest-ink:#E6A0F2;
+  --olive:#C978DC; --olive-lt:#331E3A;
+  --ivory:#160F19; --paper:#271C2B;
+  --line:#413048; --ink:#F8EBF0; --muted:#CCB1BF; --sage:#A88F9C;
+  --night:#413048; --night-ink:#CCB1BF;
+  --panel:#100A12; --tab-face:#0A060C; --tab-ink:#CCB1BF;
+  --shadow-rgb:0,0,0; --glow-rgb:201,120,220;
+  --hdr-a:#3A1444; --hdr-b:#6B2A7C;
+}
+
+/* Retro sunset - #BE5103 #FFCE1B #069494 #B7410E
+   Three of the four swatches are orange or rust, which is this app's endurance
+   colour and therefore cannot be the brand. The teal takes it instead, walked
+   down from #069494 (3.7:1 on white) until it clears AA; the swatch teal stays
+   as the accent and the rust and yellow live in the page and tab stack. */
+:root[data-palette="retro"][data-theme="light"]{
+  --forest:#04605F; --forest-dk:#03403F; --forest-ink:#04605F;
+  --olive:#069494; --olive-lt:#E0F2F2;
+  --ivory:#FBF3E2; --paper:#FFFFFF;
+  --line:#E4D7BE; --ink:#26201A; --muted:#645845; --sage:#9A8D78;
+  --night:#3A342A; --night-ink:#645845;
+  --panel:#F3E9D3; --tab-face:#E5D9C1; --tab-ink:#554B3A;
+  --shadow-rgb:38,32,26; --glow-rgb:6,148,148;
+  --hdr-a:#03403F; --hdr-b:#046F6E;
+}
+:root[data-palette="retro"][data-theme="dark"]{
+  --forest:#04605F; --forest-dk:#032E2D; --forest-ink:#4FD1D0;
+  --olive:#069494; --olive-lt:#0C2E2E;
+  --ivory:#12100B; --paper:#211E18;
+  --line:#39342B; --ink:#F6EFE0; --muted:#C3B69D; --sage:#9A8D78;
+  --night:#39342B; --night-ink:#C3B69D;
+  --panel:#0C0A07; --tab-face:#070604; --tab-ink:#C3B69D;
+  --shadow-rgb:0,0,0; --glow-rgb:6,148,148;
+  --hdr-a:#022221; --hdr-b:#04605F;
+}
+
+/* Yacht club - #F2F0EF #BBBDBC #245F73 #733E24
+   The one set needing no invention: the teal carries white at 5.3:1 as given,
+   the off-white is the page, and the brown becomes the sleep charcoal - the
+   calmest warm value here, for the one block of the day that is meant to read
+   as absence of demand. */
+:root[data-palette="yacht"][data-theme="light"]{
+  --forest:#245F73; --forest-dk:#173F4D; --forest-ink:#1D4E5F;
+  --olive:#2F7A94; --olive-lt:#E3EFF3;
+  --ivory:#F2F0EF; --paper:#FFFFFF;
+  --line:#CFD1D0; --ink:#22282A; --muted:#586063; --sage:#8A9092;
+  --night:#733E24; --night-ink:#6B4029;
+  --panel:#E6E4E3; --tab-face:#D5D4D3; --tab-ink:#485052;
+  --shadow-rgb:34,40,42; --glow-rgb:36,95,115;
+  --hdr-a:#173F4D; --hdr-b:#245F73;
+}
+:root[data-palette="yacht"][data-theme="dark"]{
+  --forest:#245F73; --forest-dk:#12303B; --forest-ink:#7FC3D9;
+  --olive:#3E93AF; --olive-lt:#12303B;
+  --ivory:#0F1315; --paper:#1E2426;
+  --line:#343C3F; --ink:#F2F0EF; --muted:#B6BCBE; --sage:#8A9092;
+  --night:#733E24; --night-ink:#D2A98E;
+  --panel:#0A0D0E; --tab-face:#060809; --tab-ink:#B6BCBE;
+  --shadow-rgb:0,0,0; --glow-rgb:62,147,175;
+  --hdr-a:#0C2028; --hdr-b:#245F73;
+}
+
 /* Shadows need a bump in dark: a light-mode shadow barely shows once the card
    it is cast on is already near-black. (This note used to also explain why
    .nudge needed no dark override; the nudge strip was deleted on 2026-09-08.) */
@@ -184,9 +425,14 @@ input,textarea{font-family:var(--sans);font-size:14px;color:var(--ink)}
    this surface (the progress fill, the stats) instead of being the surface
    itself, which is what "focus" should look like: the one lit thing.
    Layered gradients rather than a flat fill give it depth. */
+/* --hdr-a / --hdr-b were literals (#263238 / #31424A) until 2026-09-08. A
+   palette cannot own the app's most visible surface while its two stops are
+   hardcoded here, so they became tokens - the same move --lift and --panel
+   already made for the same reason. The radial glow on top reads --glow-rgb,
+   which palettes were already free to set. */
 header{background:
     radial-gradient(120% 140% at 12% -20%, rgba(var(--glow-rgb),.28), transparent 60%),
-    linear-gradient(135deg,#263238 0%,#31424A 58%,#263238 100%);
+    linear-gradient(135deg,var(--hdr-a) 0%,var(--hdr-b) 58%,var(--hdr-a) 100%);
   color:var(--on-brand);border-radius:14px;padding:20px 24px;margin-bottom:14px;position:relative;overflow:hidden}
 header:after{content:"";position:absolute;right:-40px;top:-40px;width:220px;height:220px;background:radial-gradient(circle,rgba(var(--glow-rgb),.34),transparent 70%)}
 /* Used to be a two-column flex (title left, stats right); stats now lives
@@ -375,9 +621,8 @@ span.apt.must{background:var(--alert-lt);color:var(--alert-ink)}
    version of this - it is the same bug, found once before in task titles. */
 .rit-l,.rit-tag,.tsk-l,.blk-n,.blk-d,.lane-h h3,.rep-lane-h h3,
 .cal-rn,.cal-rd,.chk-t,.rev-note,.tnote-b{min-width:0;overflow-wrap:anywhere}
-/* The outstanding bar sits in <header>, outside the sweep that checked the
-   rest of the app: the header is its own layout context and a long
-   non-negotiable name would otherwise push the whole lane sideways. */
+/* The outstanding bar, same pairing as everywhere else in this sweep: a long
+   non-negotiable name must wrap inside its chip rather than widen the card. */
 .ngbar,.ngbar .ng-c{overflow-wrap:anywhere}
 .ngbar .ng-list{min-width:0}
 /* The "now" bar, third member of this family. It only overflows while an
@@ -682,60 +927,58 @@ span.apt{background:var(--terra);color:var(--on-warm);font-size:9px;font-weight:
 .foot button:hover{color:var(--forest-ink);border-color:var(--olive)}
 .saved{text-align:center;font-size:11px;color:var(--olive);height:14px;margin-top:6px}
 /* ---- the outstanding bar --------------------------------------------
-   Replaced the nudge strip on 2026-09-08. It occupies the same sub-header
-   lane - inside <header>, under the stats row - and keeps that lane's two
-   rules, which were the good part of the thing it replaced: the header grows
-   to fit so nothing ever overlaps, and [hidden] collapses the divider and
-   spacing entirely when there is nothing to say.
+   Replaced the nudge strip on 2026-09-08 and lived inside <header> for one
+   version. It is now its own card between the header and the tabs: the header
+   is identity, this is today's debt, and two ideas on one surface was always
+   the weaker arrangement. Being a sibling of <header> inside .wrap is what
+   gives it the header's exact width with no width plumbing of its own.
 
-   Shape is the Now bar's, at small: a coloured left rule, a small uppercase
-   label, content to the right. Colour is OLIVE, not terracotta. Orange means
-   "a commitment you agreed to attend" in the Now bar, the day view and the
-   activity badges; a non-negotiable is a promise to yourself, and giving it
-   the same orange would spend the one loud colour this palette has on two
-   different ideas. The rule carries the colour and the text stays uniform
-   on-brand - the contrast rule the old strip established, kept because it is
-   what lets white sit safely on the green at every tier. */
-#ngbar{margin-top:14px;padding-top:12px;border-top:1px solid rgba(236,239,241,.20);
-  position:relative;z-index:1}
+   Moving off the dark brand ground onto the page means it is now a normal
+   card - var(--paper), var(--line), var(--lift) - like every other card in
+   the app, rather than the translucent-on-green treatment it wore in the
+   header. That is why the alpha-white literals are gone: on the page there
+   are real tokens for all of this, and they flip with the theme by themselves.
+
+   Shape is still the Now bar's, at small: a coloured left rule, a small
+   uppercase label, content to the right. Colour is OLIVE, not terracotta.
+   Orange means "a commitment you agreed to attend" in the Now bar, the day
+   view and the activity badges; a non-negotiable is a promise to yourself, and
+   giving it the same orange would spend the one loud colour in this palette on
+   two different ideas. */
+#ngbar{margin-bottom:14px}
 #ngbar[hidden]{display:none}
-.ngbar{background:rgba(0,0,0,.22);border:1px solid rgba(236,239,241,.20);
-  border-left:4px solid var(--olive);border-radius:10px;padding:11px 13px;
-  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+.ngbar{background:var(--paper);border:1px solid var(--line);
+  border-left:5px solid var(--olive);border-radius:12px;padding:12px 16px;
+  box-shadow:var(--lift);
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
   animation:ngIn .18s ease-out}
 @keyframes ngIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
-/* Alpha in the COLOUR, not `opacity` on the element. opacity creates a group,
-   so a child can never be brighter than its parent - `.ng-l b{opacity:1}` would
-   silently do nothing and the count would stay as dim as the label above it.
-   The literal white matches the rgba(236,239,241,...) borders already used on
-   this brand surface; --on-brand is the token wherever full strength is wanted.
-   Measured on the header green: label ~4.7:1, count ~6:1, both over AA. */
 .ngbar .ng-l{font-size:9.5px;text-transform:uppercase;letter-spacing:1.2px;font-weight:800;
-  color:rgba(255,255,255,.75);flex-shrink:0;line-height:1.35}
+  color:var(--muted);flex-shrink:0;line-height:1.35}
 /* Serif and sentence case, echoing .nowbar .nt - this is the small sibling of
    the Now bar's headline, and the count is the thing it is announcing. Caps
    are for the label above it; a whole line of them here would just shout. */
 .ngbar .ng-l b{display:block;font-family:var(--serif);font-size:17px;font-weight:700;
-  text-transform:none;letter-spacing:0;color:var(--on-brand);
+  text-transform:none;letter-spacing:0;color:var(--forest-ink);
   font-variant-numeric:tabular-nums}
 .ngbar .ng-list{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
 /* Chips are buttons: this is where you tick the thing off, not just where you
    read that it is undone. Sized for a thumb rather than for density - 34px
    tall, which clears the 24px minimum with room to spare on a phone at 3am. */
 .ngbar .ng-c{display:inline-flex;align-items:center;gap:8px;min-height:34px;
-  font-size:13px;font-weight:600;color:var(--on-brand);
-  background:rgba(236,239,241,.10);border:1px solid rgba(236,239,241,.28);
+  font-size:13px;font-weight:600;color:var(--ink);
+  background:var(--ivory);border:1px solid var(--line);
   border-radius:999px;padding:6px 14px;cursor:pointer;text-align:left;
   overflow-wrap:anywhere;min-width:0;transition:background .15s,border-color .15s}
-.ngbar .ng-c:hover{background:rgba(236,239,241,.20);border-color:rgba(236,239,241,.55)}
-.ngbar .ng-c:focus-visible{outline:2px solid var(--on-brand);outline-offset:2px}
+.ngbar .ng-c:hover{background:var(--olive-lt);border-color:var(--olive)}
+.ngbar .ng-c:focus-visible{outline:2px solid var(--forest-ink);outline-offset:2px}
 /* The ring is the affordance: an empty circle that fills with a tick on hover
    says "clicking this completes it" without a word of instruction. */
 .ngbar .ng-c i{width:15px;height:15px;border-radius:50%;flex-shrink:0;
-  border:1.5px solid rgba(236,239,241,.55);display:grid;place-items:center;
+  border:1.5px solid var(--sage);display:grid;place-items:center;
   font-size:10px;font-style:normal;line-height:1;color:transparent;transition:.15s}
 .ngbar .ng-c:hover i{background:var(--olive);border-color:var(--olive);color:var(--on-brand)}
-.ngbar .ng-c b{font-weight:800;font-variant-numeric:tabular-nums;opacity:.85}
+.ngbar .ng-c b{font-weight:800;font-variant-numeric:tabular-nums;color:var(--forest-ink)}
 .dual{background:var(--night);color:var(--on-brand);font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border-radius:4px;padding:1px 5px}
 
 /* ---- main nav: layered document tabs -------------------------------------
@@ -1519,6 +1762,29 @@ return {
      the gate uses - one place that attaches the token, handles the JSON and
      tells a transport failure apart from a refusal. */
   api: api,
+  /* Merge fresher fields into the stored session user and tell the app.
+
+     Exactly the merge /auth/me performs at boot, exposed so a change the admin
+     panel just made to YOUR OWN account reaches the open page immediately
+     rather than waiting for the next load. Without it, saving your own
+     nickname updated the sheet and the panel and left the heading reading the
+     stale cached copy - which looked exactly like the save had failed.
+
+     Display fields only. This cannot widen what you may DO: capabilities are
+     read out of the signed token by the Worker on every request and never out
+     of anything stored here, so the worst a wrong value does is mislabel the
+     screen until the next /auth/me corrects it. */
+  mergeUser: function(patch){
+    if(!session || !session.user || !patch) return false;
+    var merged={},k;
+    for(k in session.user) if(Object.prototype.hasOwnProperty.call(session.user,k)) merged[k]=session.user[k];
+    for(k in patch)        if(Object.prototype.hasOwnProperty.call(patch,k))        merged[k]=patch[k];
+    if(JSON.stringify(merged)===JSON.stringify(session.user)) return false;
+    session.user=merged;
+    set(SESSION_KEY, JSON.stringify(session));
+    try{ window.dispatchEvent(new CustomEvent("pdauth:userchanged")); }catch(e){}
+    return true;
+  },
   /* Which account inherited this device's pre-accounts data. Used to decide who
      the old un-namespaced OneDrive file handle belongs to - it is the same
      person, and giving it to anyone else is precisely the leak that made a
@@ -1566,17 +1832,22 @@ return {
         <button class="hdr-out hdr-wg" id="wgBtn" aria-haspopup="dialog" aria-controls="wgDock" aria-expanded="false" title="App Widgets — world clocks and Bible">
           <svg class="bv-i" viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" focusable="false"><rect x="1" y="1" width="6" height="6" rx="1.4"/><rect x="9" y="1" width="6" height="6" rx="1.4"/><rect x="1" y="9" width="6" height="6" rx="1.4"/><rect x="9" y="9" width="6" height="6" rx="1.4"/></svg><span class="wg-lbl">Widgets</span>
         </button>
-        <button class="hdr-out" id="themeBtn" title="Light / dark / follow the system">Theme: auto</button>
+        <button class="hdr-out" id="themeBtn" aria-haspopup="dialog" aria-controls="themeModal" title="Colours and light / dark">Forest</button>
         <button class="hdr-out" id="signOutBtn">Sign out</button>
       </div>
     </div>
-    <!-- What you still owe today. This lane used to hold the nudge strip; the
-         strip was deleted on 2026-09-08 and this took its place, which is why
-         the spacing and the divider above it are inherited rather than new.
-         Hidden outright when the list is clear, so a finished day gives the
-         header its height back. -->
-    <div id="ngbar" class="board-only" hidden></div>
   </header>
+
+  <!-- What you still owe today. It sat INSIDE the header until 2026-09-08,
+       first as the nudge strip's replacement; it is now its own card between
+       the header and the tabs, so the header is purely identity and the bar is
+       purely today's debt - two ideas, two surfaces.
+       A sibling of <header> inside .wrap, so it inherits the same 1200px
+       max-width with no width plumbing of its own. Deliberately NOT
+       .board-only any more: it follows you across every tab, because a
+       non-negotiable does not stop being outstanding while you are reading the
+       Calendar. Hidden outright when the list is clear. -->
+  <div id="ngbar" hidden></div>
 
   <!-- Layered document tabs. role="tablist" on the <nav> costs the navigation
        landmark but is the correct semantics for a tab strip; the labels inside
@@ -2029,9 +2300,37 @@ return {
     padding-bottom:5px;border-bottom:1px solid var(--line)}
 
   /* Activity editor */
-  #actModal,#profModal{position:fixed;inset:0;z-index:9998;display:flex;align-items:flex-start;justify-content:center;
+  #actModal,#profModal,#themeModal{position:fixed;inset:0;z-index:9998;display:flex;align-items:flex-start;justify-content:center;
     padding:24px 16px;background:rgba(var(--shadow-rgb),.55);overflow-y:auto}
-  #actModal[hidden],#profModal[hidden]{display:none}
+  #actModal[hidden],#profModal[hidden],#themeModal[hidden]{display:none}
+
+  /* ---- theme picker ----------------------------------------------------
+     Mode is a segmented control because the three states are exclusive and
+     equally weighted; palette is a grid of real swatches because you choose a
+     colour scheme by looking at it, not by reading its name. Each card shows
+     the four source values at full strength - a palette that has been reasoned
+     into surfaces and inks still has to be recognisable as the swatch it came
+     from, and this is the only place the raw four are ever shown. */
+  .th-modes{display:flex;gap:0;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+  .th-modes button{flex:1;padding:9px 10px;font-size:12.5px;font-weight:700;background:var(--paper);
+    color:var(--muted);border:0;border-right:1px solid var(--line);cursor:pointer;transition:.15s}
+  .th-modes button:last-child{border-right:0}
+  .th-modes button:hover{background:var(--ivory);color:var(--ink)}
+  .th-modes button[aria-checked="true"]{background:var(--forest);color:var(--on-brand)}
+  .th-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:9px}
+  .th-p{padding:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--paper);
+    cursor:pointer;text-align:left;transition:border-color .15s,box-shadow .15s}
+  .th-p:hover{border-color:var(--olive)}
+  .th-p:focus-visible{outline:2px solid var(--forest-ink);outline-offset:2px}
+  /* The selected card is marked by a ring in the app's own brand colour, which
+     re-renders as you pick - so the tick you just clicked is already wearing
+     the theme it turned on. That is the confirmation, not a checkmark. */
+  .th-p[aria-checked="true"]{border-color:var(--forest);box-shadow:0 0 0 2px var(--forest)}
+  .th-sw{display:flex;height:38px}
+  .th-sw i{flex:1;display:block}
+  .th-n{display:block;padding:7px 9px;font-size:11.5px;font-weight:700;color:var(--ink);
+    overflow-wrap:anywhere}
+  .th-p[aria-checked="true"] .th-n{color:var(--forest-ink)}
   .am-card{width:100%;max-width:470px;background:var(--paper);border:1px solid var(--line);
     border-radius:13px;padding:22px;box-shadow:0 14px 50px rgba(var(--shadow-rgb),.34)}
   .am-card h3{margin:0 0 14px;font-family:var(--serif);font-size:19px;color:var(--forest-ink)}
@@ -2399,6 +2698,9 @@ return {
       <h2>User &amp; Role Management <span class="cnt" id="umCnt">0</span></h2>
       <div class="sub">Accounts live in the Google Sheet; this reads and writes them through the Worker. Any change to a role, a status or a permission signs that person out everywhere, so it lands on their next request instead of whenever their token happens to lapse.</div>
       <div class="pf-msg" id="umMsg"></div>
+      <!-- Shown only when the Worker answering at this URL is older than the
+           version this app needs. See umWorkerCheck(). -->
+      <div class="um-stale" id="umStale" hidden></div>
 
       <div class="um-wrap">
         <div>
@@ -2609,6 +2911,15 @@ return {
   .pf-msg.on{display:block}
   .pf-msg.err{background:var(--alert-lt);color:var(--alert-ink);border:1px solid var(--alert)}
   .pf-msg.ok{background:var(--olive-lt);color:var(--forest-ink);border:1px solid var(--olive)}
+  /* Deliberately terracotta rather than red. A stale Worker is a maintenance
+     job, not an emergency: the app still works, one field on one screen does
+     not. Red here would compete with the actual failures .pf-msg.err reports
+     directly above it. */
+  .um-stale{margin:10px 0;padding:10px 12px;border-radius:8px;font-size:12.5px;line-height:1.55;
+    background:var(--terra-lt);color:var(--ink);border:1px solid var(--terra);border-left-width:4px}
+  .um-stale[hidden]{display:none}
+  .um-stale code{background:rgba(var(--shadow-rgb),.10);padding:1px 5px;border-radius:4px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px}
   @media(max-width:620px){ .pf-grid{grid-template-columns:1fr;gap:1px 0}
     .pf-grid dt{margin-top:7px} }
   </style>
@@ -2618,6 +2929,24 @@ return {
        list came out of the signed session token, and every admin action is
        re-checked server-side. Hiding a control here is a courtesy, not a
        boundary - see the note at the top of worker.js. -->
+  <!-- Theme picker. A panel rather than the cycling button it replaced: three
+       states could be cycled, nine palettes times two modes cannot - you would
+       have to click through Chili spice to reach Yacht club. Reuses #profModal's
+       overlay and .am-card so it inherits the same scrim, scroll and Escape
+       behaviour instead of inventing a second dialog idiom. -->
+  <div id="themeModal" hidden>
+    <div class="am-card" role="dialog" aria-modal="true" aria-labelledby="thTitle">
+      <h3 id="thTitle">Appearance</h3>
+      <div class="th-modes" id="thModes" role="radiogroup" aria-label="Light or dark"></div>
+      <div class="sub" style="margin:14px 0 9px">Colours</div>
+      <div class="th-grid" id="thGrid" role="radiogroup" aria-label="Colour palette"></div>
+      <div class="um-note" style="margin-top:12px">Every palette has a light and a dark form; the two
+        controls are independent. Orange still means a commitment and red still means must-attend in
+        all of them — those are the only colours a palette does not get to touch.</div>
+      <div class="am-actions"><button type="button" class="ag-btn" id="thClose">Done</button></div>
+    </div>
+  </div>
+
   <div id="profModal" hidden>
     <div class="am-card" role="dialog" aria-modal="true" aria-labelledby="pfTitle">
       <h3 id="pfTitle">Your profile</h3>
@@ -3027,11 +3356,24 @@ if(!window.PDAuth || !PDAuth.ready()) return;
    location.reload(), so this whole script is evaluated again. */
 var PET_NAMES=["Honey","Hon","Sweetheart","Darling","Honeybun","Pumpkin","Cupcake",
   "Goofball","Stinker","Silly Goose","Giggles","Butterfingers","Grumpy","Nutty"];
-var GREETING=(function(){
+/* The random draw happens ONCE PER LOAD and is kept, separately from the
+   greeting itself. applyGreeting() below can now run more than once - it did
+   not used to - and re-drawing inside it would rename you every time anything
+   about your account changed. The rule the old comment stated ("picked once,
+   into a variable") is unchanged; it just needs its own variable now that the
+   thing reading it is re-runnable. */
+var PET_FALLBACK=PET_NAMES[Math.floor(Math.random()*PET_NAMES.length)];
+var GREETING="";
+/* Re-runnable as of 2026-09-08. It used to be a one-shot IIFE, which is the
+   whole reason saving a nickname appeared to do nothing: the heading was
+   computed at boot from the cached session and nothing ever recomputed it, so
+   even a successful save only showed up after a sign-out and back in. It now
+   also listens for pdauth:userchanged, which fires both when /auth/me returns
+   fresher truth at boot and when you save your own nickname in User & Role
+   Management. */
+function applyGreeting(){
   var nick=((PDAuth.user()||{}).nickname||"").trim();
-  return nick||PET_NAMES[Math.floor(Math.random()*PET_NAMES.length)];
-})();
-(function(){
+  GREETING=nick||PET_FALLBACK;
   var line="How's our "+GREETING+" looking?";
   // textContent, not innerHTML with esc(): a nickname is a user-chosen string
   // and the strongest guarantee is the one that never parses it as markup at
@@ -3040,7 +3382,9 @@ var GREETING=(function(){
   var h=document.getElementById("hdrGreet");
   if(h)h.textContent=line;
   document.title=line+" · ProDash";
-})();
+}
+applyGreeting();
+window.addEventListener("pdauth:userchanged",applyGreeting);
 
 /* Per-account storage. Two people on one browser get genuinely separate caches;
    PDAuth.ns() also carries the single-user era's board over to the first
@@ -3205,6 +3549,14 @@ function norm(s){
   if(!Array.isArray(s.rituals))
     s.rituals=DEFAULT_RITUALS.map(function(r){return {id:r.id,l:r.l,tag:r.tag};});
   if(["auto","dark","light"].indexOf(s.theme)<0)s.theme="auto";
+  /* The palette is a second, independent axis (see the PALETTES block in the
+     stylesheet). Validated against the known list rather than trusted: this
+     value comes back through sync and history from other devices, and an
+     unknown id would stamp a data-palette that no rule matches - a board that
+     silently ignores your theme with no error anywhere. Unknown falls back to
+     the default, which is the absence of a palette. */
+  if(["forest","eclipse","chili","inkwash","sienna","lavender","hydrangea","retro","yacht"]
+      .indexOf(s.palette)<0)s.palette="forest";
   /* s.roll (the old 07:00 day-start, in minutes past midnight) is no longer
      normalised or read - the shift roll was removed on 2026-09-07 and a day is
      now an ordinary 12:00am-11:59pm calendar day. A board saved before that may
@@ -3507,7 +3859,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="4.7";
+var APP_VERSION="4.8";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -3518,6 +3870,7 @@ var APP_VERSION="4.7";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-08T03:20:00+08:00",text:"Eight new colour schemes: Blue eclipse, Chili spice, Ink wash, Burnt sienna, Lavender fields, Hydrangea, Retro sunset and Yacht club, alongside the original green which is now called Forest. The button in the header that used to say Theme: auto now names your colours and opens a picker with all nine as swatches, plus Auto, Light and Dark. The two choices are separate: every scheme has a light form and a dark form, so you can run Hydrangea light by day and Hydrangea dark at 3am. Your choice follows you to your other devices the same way the rest of the board does. Two colours never change, whichever scheme you pick: orange still means an appointment you agreed to attend, and red still means must-attend or overdue. A red scheme would otherwise make a must-attend appointment look like every other one, and the point of those two colours is that you can read them without thinking. Lane colours are also left alone, since a lane colour tells you whose time it is. Separately, the Still to do bar has moved out of the green header and become its own card just below it, the same width, and it now follows you onto every tab instead of living only on the Board. And the nickname now works properly: saving one updates the heading and the browser tab immediately instead of waiting until the next time you sign in. If the greeting still will not change, the User & Role Management screen will now tell you why -- your Worker needs redeploying, and it can finally say so instead of failing with a confusing error."},
   {ts:"2026-09-08T01:45:00+08:00",text:"The notification strip in the green header is gone -- every one of those flagged lines. In its place sits a single bar for what you still owe today: the words Still to do, then how many are left, then each outstanding non-negotiable and goal as a chip you can tap to tick it off. Ticking it there is the same as ticking it on the card further down, so the count, the streak and the percentage at the top all move together. A goal with a weekly target shows where it stands, like Exercise 0/3, and disappears from the bar once you have hit that target for the week. When the last one is ticked the whole bar disappears and the header gets its height back. It has moved out of the Now bar, which now answers one question again: what am I in. Three things went with the strip and are worth knowing about. All-day activities -- the ones you set with no start or end time -- used to announce themselves there, and the strip was the only place on the Board they ever appeared; they now show only in your Calendar tab. Nothing warns you before an appointment starts any more: an appointment first appears at the minute it begins, in the Now bar. And the count of tasks left open three or more days is no longer shown anywhere. Your data is untouched -- the reminder lead time is still saved on every activity, and every task still records the day you added it -- so any of the three can be brought back if you miss it."},
   {ts:"2026-09-08T00:30:00+08:00",text:"The Now bar has stopped looking ahead and started dealing with what is actually on you right now. The \"Upcoming\" line underneath it -- the one that named the next thing and counted down to it -- is gone. When two or three appointments run at the same time, the bar no longer picks one for the headline and demotes the rest to a smaller line: it now shows each of them in turn at full size, one every eight seconds, with a row of small dots beside the \"Happening now\" label so you can see how many there are. Tap a dot to hold that one on screen and stop the rotation; tap it again to let it carry on. Must-attend items come first in the cycle, then the rest in start order, so the thing you cannot skip is the thing you see first -- the day list below stays in plain clock order, which is what it is for. When only one appointment is running there are no dots and nothing moves, exactly as before. In the space the old Upcoming line used, the bar now shows what you still owe today: a count and then every non-negotiable and goal you have not ticked, straight from your Non-negotiables & Goals list -- just the name, not the note underneath it. A goal with a weekly target shows where it stands, like Exercise 2/3, and drops off the row entirely once you have hit that target for the week, so it only nags you on the days you are actually behind. The whole row disappears the moment the list is clear."},
   {ts:"2026-09-07T23:15:00+08:00",text:"The small grey line under each lane name -- \"10:30pm-6:30am, write tomorrow's to-dos\" and the like -- can now be edited. Click it, type, press Enter. Clear it and press Enter to remove the line altogether; where a lane has none, a faint \"+ add a note\" sits in its place so you can always put one back. Escape cancels without saving, and clicking away saves. Nothing else about the lanes changed. Separately, the app's install description has been removed: it still described ProDash as a tracker for a 2pm-7am shift schedule, which stopped being true when the shift timing came out earlier today."},
@@ -3573,8 +3926,8 @@ var APP_VERSION_HISTORY=[
    pushed" is per-account, though - it tracks a specific board's revisions. */
 var DEV_KEY="prodash.deviceId", DEV_NAME_KEY="prodash.deviceName", PUSHED_KEY=PDAuth.ns("prodash.pushedUpTo");
 var HIST_CAP=400, CKPT_EVERY=25, BATCH_MS=2500;
-var BOARD_KEYS=["tasks","log","days","events","lanes","rituals","theme","hiddenBlocks","plans","roll","boardView","expenses","cur","subs","subSkip","zones","bibleVer","bibleAt","bibleSize","wgLast"];
-var KEYED=["tasks","events","lanes","rituals","expenses","subs","zones"], MAPS=["log","days","plans"], SCALARS=["theme","roll","boardView","cur","bibleVer","bibleAt","bibleSize","wgLast"];
+var BOARD_KEYS=["tasks","log","days","events","lanes","rituals","theme","palette","hiddenBlocks","plans","roll","boardView","expenses","cur","subs","subSkip","zones","bibleVer","bibleAt","bibleSize","wgLast"];
+var KEYED=["tasks","events","lanes","rituals","expenses","subs","zones"], MAPS=["log","days","plans"], SCALARS=["theme","palette","roll","boardView","cur","bibleVer","bibleAt","bibleSize","wgLast"];
 // Plain arrays of primitive ids (not objects with their own .id, so KEYED's
 // per-item union doesn't apply) compared by CONTENT, not reference - a
 // cloned snapshot never shares object identity with the live array even
@@ -5456,18 +5809,65 @@ function renderWeek(){
   }
 }
 
-// auto = follow the OS. Explicit choices stamp data-theme, which wins over the
-// prefers-color-scheme block in both directions.
-function applyTheme(){
-  if(S.theme==="auto")document.documentElement.removeAttribute("data-theme");
-  else document.documentElement.setAttribute("data-theme",S.theme);
-  // Lives in the header now, so it wears .hdr-out (light-on-charcoal) rather
-  // than .pill. The "on" state the pill used is gone with it: the label already
-  // says which mode is active, and a filled chip up here fought the Sign out
-  // button beside it for attention.
-  var tb=document.getElementById("themeBtn");
-  tb.textContent="Theme: "+S.theme;
+/* Two axes: MODE (light or dark) and PALETTE (which family of colours that is
+   expressed in). They are independent - every palette has a light and a dark
+   rendering - so they are stored and chosen separately.
+
+   auto now RESOLVES to an explicit data-theme rather than removing the
+   attribute. It used to rely on the prefers-color-scheme block, which forced
+   every theme to be written twice (a media copy and an attribute copy) and
+   came with a standing warning that the two must never drift. With eight more
+   palettes that would have been eighteen blocks to keep in lockstep. Resolving
+   here means each palette needs exactly one light block and one dark block,
+   and the OS listener below keeps auto honest when the system flips mid-session.
+   The forest media block in the stylesheet survives as the pre-script paint. */
+var PALETTES=[
+  {id:"forest",    n:"Forest",         sw:["#2E7D32","#43A047","#ECEFF1","#263238"]},
+  {id:"eclipse",   n:"Blue eclipse",   sw:["#272757","#8686AC","#505081","#0F0E47"]},
+  {id:"chili",     n:"Chili spice",    sw:["#CD1C18","#FFA896","#9B1313","#38000A"]},
+  {id:"inkwash",   n:"Ink wash",       sw:["#4A4A4A","#CBCBCB","#FFFFE3","#6D8196"]},
+  {id:"sienna",    n:"Burnt sienna",   sw:["#E35336","#F5F5DC","#F4A460","#A0522D"]},
+  {id:"lavender",  n:"Lavender fields",sw:["#FDFBD4","#BDB96A","#C1BFFF","#CF6DFC"]},
+  {id:"hydrangea", n:"Hydrangea",      sw:["#FF8DA1","#FFC2BA","#FF9CE9","#AD56C4"]},
+  {id:"retro",     n:"Retro sunset",   sw:["#BE5103","#FFCE1B","#069494","#B7410E"]},
+  {id:"yacht",     n:"Yacht club",     sw:["#F2F0EF","#BBBDBC","#245F73","#733E24"]}
+];
+function paletteName(id){
+  for(var i=0;i<PALETTES.length;i++)if(PALETTES[i].id===id)return PALETTES[i].n;
+  return "Forest";
 }
+function resolvedMode(){
+  if(S.theme==="light"||S.theme==="dark")return S.theme;
+  // Wrapped: matchMedia is absent in a few embedded browsers, and a throw here
+  // would abort the boot paint entirely.
+  try{ return window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"; }
+  catch(e){ return "light"; }
+}
+function applyTheme(){
+  var r=document.documentElement;
+  r.setAttribute("data-theme",resolvedMode());
+  // "forest" is the absence of a palette, not a palette: leaving the attribute
+  // off means the default look is the plain :root cascade with nothing layered
+  // over it, which is what keeps the original board unchanged by all of this.
+  if(S.palette&&S.palette!=="forest")r.setAttribute("data-palette",S.palette);
+  else r.removeAttribute("data-palette");
+  // Lives in the header now, so it wears .hdr-out (light-on-charcoal) rather
+  // than .pill. It names the palette rather than the mode: the mode is visible
+  // on every surface already, whereas "which of nine" is not.
+  var tb=document.getElementById("themeBtn");
+  if(tb)tb.textContent=paletteName(S.palette||"forest");
+}
+/* Only meaningful while the mode is auto, and cheap enough not to bother
+   guarding: applyTheme() re-reads S.theme each time, so an explicit light or
+   dark simply re-stamps the value it already had. */
+(function(){
+  try{
+    var mq=window.matchMedia("(prefers-color-scheme: dark)");
+    var onFlip=function(){ if(S.theme==="auto"){applyTheme();themeRender();} };
+    if(mq.addEventListener)mq.addEventListener("change",onFlip);
+    else if(mq.addListener)mq.addListener(onFlip);
+  }catch(e){}
+})();
 
 function renderAll(){
   renderHeader();renderNow();renderNgBar();renderRituals();
@@ -5502,9 +5902,50 @@ document.getElementById("lanes").addEventListener("drop",laneDrop);
    already careful to do, just with a second set of inputs to keep correct. */
 document.getElementById("tlAdd").addEventListener("click",function(){openActivity(null,today());});
 
-document.getElementById("themeBtn").addEventListener("click",function(){
-  S.theme = S.theme==="auto" ? "dark" : (S.theme==="dark" ? "light" : "auto");
-  save();applyTheme();});
+/* ---------- the theme picker ---------------------------------------------
+   Rebuilt on every change rather than patched: the panel is a dozen buttons
+   and their only state is which one is checked, so re-rendering is both
+   simpler and self-correcting - the same reason renderLanes() does not try to
+   patch a lane in place. It also means the panel repaints in the palette you
+   just chose, which is the confirmation the design leans on. */
+var MODES=[["auto","Auto"],["light","Light"],["dark","Dark"]];
+function themeRender(){
+  var m=document.getElementById("thModes"),g=document.getElementById("thGrid");
+  if(!m||!g)return;
+  m.innerHTML="";
+  MODES.forEach(function(pair){
+    var b=document.createElement("button");
+    b.type="button";b.setAttribute("role","radio");
+    b.setAttribute("aria-checked",S.theme===pair[0]?"true":"false");
+    b.textContent=pair[1]+(pair[0]==="auto"?" · "+resolvedMode():"");
+    b.addEventListener("click",function(){S.theme=pair[0];save();applyTheme();themeRender();});
+    m.appendChild(b);
+  });
+  g.innerHTML="";
+  PALETTES.forEach(function(p){
+    var b=document.createElement("button");
+    b.type="button";b.className="th-p";b.setAttribute("role","radio");
+    b.setAttribute("aria-checked",(S.palette||"forest")===p.id?"true":"false");
+    b.setAttribute("aria-label",p.n);
+    // The four raw swatch values, inline: these are data about a palette, not
+    // themable surfaces, and they must look the same whichever theme is on.
+    b.innerHTML='<span class="th-sw">'+p.sw.map(function(c){
+        return '<i style="background:'+c+'"></i>';}).join("")+'</span>'+
+      '<span class="th-n">'+esc(p.n)+'</span>';
+    b.addEventListener("click",function(){S.palette=p.id;save();applyTheme();themeRender();});
+    g.appendChild(b);
+  });
+}
+function openTheme(){ themeRender();document.getElementById("themeModal").hidden=false; }
+function closeTheme(){ document.getElementById("themeModal").hidden=true; }
+document.getElementById("themeBtn").addEventListener("click",openTheme);
+document.getElementById("thClose").addEventListener("click",closeTheme);
+// Same scrim-and-Escape idiom as #profModal: clicking the backdrop (but not the
+// card) closes, and so does Escape while it is the open dialog.
+document.getElementById("themeModal").addEventListener("click",function(ev){
+  if(ev.target===this)closeTheme();});
+document.addEventListener("keydown",function(ev){
+  if(ev.key==="Escape"&&!document.getElementById("themeModal").hidden)closeTheme();});
 document.getElementById("resetBtn").addEventListener("click",function(){
   if(!confirm("Clear today's checkmarks? Tasks are kept."))return;
   delete S.log[today()];save();renderAll();});
@@ -5727,7 +6168,50 @@ function umEl(id){return document.getElementById(id);}
 function umMsg(t,kind){var m=umEl("umMsg");if(!m)return;
   m.textContent=t||"";m.className="pf-msg"+(t?" on "+(kind||"err"):"");}
 
+/* The version of cloud-worker/worker.js this app needs in order for every
+   control on this screen to do what it says. Bump it in lockstep with
+   WORKER_VERSION over there whenever the app starts depending on something new.
+   It is a plain string compare on dotted numbers, so keep both numeric. */
+var WORKER_MIN="4.8";
+function verLt(a,b){
+  var x=String(a||"0").split("."),y=String(b||"0").split("."),i;
+  for(i=0;i<Math.max(x.length,y.length);i++){
+    var p=+x[i]||0,q=+y[i]||0;
+    if(p!==q)return p<q;
+  }
+  return false;
+}
+/* Is the deployed Worker older than this app expects?
+
+   /health is unauthenticated and cheap, so this is a bare fetch rather than a
+   PDAuth.api() call - it must work even when the session is the thing that is
+   broken. A Worker old enough to predate the version marker answers without
+   one, which is itself the answer: anything without a version is older than
+   4.8. A network failure says nothing either way and is ignored, because this
+   screen already has a louder message for "cannot reach the server".
+
+   This exists because the Worker and the app deploy separately and drift
+   silently. The nickname field sat broken behind a "Nothing to change." error
+   that pointed nowhere near the real cause: a Worker that predated the field.
+   One banner here is cheaper than that hunt happening again. */
+function umWorkerCheck(){
+  var host=umEl("umStale"),base=PDAuth.serverUrl();
+  if(!host||!base)return;
+  fetch(base+"/health",{method:"GET"}).then(function(r){return r.json();}).then(function(h){
+    var v=(h&&h.version)||"";
+    if(v&&!verLt(v,WORKER_MIN)){host.hidden=true;return;}
+    host.hidden=false;
+    host.innerHTML='<b>The server is running an old Worker'+(v?' (version '+esc(v)+')':'')+'.</b> '+
+      'This app expects '+esc(WORKER_MIN)+'. Controls on this screen that depend on newer fields — the '+
+      'nickname in particular — will fail with a confusing error until it is updated. '+
+      'Paste <code>cloud-worker/worker.js</code> into the Cloudflare Quick Edit editor, Deploy, '+
+      'then open Deployments and promote the new version to <b>Active</b> — the promote step is '+
+      'the one that is easy to miss.';
+  }).catch(function(){ /* offline or blocked: says nothing about the version */ });
+}
+
 function umLoad(){
+  umWorkerCheck();
   umEl("umList").innerHTML='<div class="um-empty">Loading&hellip;</div>';
   PDAuth.api("/admin/users").then(function(res){
     UM.users=res.users||[];
@@ -5984,12 +6468,30 @@ function umPatch(userId,patch){
     UM.busy=false;
     umMsg("@"+(res.user.username||"account")+" updated"+
       (res.signedOut?" · signed out everywhere":""),"ok");
+    /* Your own account is the one case where the server's answer also describes
+       the page you are looking at. The heading, the tab title and the profile
+       panel all read the stored session, so without this a nickname save wrote
+       the sheet and left the screen still calling you a Silly Goose - a bug
+       that reads as "the save did not work" when in fact it did. Fed from
+       res.user, not from what we sent: the Worker clamps a nickname (control
+       characters stripped, trimmed, 24 chars), and the screen should show what
+       was actually stored rather than what was typed. */
+    if(res.user && userId===PDAuth.uid())
+      PDAuth.mergeUser({nickname:res.user.nickname||""});
     UM.sel=userId;
     umLoad();   // re-read rather than patching in place: the server may have
                 // changed more than we asked for (a guest clock, a status).
   }).catch(function(err){
     UM.busy=false;
-    umMsg(err.message);
+    /* "Nothing to change." means the Worker built an empty patch - it did not
+       recognise a single field we sent. When we sent one it certainly should
+       recognise, the Worker deployed at that URL is older than this app, and
+       saying so beats letting the admin hunt for a fault in their own input.
+       See umWorkerCheck(): this is the fallback for when /health could not be
+       reached or answered without a version. */
+    if(/nothing to change/i.test(err.message||""))
+      umMsg("The server rejected every field. Its Worker is probably older than this app — redeploy cloud-worker/worker.js and promote the new version to Active.");
+    else umMsg(err.message);
     umLoad();   // put every control back to the truth
   });
 }

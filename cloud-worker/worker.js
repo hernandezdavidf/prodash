@@ -77,6 +77,22 @@
 // could not already do with curl — it cannot read another origin's storage.
 
 // ===========================================================================
+// Deployed version
+// ===========================================================================
+// Bump this whenever a change here adds or alters something index.html depends
+// on. The app compares it against its own WORKER_MIN and says so on the User &
+// Role Management screen when this Worker is behind.
+//
+// WHY THIS EXISTS: the Worker and the app deploy through completely separate
+// pipelines - the app rides a git push to Pages, this file is pasted into the
+// Cloudflare editor by hand and then has to be PROMOTED TO ACTIVE, which is
+// easy to forget. When they drift, the symptom appears far from the cause: a
+// nickname save returned "Nothing to change." for weeks because the deployed
+// Worker predated the nickname field and quietly ignored it. There was no way
+// to ask what version was running. Now there is.
+const WORKER_VERSION = "4.8";
+
+// ===========================================================================
 // The Users sheet
 // ===========================================================================
 // Columns A..S, row 1 headers, data from row 2. Keep this list and
@@ -207,7 +223,14 @@ export default {
       // a bare 1101 "Worker threw exception" instead of the JSON error the
       // client knows how to read. Only the synchronous requireConfig() throw
       // above was being caught. Do not drop these awaits to "simplify".
-      if (path === "/health") return json({ ok: true });
+      // Version, not just ok. The Worker deploys separately from the app (paste
+      // + promote to Active in the Cloudflare dashboard), so the two drift
+      // silently and a stale Worker shows up as a nonsense error somewhere far
+      // from the cause -- a nickname save answering "Nothing to change." was
+      // exactly that. This is the endpoint that makes the drift answerable, and
+      // it is deliberately unauthenticated: a version string tells an attacker
+      // nothing they could not learn by reading the public repo.
+      if (path === "/health") return json({ ok: true, version: WORKER_VERSION });
 
       if (path === "/auth/signup" && request.method === "POST") return await signup(request, env);
       if (path === "/auth/login" && request.method === "POST") return await login(request, env);
