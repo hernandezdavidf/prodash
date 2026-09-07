@@ -955,11 +955,14 @@ span.apt{background:var(--terra);color:var(--on-warm);font-size:9px;font-weight:
 @keyframes ngIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 .ngbar .ng-l{font-size:9.5px;text-transform:uppercase;letter-spacing:1.2px;font-weight:800;
   color:var(--muted);flex-shrink:0;line-height:1.35}
-/* Serif and sentence case, echoing .nowbar .nt - this is the small sibling of
-   the Now bar's headline, and the count is the thing it is announcing. Caps
-   are for the label above it; a whole line of them here would just shout. */
-.ngbar .ng-l b{display:block;font-family:var(--serif);font-size:17px;font-weight:700;
-  text-transform:none;letter-spacing:0;color:var(--forest-ink);
+/* Sans, not the serif it launched with. The serif was borrowed from .nowbar .nt
+   to make this read as the Now bar's small sibling, but the two are no longer
+   siblings - this bar moved out of the header onto its own card, and a Georgia
+   line here just read as a second, competing headline. The count is a readout,
+   so it gets the body face and earns its emphasis from weight and size instead.
+   Sentence case stays: caps are for the label above it. */
+.ngbar .ng-l b{display:block;font-size:16px;font-weight:800;
+  text-transform:none;letter-spacing:-.1px;color:var(--forest-ink);
   font-variant-numeric:tabular-nums}
 .ngbar .ng-list{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
 /* Chips are buttons: this is where you tick the thing off, not just where you
@@ -3859,7 +3862,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="4.8";
+var APP_VERSION="4.9";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -3870,6 +3873,7 @@ var APP_VERSION="4.8";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-08T04:30:00+08:00",text:"A nickname now survives a refresh. Saving one already changed the heading straight away, but the next time you loaded the page it went back to a random silly name -- while the Nickname box still showed what you had saved, which made it look like the app had two different opinions about your name. It did. When the page loads it asks the server who you are, and the server was answering from your sign-in token rather than from the account sheet. Your token was issued before you set the nickname, so it kept reporting that you had none, and that empty answer overwrote the good one. The server now reads your nickname from the sheet, which is where it actually lives, so it is correct from the moment you save it until you change it again -- no signing out, no thirty-day wait. This one needs the Worker redeployed; until it is, the User & Role Management screen will say so. Also, the count in the Still to do bar is now in the ordinary text face instead of the serif one -- that serif was borrowed from the Now bar to make the two look related, and once the bar moved out of the header it just read as a second headline competing with the first."},
   {ts:"2026-09-08T03:20:00+08:00",text:"Eight new colour schemes: Blue eclipse, Chili spice, Ink wash, Burnt sienna, Lavender fields, Hydrangea, Retro sunset and Yacht club, alongside the original green which is now called Forest. The button in the header that used to say Theme: auto now names your colours and opens a picker with all nine as swatches, plus Auto, Light and Dark. The two choices are separate: every scheme has a light form and a dark form, so you can run Hydrangea light by day and Hydrangea dark at 3am. Your choice follows you to your other devices the same way the rest of the board does. Two colours never change, whichever scheme you pick: orange still means an appointment you agreed to attend, and red still means must-attend or overdue. A red scheme would otherwise make a must-attend appointment look like every other one, and the point of those two colours is that you can read them without thinking. Lane colours are also left alone, since a lane colour tells you whose time it is. Separately, the Still to do bar has moved out of the green header and become its own card just below it, the same width, and it now follows you onto every tab instead of living only on the Board. And the nickname now works properly: saving one updates the heading and the browser tab immediately instead of waiting until the next time you sign in. If the greeting still will not change, the User & Role Management screen will now tell you why -- your Worker needs redeploying, and it can finally say so instead of failing with a confusing error."},
   {ts:"2026-09-08T01:45:00+08:00",text:"The notification strip in the green header is gone -- every one of those flagged lines. In its place sits a single bar for what you still owe today: the words Still to do, then how many are left, then each outstanding non-negotiable and goal as a chip you can tap to tick it off. Ticking it there is the same as ticking it on the card further down, so the count, the streak and the percentage at the top all move together. A goal with a weekly target shows where it stands, like Exercise 0/3, and disappears from the bar once you have hit that target for the week. When the last one is ticked the whole bar disappears and the header gets its height back. It has moved out of the Now bar, which now answers one question again: what am I in. Three things went with the strip and are worth knowing about. All-day activities -- the ones you set with no start or end time -- used to announce themselves there, and the strip was the only place on the Board they ever appeared; they now show only in your Calendar tab. Nothing warns you before an appointment starts any more: an appointment first appears at the minute it begins, in the Now bar. And the count of tasks left open three or more days is no longer shown anywhere. Your data is untouched -- the reminder lead time is still saved on every activity, and every task still records the day you added it -- so any of the three can be brought back if you miss it."},
   {ts:"2026-09-08T00:30:00+08:00",text:"The Now bar has stopped looking ahead and started dealing with what is actually on you right now. The \"Upcoming\" line underneath it -- the one that named the next thing and counted down to it -- is gone. When two or three appointments run at the same time, the bar no longer picks one for the headline and demotes the rest to a smaller line: it now shows each of them in turn at full size, one every eight seconds, with a row of small dots beside the \"Happening now\" label so you can see how many there are. Tap a dot to hold that one on screen and stop the rotation; tap it again to let it carry on. Must-attend items come first in the cycle, then the rest in start order, so the thing you cannot skip is the thing you see first -- the day list below stays in plain clock order, which is what it is for. When only one appointment is running there are no dots and nothing moves, exactly as before. In the space the old Upcoming line used, the bar now shows what you still owe today: a count and then every non-negotiable and goal you have not ticked, straight from your Non-negotiables & Goals list -- just the name, not the note underneath it. A goal with a weekly target shows where it stands, like Exercise 2/3, and drops off the row entirely once you have hit that target for the week, so it only nags you on the days you are actually behind. The whole row disappears the moment the list is clear."},
@@ -6172,7 +6176,7 @@ function umMsg(t,kind){var m=umEl("umMsg");if(!m)return;
    control on this screen to do what it says. Bump it in lockstep with
    WORKER_VERSION over there whenever the app starts depending on something new.
    It is a plain string compare on dotted numbers, so keep both numeric. */
-var WORKER_MIN="4.8";
+var WORKER_MIN="4.9";
 function verLt(a,b){
   var x=String(a||"0").split("."),y=String(b||"0").split("."),i;
   for(i=0;i<Math.max(x.length,y.length);i++){

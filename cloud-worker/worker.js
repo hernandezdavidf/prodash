@@ -90,7 +90,7 @@
 // nickname save returned "Nothing to change." for weeks because the deployed
 // Worker predated the nickname field and quietly ignored it. There was no way
 // to ask what version was running. Now there is.
-const WORKER_VERSION = "4.8";
+const WORKER_VERSION = "4.9";
 
 // ===========================================================================
 // The Users sheet
@@ -519,6 +519,35 @@ async function logout(request, env) {
 
 async function me(request, env) {
   const session = await requireSession(request, env);
+
+  /* The nickname is read from the SHEET here, not from the token.
+
+     Everything else in this response can safely come out of the signed token,
+     because everything else KILLS THE SESSION when it changes: a role, a
+     status or a permission change bumps sessionEpoch, so the holder is signed
+     out and their next token is minted from the new row. The nickname
+     deliberately does not do that - it is a word in a heading, and signing
+     someone out over it would be absurd.
+
+     That exemption is exactly what broke it. session.nick is a snapshot taken
+     when the token was issued, so a nickname set afterwards was invisible to
+     this endpoint for the life of the token - up to thirty days. The symptom
+     was precise and misleading: saving worked, the sheet was correct, the
+     heading changed instantly, and then the next page load called /auth/me,
+     got nickname:"" from a token minted before the change, and merged that
+     empty string back over the good value. It looked like the save had not
+     persisted when in fact only this line disagreed with the sheet.
+
+     One row read per boot. /auth/me is a background confirmation - the board
+     has already opened from cache by the time it answers - so the cost is not
+     on any path the user waits for. Wrapped, because a Sheets hiccup must
+     degrade to the token's copy rather than fail the confirmation outright. */
+  let nickname = session.nick || "";
+  try {
+    const found = await findUser(env, (r) => r[F.userId] === session.uid);
+    if (found) nickname = found.row[F.nickname] || "";
+  } catch (e) { /* keep the token's copy */ }
+
   return json({
     ok: true,
     user: {
@@ -526,7 +555,7 @@ async function me(request, env) {
       username: session.un,
       role: session.role,
       caps: session.caps || [],
-      nickname: session.nick || "",
+      nickname: nickname,
       guestExpiresAt: session.gexp || null,
       boardId: session.bid,
     },

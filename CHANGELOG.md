@@ -2,6 +2,48 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-08 — /auth/me reads the nickname from the sheet, not the token (v4.9)
+
+### The bug
+
+v4.8 fixed the client half of the nickname (`applyGreeting()` re-runnable,
+`PDAuth.mergeUser()`, `umPatch()` writing the session) and the deploy half
+(`/health` versioning). Saving then worked — heading and tab title changed
+instantly, the sheet was correct, the Nickname field kept the value — and a
+refresh put a random pet name back.
+
+The give-away was that the *field* stayed right while the *heading* reverted:
+two sources disagreeing, not a failed write.
+
+`me()` answered `nickname: session.nick`, read out of the **signed token**.
+Everything else in that response can safely come from the token because
+everything else bumps `sessionEpoch` when it changes, forcing a re-login and a
+freshly-minted token. The nickname deliberately does **not** — `adminUpdateUser`
+has an explicit `// No killSessions: this is a word in a heading`. That
+exemption is exactly what broke it: `session.nick` is a snapshot from issue
+time, so a nickname set afterwards stayed invisible to `/auth/me` for the life
+of the token (up to 30 days), and boot merged that stale `""` back over the
+good value the admin panel had just written.
+
+### The fix
+
+`me()` now reads the row and takes `F.nickname` from the sheet, falling back to
+the token's copy inside a `try` so a Sheets hiccup degrades rather than fails
+the confirmation. One row read per boot, on a background endpoint the board has
+already opened from cache before it answers — not on any path the user waits on.
+
+`WORKER_VERSION` and `WORKER_MIN` both go to 4.9, so the User & Role Management
+banner demands the redeploy until it happens. Which is the versioning added in
+4.8 doing precisely the job it was added for, one release later.
+
+### Also
+
+`.ngbar .ng-l b` drops `--serif` for the body sans (16px/800). The serif was
+borrowed from `.nowbar .nt` when this row lived inside the Now bar and wanted to
+read as its small sibling. It is not a sibling any more — it moved onto its own
+card in 4.7 — and a Georgia line there read as a second headline competing with
+the real one.
+
 ## 2026-09-08 — Eight palettes on a second theme axis; the outstanding bar leaves the header; the nickname actually applies (v4.8)
 
 ### The outstanding bar is its own card
