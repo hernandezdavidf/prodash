@@ -2,6 +2,89 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-08 — All-day activities return to the day view (v4.10)
+
+### The bug, and why it wasn't where it looked
+
+An all-day activity appeared nowhere on the Board. Not a fault in the activity
+or in the Must-attend switch — which is why toggling `must` changed nothing, and
+why it looked so much like a save failure.
+
+`dayBlocks()` has always excluded `e.allDay`, because the day view is laid out
+by start/end minute and an all-day item has no position in it. That was
+survivable while the nudge strip existed: it announced all-day items, so they
+had *a* home on the Board. Deleting the strip in 4.7 took that home away and
+left the exclusion behind. The v4.7 changelog and a comment at the exclusion
+both recorded this as a known consequence; this is that consequence coming due.
+
+### The fix
+
+A new `allDayOn(k)`, read by `renderTimeline()` and drawn as its own band above
+the timed list — where a calendar puts these, and the same shape the Calendar
+tab already uses.
+
+**They stay out of `dayBlocks()`/`daySpans()`, deliberately.** Those feed
+`currentSpan()`, which prefers a calendar activity covering the current minute
+over the routine block underneath it. An all-day item given a 00:00–24:00 span
+would therefore win the Now bar every minute of every day and permanently
+replace "Day Client" with "Bills: Water District". An all-day item is the frame
+around the day, not the thing you are in.
+
+### The Now bar, in the gaps only
+
+`nowRotation()` makes the precedence explicit, and it is the whole safety
+argument:
+
+1. timed appointments happening this minute (rotating, must-attend first)
+2. the routine block you are inside (no rotation — there is one)
+3. today's outstanding all-day activities (rotating)
+4. nothing, and the bar reads "Unscheduled"
+
+Three is new. An all-day item can reach the headline **only** in a slot that
+would otherwise say "Unscheduled", which is exactly what makes it safe: it can
+never displace the block you are working, and it cannot hold the bar all day.
+That answers the objection to giving all-day items a real span without touching
+`daySpans()` or `currentSpan()` at all.
+
+The pseudo-span carries `allDay:true` and no `st`/`en` — deliberately, so it
+stays ineligible for the span layer. The rotation key includes the shape
+(`id@ad` vs `id@st`) rather than keying on an undefined `st`. Label reads "All
+day today", and the meta line states what the item *is* (repeat rule, note)
+because there is no countdown to run.
+
+The 8s ticker moved from `nowSpans()` to `nowRotation()`; asking a different
+question than `renderNow()` answers would have left the dots and the headline
+disagreeing about how many items there are.
+
+Precedence verified across all six states: nothing → "Unscheduled"; one all-day
+→ headline, no dots; two all-day → rotating with 2 dots; a timed appointment
+present → it wins; routine block restored → it wins; all-day ticked done →
+back to "Unscheduled".
+
+The band carries no `now` and no `past` badge — it has no start to be current at
+and no end to be over at. Its only state is done, ticked from the Calendar,
+which renders `past doneb` and a done badge exactly as a timed activity does.
+
+### Shared wiring
+
+Tap-to-edit and the `×` were inline in `renderTimeline()`'s loop. They are now
+`wireActivityRow(el, b, k)`, used by both the band and the timed list, so the
+two cannot drift into disagreeing about what a row does — including the
+recurring-activity prompt, where guessing wrong destroys a series to cancel one
+day. The timed path passes yesterday's key for a carry-over occurrence, as
+before.
+
+Regression-checked after the refactor: tapping a timed appointment still opens
+the right activity with the right start time, and a routine block's `×` is still
+the hide-from-schedule path rather than a delete.
+
+### Styling
+
+`.blk.allday` takes a solid bottom rule against the dashed one every other row
+carries — that change of rule is what separates the band from the clock-ordered
+list without needing a heading to say so. "ALL DAY" is set in caps at label
+weight in the time column, which is otherwise all tabular digits.
+
 ## 2026-09-08 — Section headings go sans (v4.9.1)
 
 Follows the same call made for `.ngbar .ng-l b` in 4.9, applied to the headings
