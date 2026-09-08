@@ -2,6 +2,93 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-08 — Fix the time-reset bug; suggest the next free hour (v4.11)
+
+### The reset bug, and where it actually was
+
+One line in `amSave()`:
+
+```js
+e.s = allDay ? "" : s;   e.e = allDay ? "" : en;
+```
+
+Ticking **All day** *destroyed* the stored times. `openActivity()` then found
+`e.s` empty and fell through to its hardcoded `"09:00"` / `"10:00"`, which is
+what read as "the time reset itself to the default". A 2pm meeting marked
+all-day for a day came back as a 9am one, permanently — the original times were
+not recoverable from anywhere.
+
+Now `e.s = s; e.e = en;` unconditionally, with `e.allDay` alone deciding how the
+activity is treated. Keeping the times is inert for an all-day item — every
+reader tests `allDay` first (`dayBlocks()` excludes it, `allDayOn()` collects
+it, `activitiesOn()` sorts it above the timed ones, the Calendar prints "All
+day" instead of a range) — and un-ticking the box now hands back exactly what
+was there. Nothing ever required these fields to be empty; the emptiness *was*
+the bug.
+
+`openActivity()` no longer has a default on the edit path at all: an existing
+activity renders `e.s`/`e.e` verbatim, and the suggestion logic runs only for
+`!e`.
+
+### Next free hour
+
+`nextFreeHour(k)` walks whole hours looking for one that does not overlap an
+existing timed activity on that date.
+
+- **Calendar activities only, not routine blocks.** The routine covers nearly
+  all 24 hours on a weekday, so counting it would push every suggestion off the
+  end of the search and the feature would never suggest anything useful.
+- On **today**, starts from the top of the next hour rather than
+  `DEFAULT_START_HOUR` — offering 9am at 3pm is worse than useless.
+- Overlap is **half-open**: an activity ending at 10:00 does not block 10:00.
+- Searches to `LAST_HOUR` (22) so the +1h end stays inside the day, and falls
+  back to the first candidate rather than refusing — a suggestion is a
+  convenience and must never block creation.
+- Midnight-crossing activities are normalised (`en += 1440`) before the overlap
+  test, so an 11pm–2:30am booking is busy at 11pm, not "busy from 2:30 back to
+  11".
+
+`DEFAULT_START_HOUR` (9) and `DEFAULT_MINS` (60) replace the two literals.
+Constants rather than settings because the app has no working-hours or duration
+setting to read; if one is added, these are what it replaces. **Timezone needs
+no handling** — every date is a local wall-clock date and `nowDm()` is local
+minutes, so there is no conversion anywhere to get wrong.
+
+### End follows Start, duration preserved
+
+Moving Start shifts End by the same delta, so the *current* duration survives —
+a 30-minute activity dragged an hour later is still 30 minutes, not reset to an
+hour. There is deliberately **no** "has End been touched" flag governing this:
+the rule is identical whether the duration came from `DEFAULT_MINS` on a new
+activity or from what was saved on an existing one, so an explicit End is never
+overwritten with a default, only carried along. Setting End by hand is a manual
+override that then persists through further Start changes.
+
+### One flag, and the trap it avoids
+
+`amTimesTouched` gates the date-change re-suggestion. It has to be a real flag:
+the obvious test — "is Start still what we suggested?" — is wrong, because
+`amStartMoved()` updates `amPrevStart` as it goes, so after one edit the two
+agree again and a hand-typed time reads as untouched. It did, and a later date
+change wiped the user's 3pm back to the suggestion. Caught in testing.
+
+### Verified
+
+Suggestion: empty day → 09:00; earlier booking → 10:00; gap between two → the
+gap; after a long block → 13:00; activity ending at 10:00 leaves 10:00 free;
+today → never an hour already gone.
+
+Persistence: edit shows saved times; unrelated-field edit preserves them; reopen
+preserves them; Start move preserves duration; manual End sticks and is carried
+through later Start moves; midnight-crossing duration preserved (23:00–02:30 →
+22:00–01:30); all-day round trip returns the original times; manual Start and
+manual End both survive a date change; an untouched new activity still
+re-suggests on a date change; existing activity's date change never touches its
+time.
+
+Downstream: day view row, Now bar headline and `nowRotation()` all read the
+saved times.
+
 ## 2026-09-08 — All-day activities return to the day view (v4.10)
 
 ### The bug, and why it wasn't where it looked

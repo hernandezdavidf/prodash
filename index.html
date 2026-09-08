@@ -3895,7 +3895,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="4.10";
+var APP_VERSION="4.11";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -3906,6 +3906,7 @@ var APP_VERSION="4.10";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-08T11:10:00+08:00",text:"Two things about scheduling. First, the bug: an activity's time could reset itself to 9:00-10:00. The cause was ticking \"All day\" -- doing that threw the times away rather than just ignoring them, so a 2pm meeting marked all-day came back as a 9am one, and the times were gone for good. The times are now always kept and the All day tick only decides how the activity is treated, so un-ticking it hands back exactly what was there. Editing an existing activity no longer has a default anywhere in its path: what you saved is what you see, whatever else you change. Second, new activities are now scheduled for you. Instead of always offering 9:00, the editor looks at what else you have booked that day and offers the next free hour -- if 9 to 10 is taken it offers 10, if there is a gap between two bookings it offers the gap, and on today it never offers an hour that has already gone. An empty day still starts at 9:00. The End time follows the Start an hour later, and once you set a length yourself that length is kept when you move the Start: a 30-minute activity dragged an hour later is still 30 minutes, not reset to an hour. Anything you type by hand is left alone from then on, including if you change the date afterwards. Your routine blocks are not counted as busy for this -- only real appointments -- otherwise there would be no free hour to find on a weekday."},
   {ts:"2026-09-08T07:30:00+08:00",text:"All-day activities are back on the Board. An activity you set as All day -- one with no start or end time, like \"Bills: Water District\" -- was showing only in your Calendar tab and nowhere on the Board at all. That was not a fault in the activity or in the Must attend switch, which is why toggling it changed nothing: \"What does my day look like?\" lays the day out by clock time, an all-day item has no clock time, and it was being left out. It used to be announced by the old notification strip in the green header, and when that strip was removed nothing was left to show it. There is now an All day band at the top of the list, above everything with a time on it, exactly where a calendar puts these. Each one shows its name, whether it is must-attend, and whether it repeats; tapping it opens the same editor as any other activity and the x removes it, asking first if it is a repeating one. Ticking it off in the Calendar shows it as done here too. The Now bar shows them as well, but only in the gaps -- where it used to say \"Unscheduled\" it now names your all-day activity instead, with two or more taking turns the way overlapping appointments already do. It will not do this at any other time: an appointment happening right now comes first, then the routine block you are inside, and only when there is neither does an all-day item take the space. That ordering is the point. Something that runs all day would otherwise win the bar every minute of every day and permanently hide the block you are actually working."},
   {ts:"2026-09-08T06:15:00+08:00",text:"Section headings are now in the ordinary text face instead of the serif one -- \"What does my day look like?\", \"Non-negotiables & Goals\", \"My Personal Calendar\", \"Expense Tracker\", \"User & Role Management\", the title on every panel that opens over the page, and your lane names on both the Classic board and the Consolidated Checklist. Same change as the count in the Still to do bar. The greeting at the top of the page keeps the serif: one line of it reads as the app's signature, the same face repeated down every card just looked like a font. Nothing moved and nothing changed size beyond the headings themselves. Two places deliberately keep the serif for their own reasons: the ruled Consolidated Checklist page, where the serif is the notebook it is imitating, and the Bible reader, where it is there to be read at length."},
   {ts:"2026-09-08T04:30:00+08:00",text:"A nickname now survives a refresh. Saving one already changed the heading straight away, but the next time you loaded the page it went back to a random silly name -- while the Nickname box still showed what you had saved, which made it look like the app had two different opinions about your name. It did. When the page loads it asks the server who you are, and the server was answering from your sign-in token rather than from the account sheet. Your token was issued before you set the nickname, so it kept reporting that you had none, and that empty answer overwrote the good one. The server now reads your nickname from the sheet, which is where it actually lives, so it is correct from the moment you save it until you change it again -- no signing out, no thirty-day wait. This one needs the Worker redeployed; until it is, the User & Role Management screen will say so. Also, the count in the Still to do bar is now in the ordinary text face instead of the serif one -- that serif was borrowed from the Now bar to make the two look related, and once the bar moved out of the header it just read as a second headline competing with the first."},
@@ -7362,6 +7363,89 @@ function amSyncRepeatUI(){
 }
 function amSyncAllDay(){ amEl("amTimes").hidden=amEl("amAllDay").checked; }
 
+/* ---------- default times for a NEW activity ------------------------------
+   The old defaults were the literals "09:00" and "10:00", written in two
+   places in openActivity() and used for new AND existing activities alike.
+
+   DEFAULT_START_HOUR is the fallback when a day is empty, and DEFAULT_MINS is
+   how long a new activity is assumed to run. They are constants rather than
+   settings because the app has no working-hours or per-user duration setting
+   to read - if one is ever added, these two are what it replaces. Timezone
+   needs no handling: every date in ProDash is a local wall-clock date and
+   nowDm() is local minutes, so there is no conversion anywhere to get wrong. */
+var DEFAULT_START_HOUR=9, DEFAULT_MINS=60;
+
+/* The next free hour on a date, for a new activity's Start.
+
+   Considers CALENDAR ACTIVITIES ONLY, not the routine blocks. The routine
+   covers almost the entire 24 hours on a weekday, so counting it would mean
+   every suggestion fell off the end of the search and the feature would never
+   suggest anything useful. "What else have I agreed to that day" is the
+   question this answers.
+
+   Starts from the top of the next hour when the date is today and the day is
+   already past DEFAULT_START_HOUR - suggesting 9am at 3pm would be worse than
+   useless. Stops at LAST_HOUR so the +1h end stays inside the same day; a day
+   that full falls back to the first candidate rather than blocking creation,
+   because a suggestion is a convenience and must never be a refusal. */
+function nextFreeHour(k){
+  var LAST_HOUR=22;
+  var busy=(S.events||[]).filter(function(e){
+    return !e.allDay&&e.s&&e.e&&occursOn(e,k);
+  }).map(function(e){
+    var st=mins(e.s),en=mins(e.e);
+    if(en<=st)en+=1440;                 // runs through midnight
+    return [st,en];
+  });
+  var from=DEFAULT_START_HOUR;
+  if(k===today()){
+    var nextHour=Math.ceil((nowDm()+1)/60);   // +1 so 10:00 exactly still gives 11
+    if(nextHour>from)from=nextHour;
+  }
+  if(from>LAST_HOUR)from=LAST_HOUR;
+  for(var h=from;h<=LAST_HOUR;h++){
+    var a=h*60,b=a+DEFAULT_MINS,clash=false;
+    for(var i=0;i<busy.length;i++){
+      // Half-open overlap: an activity ending at 10:00 does not block 10:00.
+      if(a<busy[i][1]&&b>busy[i][0]){clash=true;break;}
+    }
+    if(!clash)return a;
+  }
+  return from*60;
+}
+function hhmmOf(m){
+  m=((Math.round(m)%1440)+1440)%1440;
+  return String(Math.floor(m/60)).padStart(2,"0")+":"+String(m%60).padStart(2,"0");
+}
+/* Start moved, so End follows it and KEEPS THE DURATION the user is currently
+   working with - a 30-minute activity dragged an hour later is still 30
+   minutes. This is why there is no "has the user touched End yet" flag: the
+   rule is the same whether the duration came from DEFAULT_MINS on a new
+   activity or from what was saved on an existing one, so an explicit End is
+   never overwritten with a default, only carried along. Requirement: changing
+   Start adjusts End; changing End is a manual override that sticks. Both hold. */
+/* amTimesTouched is a separate flag and NOT "is Start still what we suggested".
+   It cannot be, because amStartMoved() updates amPrevStart as it goes, so after
+   a single edit the two agree again and a comparison would call a hand-typed
+   time untouched - which it did, and a later date change wiped the user's 3pm
+   back to the suggestion. Only a real user event sets this; openActivity()
+   seeds amPrevStart directly and deliberately leaves the flag alone. */
+var amPrevStart="",amTimesTouched=false;
+function amStartMoved(){
+  amTimesTouched=true;
+  var s=amEl("amStart").value;
+  if(!s){amPrevStart="";return;}
+  var e=amEl("amEnd").value;
+  if(amPrevStart&&e){
+    var dur=mins(e)-mins(amPrevStart);
+    if(dur<=0)dur+=1440;                      // the activity runs past midnight
+    amEl("amEnd").value=hhmmOf(mins(s)+dur);
+  }else if(!e){
+    amEl("amEnd").value=hhmmOf(mins(s)+DEFAULT_MINS);
+  }
+  amPrevStart=s;
+}
+
 function openActivity(id,dateKey){
   amEditing=id||null; amDate=dateKey||today(); amMsg("");
   var e=id?(S.events||[]).filter(function(x){return x.id===id;})[0]:null;
@@ -7371,8 +7455,23 @@ function openActivity(id,dateKey){
   amEl("amName").value=e?e.n:"";
   amEl("amDate").value=e?e.date:amDate;
   amEl("amAllDay").checked=e?!!e.allDay:false;
-  amEl("amStart").value=e&&e.s?e.s:"09:00";
-  amEl("amEnd").value=e&&e.e?e.e:"10:00";
+  /* An EXISTING activity is shown exactly as it was saved, with no default
+     anywhere in the path - that is requirement one, and the old code failed it
+     by falling through to a literal whenever e.s happened to be empty.
+     A NEW one is suggested the next free hour on its date, plus DEFAULT_MINS.
+     amPrevStart is seeded with whatever Start ends up showing so the very first
+     nudge of the Start field moves End by the right amount rather than
+     rediscovering the duration from nothing. */
+  if(e){
+    amEl("amStart").value=e.s||"";
+    amEl("amEnd").value=e.e||"";
+  }else{
+    var sug=nextFreeHour(amEl("amDate").value||amDate);
+    amEl("amStart").value=hhmmOf(sug);
+    amEl("amEnd").value=hhmmOf(sug+DEFAULT_MINS);
+  }
+  amPrevStart=amEl("amStart").value;
+  amTimesTouched=false;   // fresh dialog: nothing here came from the user yet
   amEl("amNotes").value=e?(e.d||""):"";
   amEl("amMust").checked=e?!!e.must:false;
   amEl("amRemind").value=e&&e.remind!==undefined&&e.remind!==null?String(e.remind):"120";
@@ -7424,7 +7523,22 @@ function amSave(){
   var e=amEditing?(S.events||[]).filter(function(x){return x.id===amEditing;})[0]:null;
   if(!e){ e={id:"evt_"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),ev:true,done:{},ex:[]}; S.events.push(e); }
   e.n=name; e.date=date; e.allDay=allDay;
-  e.s=allDay?"":s; e.e=allDay?"":en;
+  /* THE TIME-RESET BUG LIVED ON THIS LINE. It used to read
+       e.s = allDay ? "" : s;   e.e = allDay ? "" : en;
+     so ticking "All day" DESTROYED the stored times. Reopening then found
+     e.s empty and fell back to the hardcoded 09:00/10:00 in openActivity(),
+     which is what looked like "the time reset itself to the default": a 2pm
+     meeting marked all-day for a day came back as a 9am one, permanently.
+
+     The times are now always stored and e.allDay alone decides how the
+     activity is treated. Keeping them is inert for an all-day item - every
+     reader tests allDay first (dayBlocks() excludes it, allDayOn() collects
+     it, activitiesOn() sorts it above the timed ones, the Calendar prints
+     "All day" instead of a range) - and it means un-ticking the box hands
+     back exactly the times that were there before, which is the only
+     non-surprising behaviour. Nothing in the app has ever required these to
+     be empty; the emptiness was the bug. */
+  e.s=s; e.e=en;
   e.d=amEl("amNotes").value.trim();
   e.cat=amEl("amCat").value;
   e.lane=amEl("amLane").value||null;
@@ -7486,10 +7600,28 @@ document.addEventListener("keydown",function(ev){
    the opposite case - an activity whose end is earlier than its start runs
    through midnight, which is legal and handled (see spanOf), but is also what a
    typo looks like. */
+/* "input", not "change": a time field fires change only on blur in some
+   browsers, so End would lag a step behind Start while the user was still
+   spinning it. */
+amEl("amStart").addEventListener("input",amStartMoved);
+amEl("amStart").addEventListener("change",amStartMoved);
 amEl("amEnd").addEventListener("change",function(){
+  amTimesTouched=true;
   var s=amEl("amStart").value,e=amEl("amEnd").value;
   if(s&&e&&e<s)amMsg("Heads up: this ends before it starts, so it runs through midnight into the next day.");
   else amMsg("");
+});
+/* Changing the DATE re-suggests, but only for a new activity the user has not
+   already given a time to. Moving an existing appointment to another day must
+   never touch its time, and neither must picking a date after deliberately
+   setting one. */
+amEl("amDate").addEventListener("change",function(){
+  if(amEditing)return;          // an existing activity keeps its time, always
+  if(amTimesTouched)return;     // and so does a time the user has already set
+  var sug=nextFreeHour(amEl("amDate").value||today());
+  amEl("amStart").value=hhmmOf(sug);
+  amEl("amEnd").value=hhmmOf(sug+DEFAULT_MINS);
+  amPrevStart=amEl("amStart").value;
 });
 
 /* ==================== EXPENSE TRACKER ====================================
@@ -9061,6 +9193,11 @@ window.dfDebug={dayBlocks:dayBlocks,today:today,norm:norm,state:function(){retur
   // pendingRituals() is the outstanding row. All pure reads, safe anytime.
   nowSpans:nowSpans,nowRotation:nowRotation,allDayOn:allDayOn,
   pendingRituals:pendingRituals,
+  // Scheduling: dfDebug.nextFreeHour("2026-09-12") answers what a new activity
+  // on that date would be offered, without opening the editor. openActivity is
+  // exposed so the editor's own defaulting can be exercised directly - it is
+  // the thing that regressed, so it needs to be reachable.
+  nextFreeHour:nextFreeHour,openActivity:openActivity,closeActivity:closeActivity,
   xlsxBlob:xlsxBlob,buildZip:buildZip,crc32:crc32,
   // Board History hooks: dfDebug.hist() · dfDebug.stateAt("rev_…") · dfDebug.devices()
   hist:function(){return S.hist;}, devices:function(){return S.devices;},
