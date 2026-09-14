@@ -3278,6 +3278,169 @@ return {
     .wg-max .bb-size-l .bb-txt{font-size:21px}
     .wg-max .bb-read{padding:22px 26px}
 
+    /* ---- Teleprompter: library + editor (in the dock) ---- */
+    .tp-lib-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+    .tp-row{display:flex;align-items:stretch;gap:0;margin-bottom:8px;border:1px solid var(--line);
+      border-radius:11px;background:var(--paper);overflow:hidden}
+    .tp-row:hover{border-color:var(--sage)}
+    .tp-open{flex:1 1 auto;min-width:0;text-align:left;padding:10px 12px;background:none;border:0;cursor:pointer}
+    .tp-nm{display:block;font-size:13px;font-weight:700;color:var(--ink);overflow-wrap:anywhere}
+    .tp-sub{display:block;font-size:11px;color:var(--muted);margin-top:2px;font-variant-numeric:tabular-nums}
+    /* Quick start is its own full-height target at the right of every row, so
+       "prompt this now" is one tap from the list and never a hunt through the
+       editor. Brand fill because it is the primary thing this list is for. */
+    .tp-go{flex:none;width:52px;border:0;border-left:1px solid var(--line);cursor:pointer;
+      background:var(--olive-lt);color:var(--forest-ink);display:flex;align-items:center;justify-content:center}
+    .tp-go:hover{background:var(--forest);color:var(--on-brand)}
+    .tp-go svg{fill:currentColor}
+    .tp-empty{padding:18px 14px;text-align:center;font-size:12.5px;line-height:1.6;color:var(--muted);
+      border:1px dashed var(--line);border-radius:11px}
+    .tp-ed-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+    .tp-state{font-size:10.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+    .tp-state.dirty{color:var(--terra-ink)}
+    .tp-lbl{display:block;font-size:10.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;
+      color:var(--muted);margin:10px 0 5px}
+    .tp-in{width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid var(--line);border-radius:9px;
+      background:var(--paper);color:var(--ink);font:inherit;font-size:14px}
+    .tp-in:focus{outline:none;border-color:var(--forest);box-shadow:0 0 0 3px var(--olive-lt)}
+    /* Tall enough to see a paragraph at a time in the default dock; in the
+       expanded dock it grows with the space, which is where real editing
+       of a long script actually happens. */
+    .tp-body{min-height:190px;resize:vertical;line-height:1.6}
+    .wg-max .tp-body{min-height:52vh}
+    .tp-stats{margin-top:6px;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+    .tp-ed-acts{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-top:12px}
+    .tp-ed-acts .am-del{margin-left:auto}
+
+    /* ---- Teleprompter: the stage ----
+       Light text on the palette's own deepest brand value (--hdr-a), in every
+       theme and both modes. Dark-ground prompting is not a style preference:
+       it is what keeps glare off glasses and reflections off a camera lens,
+       and it is what every hardware prompter does. Using --hdr-a rather than
+       a literal black means the stage still belongs to the chosen palette -
+       deep indigo on Blue eclipse, deep teal on Yacht club - and every --hdr-a
+       in the palette table carries white well past AA. */
+    #tpStage{position:fixed;inset:0;z-index:9995;
+      background:var(--hdr-a);color:#fff;outline:none}
+    #tpStage[hidden]{display:none}
+    /* The reading area is the WHOLE stage, and the control bar floats over its
+       bottom edge. The first version stacked them as flex siblings, which meant
+       a bar that faded out while playing still held its space: on a landscape
+       phone the speaker lost 143px of 375 for the entire presentation to an
+       invisible band. Overlaid, the bar sits on top of the bottom fade - text
+       there is already dissolving and is never the reading zone - and when it
+       goes idle the full screen is text. */
+    .tp-view{position:absolute;inset:0;overflow:hidden;cursor:default;
+      touch-action:none;user-select:none;-webkit-user-select:none}
+    /* Fades at both edges so text arrives and leaves rather than being cut by a
+       hard line - the eye stays on the reading band instead of the frame. */
+    .tp-view:before,.tp-view:after{content:"";position:absolute;left:0;right:0;z-index:2;pointer-events:none}
+    .tp-view:before{top:0;height:22%;background:linear-gradient(var(--hdr-a),transparent)}
+    .tp-view:after{bottom:0;height:30%;background:linear-gradient(transparent,var(--hdr-a))}
+    /* The column is moved with translate3d, never scrollTop. scrollTop snaps to
+       whole device pixels, so at a slow reading speed the text visibly stutters
+       one pixel at a time; a transform moves in sub-pixel steps on the GPU,
+       which is the difference between "smooth" and "ticking". will-change keeps
+       it on its own layer so a long script is not repainted every frame. */
+    .tp-col{position:absolute;left:0;right:0;top:0;will-change:transform;
+      padding:34vh max(5vw,20px) 70vh}
+    .tp-txt{max-width:30em;margin:0 auto;font-family:var(--sans);font-weight:700;
+      letter-spacing:.1px;overflow-wrap:anywhere;color:#fff}
+    .tp-txt p{margin:0 0 .9em}
+    /* The eye line. Speakers read best a third of the way down - high enough to
+       keep the gaze near a camera lens, low enough to see what is coming. The
+       text is padded so the first line starts ON this band. */
+    .tp-line{position:absolute;left:0;right:0;top:34vh;height:0;z-index:3;pointer-events:none;
+      border-top:2px solid rgba(255,255,255,.22)}
+    .tp-line:before,.tp-line:after{content:"";position:absolute;top:-8px;border:7px solid transparent}
+    .tp-line:before{left:6px;border-left-color:var(--olive)}
+    .tp-line:after{right:6px;border-right-color:var(--olive)}
+    .tp-cd{position:absolute;inset:0;z-index:4;display:flex;align-items:center;justify-content:center;
+      font-size:min(38vw,220px);font-weight:800;color:#fff;background:rgba(0,0,0,.35);
+      font-variant-numeric:tabular-nums;pointer-events:none}
+    .tp-cd[hidden],.tp-end[hidden],.tp-toast[hidden]{display:none}
+    /* Explains a refusal - full screen or orientation lock blocked by the browser
+       - instead of letting the button appear to do nothing. Top of the screen so
+       it never sits over the reading band or the controls. */
+    .tp-toast{position:absolute;left:50%;top:max(14px,env(safe-area-inset-top));z-index:6;
+      transform:translateX(-50%);max-width:min(92vw,460px);padding:9px 15px;border-radius:12px;
+      background:rgba(0,0,0,.72);border:1px solid rgba(255,255,255,.2);
+      font-size:12.5px;line-height:1.45;text-align:center;pointer-events:none}
+    .tp-end{position:absolute;left:50%;bottom:18%;z-index:4;transform:translateX(-50%);
+      padding:8px 16px;border-radius:999px;background:rgba(0,0,0,.4);
+      font-size:12px;font-weight:800;letter-spacing:1px;text-transform:uppercase;pointer-events:none}
+
+    /* Overlaid on the bottom of the view (see .tp-view). The ground fades in over
+       the top 26px and is SOLID stage colour from there down. A translucent black
+       wash was tried first and was wrong: bold 48px text passing underneath stayed
+       legible straight through it and ran into the Play button. Solid --hdr-a
+       means text slides cleanly behind the controls, and being the stage's own
+       colour it reads as the page continuing rather than a panel on top. */
+    .tp-bar{position:absolute;left:0;right:0;bottom:0;z-index:5;
+      display:flex;align-items:center;gap:12px 18px;flex-wrap:wrap;
+      padding:26px max(3vw,14px) calc(12px + env(safe-area-inset-bottom));
+      background:linear-gradient(transparent,var(--hdr-a) 26px);
+      transition:opacity .25s ease,transform .25s ease}
+    /* Idle while playing: the bar fades away and STOPS TAKING CLICKS. That second
+       half is the interruption guard - a hand brushing the screen mid-sentence
+       only brings the controls back, it cannot press one of them. */
+    #tpStage.tp-idle .tp-bar{opacity:0;transform:translateY(8px);pointer-events:none}
+    #tpStage.tp-idle .tp-view{cursor:none}
+    .tp-transport{display:flex;align-items:center;gap:8px}
+    .tp-btn{width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.28);
+      background:rgba(255,255,255,.08);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer}
+    .tp-btn svg{fill:currentColor}
+    .tp-btn:hover{background:rgba(255,255,255,.18)}
+    .tp-play{width:58px;height:58px;background:var(--forest);border-color:var(--forest)}
+    .tp-play:hover{background:var(--forest-dk)}
+    .tp-play .tp-i-pause{display:none}
+    #tpStage.tp-on .tp-play .tp-i-play{display:none}
+    #tpStage.tp-on .tp-play .tp-i-pause{display:block}
+    .tp-btn:focus-visible,.tp-txtbtn:focus-visible,.tp-sl input:focus-visible{outline:2px solid #fff;outline-offset:3px}
+    .tp-sliders{display:flex;gap:10px 18px;flex-wrap:wrap;flex:1 1 360px;min-width:0}
+    .tp-sl{display:flex;align-items:center;gap:8px;font-size:10.5px;font-weight:800;letter-spacing:.6px;
+      text-transform:uppercase;color:rgba(255,255,255,.78);flex:1 1 150px;min-width:0}
+    .tp-sl input{flex:1 1 auto;min-width:60px;accent-color:var(--olive)}
+    .tp-sl output{min-width:2.6em;text-align:right;color:#fff;font-variant-numeric:tabular-nums;letter-spacing:0}
+    .tp-acts{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+    .tp-txtbtn{padding:9px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.28);
+      background:transparent;color:#fff;font-size:12px;font-weight:700;cursor:pointer}
+    .tp-txtbtn[hidden]{display:none}
+    .tp-txtbtn:hover,.tp-txtbtn[aria-pressed="true"]{background:rgba(255,255,255,.16)}
+    .tp-exit{border-color:rgba(255,255,255,.5)}
+    @media(max-width:620px){
+      .tp-bar{gap:10px 12px}
+      .tp-sliders{flex-basis:100%;order:3}
+      .tp-sl{flex-basis:100%}
+      .tp-acts{margin-left:auto}
+      .tp-col{padding-top:28vh}
+      .tp-line{top:28vh}
+    }
+    /* Landscape phone: vertical space is the scarce thing, so the eye line
+       climbs and the bar tightens rather than eating half the screen. */
+    @media(orientation:landscape) and (max-height:500px){
+      .tp-col{padding-top:22vh}
+      .tp-line{top:22vh}
+      .tp-bar{gap:6px 12px;padding-top:18px;padding-bottom:calc(6px + env(safe-area-inset-bottom))}
+      .tp-sliders{flex:1 1 300px;order:0;gap:4px 12px}
+      .tp-sl{flex:1 1 90px;font-size:9px;gap:5px}
+      .tp-sl input{min-width:40px}
+      .tp-btn{width:40px;height:40px}
+      .tp-play{width:48px;height:48px}
+    }
+    /* Reduced motion switches off the DECORATIVE movement only - the bar sliding
+       and fading. The scroll itself is the feature the user deliberately
+       started; stopping it would not reduce motion, it would break the tool. */
+    @media(prefers-reduced-motion:reduce){
+      .tp-bar{transition:none}
+    }
+    /* Touch: the text buttons were 36px tall, which is a miss waiting to happen
+       on Exit - the one control whose accidental press ends the session.
+       Same rule as the board's: grow the target, not the type. */
+    @media(pointer:coarse){
+      .tp-txtbtn{min-height:44px;padding-left:16px;padding-right:16px}
+    }
+
     @media(max-width:620px){
       /* Bottom sheet. Full-bleed and anchored to the bottom edge because that
          is where a thumb is, and because a floating card on a 375px screen is
@@ -3347,6 +3510,75 @@ return {
         <div id="bbStage"></div>
       </section>
 
+      <!-- Teleprompter: the library and the editor live here in the dock; the
+           prompting itself happens in #tpStage below, because reading a script
+           aloud from a 400px card is not a thing anyone can actually do. -->
+      <section class="wg-panel" id="wgp-prompter" role="tabpanel" aria-labelledby="wgc-prompter" hidden>
+        <div id="tpLib">
+          <div class="tp-lib-head">
+            <span class="wg-mut" id="tpLibCount"></span>
+            <button class="ag-btn" id="tpNew">+ New script</button>
+          </div>
+          <div id="tpList"></div>
+        </div>
+        <div id="tpEdit" hidden>
+          <div class="tp-ed-head">
+            <button class="bb-crumb" id="tpBack">&#8592; Scripts</button>
+            <span class="tp-state" id="tpState" aria-live="polite"></span>
+          </div>
+          <label class="tp-lbl" for="tpTitle">Title</label>
+          <input id="tpTitle" class="tp-in" maxlength="80" placeholder="e.g. Monday stand-up" autocomplete="off">
+          <label class="tp-lbl" for="tpBody">Script</label>
+          <textarea id="tpBody" class="tp-in tp-body" maxlength="30000" placeholder="Type or paste your script. A blank line starts a new paragraph."></textarea>
+          <div class="tp-stats" id="tpStats"></div>
+          <div class="tp-ed-acts">
+            <button class="ag-btn" id="tpStart">&#9654;&#xFE0E; Start prompter</button>
+            <button class="ag-btn ghost" id="tpSave">Save</button>
+            <button class="hist-btn am-del" id="tpDel">Delete</button>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <!-- ================== TELEPROMPTER STAGE ============================
+       A full-viewport layer, not a size of the dock. It sits beside #wgDock
+       and outside .viewpanel for the same containing-block reason the dock
+       does, and above it (z 9995) so it covers the dock it was opened from.
+       role=dialog + aria-modal because while it is up nothing else on the page
+       is meant to be reachable - you are presenting. -->
+  <div id="tpStage" hidden role="dialog" aria-modal="true" aria-label="Teleprompter" tabindex="-1">
+    <div class="tp-view" id="tpView">
+      <div class="tp-col" id="tpCol"><div class="tp-txt" id="tpTxt"></div></div>
+      <div class="tp-line" aria-hidden="true"></div>
+      <div class="tp-cd" id="tpCd" hidden aria-live="assertive"></div>
+      <div class="tp-end" id="tpEndMsg" hidden>End of script</div>
+      <div class="tp-toast" id="tpToast" hidden role="status"></div>
+    </div>
+    <div class="tp-bar" id="tpBar">
+      <div class="tp-transport">
+        <button class="tp-btn" id="tpRestart" title="Restart from the top (R)" aria-label="Restart from the top">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d="M12 5V2L7 6l5 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/></svg>
+        </button>
+        <button class="tp-btn tp-play" id="tpPlay" title="Play (Space)" aria-label="Play">
+          <svg class="tp-i-play" viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" focusable="false"><path d="M8 5v14l11-7z"/></svg>
+          <svg class="tp-i-pause" viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" focusable="false"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>
+        </button>
+        <button class="tp-btn" id="tpStop" title="Stop and go back to the top" aria-label="Stop">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M6 6h12v12H6z"/></svg>
+        </button>
+      </div>
+      <div class="tp-sliders">
+        <label class="tp-sl"><span>Speed</span><input type="range" id="tpSpeed" min="1" max="20" step="1"><output id="tpSpeedV"></output></label>
+        <label class="tp-sl"><span>Size</span><input type="range" id="tpSize" min="24" max="96" step="2"><output id="tpSizeV"></output></label>
+        <label class="tp-sl"><span>Spacing</span><input type="range" id="tpGap" min="1.1" max="2.4" step="0.1"><output id="tpGapV"></output></label>
+      </div>
+      <div class="tp-acts">
+        <button class="tp-txtbtn" id="tpFull" aria-pressed="false">Full screen</button>
+        <button class="tp-txtbtn" id="tpRotate" hidden>Landscape</button>
+        <button class="tp-txtbtn tp-exit" id="tpExit">Exit</button>
+      </div>
     </div>
   </div>
 
@@ -3635,7 +3867,24 @@ function norm(s){
   if(["KJV","NKJV"].indexOf(s.bibleVer)<0)s.bibleVer="KJV";
   if(typeof s.bibleAt!=="string"||!/^\d+:\d+$/.test(s.bibleAt))s.bibleAt="43:1";
   if(["s","m","l"].indexOf(s.bibleSize)<0)s.bibleSize="m";
-  if(["clocks","bible"].indexOf(s.wgLast)<0)s.wgLast="clocks";
+  /* Teleprompter scripts: [{id, t, body, at}]. KEYED, so a script written on
+     the phone and another written on the laptop while both were offline both
+     survive the merge. Unlike the Bible text these ARE the user's own words,
+     which is exactly why they sync and the scripture does not.
+     The DISPLAY settings (speed, size, spacing) are deliberately not here at
+     all - see TP_PREF_KEY. 64px is right on a laptop and unusable on a phone,
+     so a setting that followed you between them would be wrong on one of the
+     two every time. Malformed rows are dropped rather than repaired: a script
+     with no body has nothing to prompt, and one with no id cannot merge. */
+  if(!Array.isArray(s.scripts))s.scripts=[];
+  s.scripts=s.scripts.filter(function(x){
+    return x&&typeof x==="object"&&typeof x.id==="string"&&typeof x.body==="string";
+  });
+  s.scripts.forEach(function(x){
+    if(typeof x.t!=="string")x.t="";
+    if(typeof x.at!=="number")x.at=0;
+  });
+  if(["clocks","bible","prompter"].indexOf(s.wgLast)<0)s.wgLast="clocks";
   return s;
 }
 function load(){
@@ -3895,7 +4144,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="4.11";
+var APP_VERSION="4.12";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -3906,6 +4155,7 @@ var APP_VERSION="4.11";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-14T15:00:00+08:00",text:"A new widget: Teleprompter. Open Widgets and it sits beside World Clocks and the Bible. Type or paste a script, give it a title if you like (it borrows the first line if you don't), and press Start prompter -- or tap the play button beside any saved script to go straight in. The script fills the screen in large type on your theme's deepest colour, with a line a third of the way down marking where your eye should be, and scrolls smoothly at a pace you set. Speed is measured in lines, so making the text bigger never changes how fast you have to read. Play from the top gives you a three-second countdown to get settled; resuming after a pause does not. Restart goes back to the top with a countdown, Stop goes back to the top and waits. Size and Spacing change as you drag them without losing your place. While it plays the controls fade away after a couple of seconds, and a stray tap only brings them back -- it will not pause you or press a button by accident. Drag the text to catch up or skip ahead without stopping it, and your phone's screen stays awake while it runs. On a keyboard: Space plays and pauses, R restarts, the up and down arrows change speed, and Escape exits. Full screen is there where your browser allows it, and on an Android phone there is a Landscape button too; if a browser refuses either, it tells you rather than doing nothing. Your scripts sync to your other devices and appear in Board History like everything else. Your speed, size and spacing do not -- they stay with each device, because the text size that is right on a laptop is far too big for a phone. Anything you were typing and had not saved is still there if the page reloads."},
   {ts:"2026-09-08T11:10:00+08:00",text:"Two things about scheduling. First, the bug: an activity's time could reset itself to 9:00-10:00. The cause was ticking \"All day\" -- doing that threw the times away rather than just ignoring them, so a 2pm meeting marked all-day came back as a 9am one, and the times were gone for good. The times are now always kept and the All day tick only decides how the activity is treated, so un-ticking it hands back exactly what was there. Editing an existing activity no longer has a default anywhere in its path: what you saved is what you see, whatever else you change. Second, new activities are now scheduled for you. Instead of always offering 9:00, the editor looks at what else you have booked that day and offers the next free hour -- if 9 to 10 is taken it offers 10, if there is a gap between two bookings it offers the gap, and on today it never offers an hour that has already gone. An empty day still starts at 9:00. The End time follows the Start an hour later, and once you set a length yourself that length is kept when you move the Start: a 30-minute activity dragged an hour later is still 30 minutes, not reset to an hour. Anything you type by hand is left alone from then on, including if you change the date afterwards. Your routine blocks are not counted as busy for this -- only real appointments -- otherwise there would be no free hour to find on a weekday."},
   {ts:"2026-09-08T07:30:00+08:00",text:"All-day activities are back on the Board. An activity you set as All day -- one with no start or end time, like \"Bills: Water District\" -- was showing only in your Calendar tab and nowhere on the Board at all. That was not a fault in the activity or in the Must attend switch, which is why toggling it changed nothing: \"What does my day look like?\" lays the day out by clock time, an all-day item has no clock time, and it was being left out. It used to be announced by the old notification strip in the green header, and when that strip was removed nothing was left to show it. There is now an All day band at the top of the list, above everything with a time on it, exactly where a calendar puts these. Each one shows its name, whether it is must-attend, and whether it repeats; tapping it opens the same editor as any other activity and the x removes it, asking first if it is a repeating one. Ticking it off in the Calendar shows it as done here too. The Now bar shows them as well, but only in the gaps -- where it used to say \"Unscheduled\" it now names your all-day activity instead, with two or more taking turns the way overlapping appointments already do. It will not do this at any other time: an appointment happening right now comes first, then the routine block you are inside, and only when there is neither does an all-day item take the space. That ordering is the point. Something that runs all day would otherwise win the bar every minute of every day and permanently hide the block you are actually working."},
   {ts:"2026-09-08T06:15:00+08:00",text:"Section headings are now in the ordinary text face instead of the serif one -- \"What does my day look like?\", \"Non-negotiables & Goals\", \"My Personal Calendar\", \"Expense Tracker\", \"User & Role Management\", the title on every panel that opens over the page, and your lane names on both the Classic board and the Consolidated Checklist. Same change as the count in the Still to do bar. The greeting at the top of the page keeps the serif: one line of it reads as the app's signature, the same face repeated down every card just looked like a font. Nothing moved and nothing changed size beyond the headings themselves. Two places deliberately keep the serif for their own reasons: the ruled Consolidated Checklist page, where the serif is the notebook it is imitating, and the Bible reader, where it is there to be read at length."},
@@ -3966,8 +4216,8 @@ var APP_VERSION_HISTORY=[
    pushed" is per-account, though - it tracks a specific board's revisions. */
 var DEV_KEY="prodash.deviceId", DEV_NAME_KEY="prodash.deviceName", PUSHED_KEY=PDAuth.ns("prodash.pushedUpTo");
 var HIST_CAP=400, CKPT_EVERY=25, BATCH_MS=2500;
-var BOARD_KEYS=["tasks","log","days","events","lanes","rituals","theme","palette","hiddenBlocks","plans","roll","boardView","expenses","cur","subs","subSkip","zones","bibleVer","bibleAt","bibleSize","wgLast"];
-var KEYED=["tasks","events","lanes","rituals","expenses","subs","zones"], MAPS=["log","days","plans"], SCALARS=["theme","palette","roll","boardView","cur","bibleVer","bibleAt","bibleSize","wgLast"];
+var BOARD_KEYS=["tasks","log","days","events","lanes","rituals","theme","palette","hiddenBlocks","plans","roll","boardView","expenses","cur","subs","subSkip","zones","scripts","bibleVer","bibleAt","bibleSize","wgLast"];
+var KEYED=["tasks","events","lanes","rituals","expenses","subs","zones","scripts"], MAPS=["log","days","plans"], SCALARS=["theme","palette","roll","boardView","cur","bibleVer","bibleAt","bibleSize","wgLast"];
 // Plain arrays of primitive ids (not objects with their own .id, so KEYED's
 // per-item union doesn't apply) compared by CONTENT, not reference - a
 // cloned snapshot never shares object identity with the live array even
@@ -4174,6 +4424,14 @@ function opText(op){
   }
   if(op.k==="rituals"&&verb)return verb+" non-negotiable “"+esc((op.v||{}).l||"")+"”";
   if(op.k==="events"&&verb)return verb+" appointment “"+esc((op.v||{}).n||"")+"”";
+  // "Edited", not "Updated": every change to a script is an edit to its words,
+  // and the history reads better saying so. Only the title is quoted - the body
+  // can run to thousands of words and has no business in a one-line summary.
+  // tpTitleOf() so an untitled script is named here exactly as the library names
+  // it - by its first line - rather than "Untitled" in one place and its opening
+  // words in the other.
+  if(op.k==="scripts"&&verb)
+    return (op.o==="upd"?"Edited":verb)+" teleprompter script “"+esc(tpTitleOf((op.v||{}).t,(op.v||{}).body))+"”";
   if(op.k==="log")return "Ticked non-negotiables for "+esc(op.id);
   if(op.k==="days")return "Updated shift notes for "+esc(op.id);
   if(op.k==="theme")return "Theme → "+esc(String(op.v));
@@ -6018,6 +6276,10 @@ function renderAll(){
   // re-render that used to sit below is gone.
   setBoardView(S.boardView);
   applyTheme();
+  // A script added or deleted on another device arrives through adopt() and then
+  // here. Only the LIST is re-rendered - never the editor fields, which may be
+  // mid-sentence, and never the stage, which may be mid-speech.
+  if(wgCur==="prompter"&&!tpEl("tpLib").hidden)tpLibRender();
 }
 
 // ---------- wiring ----------
@@ -8518,6 +8780,7 @@ document.getElementById("cdrExport").addEventListener("click",function(){
    Prefixes are strict because function declarations in this IIFE share one
    namespace and the last one silently wins (see the fmtWhen note above):
      wg*  the dock itself       wc*  world clocks       bb*  Bible
+     tp*  teleprompter
    ========================================================================== */
 function wgEl(id){return document.getElementById(id);}
 
@@ -8526,7 +8789,8 @@ function wgEl(id){return document.getElementById(id);}
    entry plus a <section class="wg-panel" id="wgp-ID"> in the markup above. */
 var WG_LIST=[
   {id:"clocks",name:"World Clocks",mount:wcMount,unmount:wcUnmount},
-  {id:"bible", name:"Bible",       mount:bbMount, unmount:bbUnmount}
+  {id:"bible", name:"Bible",       mount:bbMount, unmount:bbUnmount},
+  {id:"prompter",name:"Teleprompter",mount:tpMount,unmount:tpUnmount}
 ];
 var wgCur="";           // id of the mounted widget, "" when the dock is closed
 
@@ -8616,6 +8880,9 @@ document.addEventListener("keydown",function(ev){
      stands down - otherwise a single press closed the modal AND the dock
      underneath it, losing the reader's place for no reason. */
   if(!wgEl("profModal").hidden||!wgEl("actModal").hidden)return;
+  // Same rule for the teleprompter stage, which sits above the dock too: its own
+  // handler exits the stage, and this one must not also close the dock under it.
+  if(!wgEl("tpStage").hidden)return;
   if(wgEl("wgDock").classList.contains("wg-max"))wgSetMax(false); else wgClose();
 /* Capture phase, and that is load-bearing. The modals' own Escape handlers are
    registered earlier in this file, so in the bubble phase they run FIRST and
@@ -9183,6 +9450,510 @@ wgEl("bbSizeSeg").querySelectorAll("[data-bsize]").forEach(function(b){
   });
 });
 
+/* ---------------- Widget: Teleprompter --------------------------------------
+   Prefix tp*. Three surfaces: a LIBRARY of saved scripts and an EDITOR, both
+   inside the dock, and the STAGE (#tpStage), a full-viewport layer where the
+   prompting happens.
+
+   What lives where, and why:
+     S.scripts        the words. Synced and merged (KEYED) - this is the user's
+                      own work, the thing they would be upset to lose.
+     TP_PREF_KEY      speed, size, spacing. PER DEVICE, deliberately not in S:
+                      they are properties of the screen, not of the person.
+     TP_DRAFT_KEY     the editor's unsaved contents, so a reload or a closed
+                      dock mid-paste loses nothing. Per device, never synced.
+
+   Saving is on intent - Save, Start, Back, closing the dock - and never per
+   keystroke. Every save() writes a Board History revision carrying the whole
+   changed script, so saving on each keypress of a 3,000-word script would bury
+   the history in near-identical copies of it. The draft key is what makes
+   intent-based saving safe. */
+var TP_PREF_KEY=PDAuth.ns("prodash.prompterPrefs");
+var TP_DRAFT_KEY=PDAuth.ns("prodash.prompterDraft");
+var TP_WPM=150;            // ordinary speaking pace, for the duration estimate only
+var TP_MAX=30000;          // mirrors the textarea maxlength; ~5,000 words, ~30 minutes aloud
+var tpPrefs={speed:8,size:48,gap:1.5};
+var tpEditId=null;         // id of the script open in the editor; null = a new one
+var tpDraftTimer=0;
+// stage state
+var tpStageId=null, tpPos=0, tpOn=false, tpRaf=0, tpLastTs=0, tpCdTimer=0, tpIdleTimer=0, tpWake=null;
+
+function tpEl(id){return document.getElementById(id);}
+function tpLoadPrefs(){
+  try{
+    var p=JSON.parse(localStorage.getItem(TP_PREF_KEY)||"null");
+    if(p&&typeof p==="object"){
+      if(p.speed>=1&&p.speed<=20)tpPrefs.speed=+p.speed;
+      if(p.size>=24&&p.size<=96)tpPrefs.size=+p.size;
+      if(p.gap>=1.1&&p.gap<=2.4)tpPrefs.gap=+p.gap;
+    }
+  }catch(e){}
+}
+function tpSavePrefs(){ try{localStorage.setItem(TP_PREF_KEY,JSON.stringify(tpPrefs));}catch(e){} }
+function tpFind(id){
+  for(var i=0;i<(S.scripts||[]).length;i++)if(S.scripts[i].id===id)return S.scripts[i];
+  return null;
+}
+function tpWords(t){ var m=String(t||"").trim().match(/\S+/g); return m?m.length:0; }
+function tpDur(words){
+  var mins=words/TP_WPM;
+  if(words===0)return "empty";
+  if(mins<1)return "under a minute";
+  return "~"+Math.round(mins)+" min aloud";
+}
+/* A title the user did not type is taken from the first line of the script,
+   because "Untitled" three times in a list is useless and the opening line is
+   almost always what the speaker would call it anyway. */
+function tpTitleOf(t,body){
+  t=String(t||"").trim();
+  if(t)return t;
+  var first=String(body||"").trim().split(/\n/)[0]||"";
+  return first.length>60?first.slice(0,57).trim()+"…":(first||"Untitled");
+}
+
+/* ---- library ---- */
+function tpLibRender(){
+  var list=(S.scripts||[]).slice().sort(function(a,b){return (b.at||0)-(a.at||0);});
+  tpEl("tpLibCount").textContent=list.length?list.length+(list.length===1?" script":" scripts"):"";
+  var host=tpEl("tpList");
+  if(!list.length){
+    host.innerHTML='<div class="tp-empty">No scripts yet. Write or paste one and it scrolls '+
+      'at your reading pace while you speak.</div>';
+    return;
+  }
+  host.innerHTML=list.map(function(s){
+    var w=tpWords(s.body);
+    return '<div class="tp-row">'+
+      '<button class="tp-open" data-tpopen="'+esc(s.id)+'">'+
+        '<span class="tp-nm">'+esc(tpTitleOf(s.t,s.body))+'</span>'+
+        '<span class="tp-sub">'+w+(w===1?" word":" words")+' · '+esc(tpDur(w))+'</span>'+
+      '</button>'+
+      '<button class="tp-go" data-tpgo="'+esc(s.id)+'" title="Start prompting" aria-label="Start prompting '+esc(tpTitleOf(s.t,s.body))+'">'+
+        '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d="M8 5v14l11-7z"/></svg>'+
+      '</button>'+
+    '</div>';
+  }).join("");
+  host.querySelectorAll("[data-tpopen]").forEach(function(b){
+    b.addEventListener("click",function(){tpEdit(b.getAttribute("data-tpopen"));});
+  });
+  host.querySelectorAll("[data-tpgo]").forEach(function(b){
+    b.addEventListener("click",function(){tpStageOpen(b.getAttribute("data-tpgo"));});
+  });
+}
+function tpShowLib(){
+  tpEl("tpEdit").hidden=true; tpEl("tpLib").hidden=false;
+  tpLibRender();
+}
+
+/* ---- editor ---- */
+function tpEdit(id){
+  var s=id?tpFind(id):null;
+  tpEditId=s?s.id:null;
+  tpEl("tpTitle").value=s?s.t:"";
+  tpEl("tpBody").value=s?s.body:"";
+  tpEl("tpDel").hidden=!s;
+  tpEl("tpLib").hidden=true; tpEl("tpEdit").hidden=false;
+  tpEdSync();
+  setTimeout(function(){try{tpEl(s?"tpBody":"tpTitle").focus();}catch(e){}},30);
+}
+function tpDirty(){
+  var t=tpEl("tpTitle").value, b=tpEl("tpBody").value, s=tpEditId?tpFind(tpEditId):null;
+  if(!s)return !!(t.trim()||b.trim());
+  return t!==s.t||b!==s.body;
+}
+function tpEdSync(){
+  var w=tpWords(tpEl("tpBody").value), n=tpEl("tpBody").value.length;
+  tpEl("tpStats").textContent=w+(w===1?" word":" words")+" · "+tpDur(w)+
+    (n>TP_MAX*0.9?" · "+(TP_MAX-n)+" characters left":"");
+  var d=tpDirty(), st=tpEl("tpState");
+  st.textContent=d?"Unsaved":(tpEditId?"Saved":"");
+  st.classList.toggle("dirty",d);
+  tpEl("tpStart").disabled=!tpEl("tpBody").value.trim();
+}
+/* Writes the editor into S.scripts if anything changed, and returns the id of
+   the script now holding those words (or null when there is nothing to keep -
+   a new script left completely empty is not created, so opening the editor by
+   accident never litters the library). A script deleted on another device
+   while it was open here is recreated under the same id rather than lost: the
+   words on this screen are the more recent intent. */
+function tpCommit(){
+  var t=tpEl("tpTitle").value.trim(), b=tpEl("tpBody").value;
+  if(!tpEditId&&!t&&!b.trim()){ tpClearDraft(); return null; }
+  if(!tpDirty()){ tpClearDraft(); return tpEditId; }
+  var s=tpEditId?tpFind(tpEditId):null;
+  if(!s){
+    s={id:tpEditId||rid("tp_"),t:"",body:"",at:0};
+    S.scripts.push(s);
+  }
+  s.t=t; s.body=b.slice(0,TP_MAX); s.at=Date.now();
+  tpEditId=s.id;
+  tpEl("tpDel").hidden=false;
+  save();
+  tpClearDraft();
+  tpEdSync();
+  return s.id;
+}
+function tpWriteDraft(){
+  clearTimeout(tpDraftTimer);
+  tpDraftTimer=setTimeout(function(){
+    if(!tpDirty()){tpClearDraft();return;}
+    try{localStorage.setItem(TP_DRAFT_KEY,JSON.stringify({
+      id:tpEditId,t:tpEl("tpTitle").value,body:tpEl("tpBody").value}));}catch(e){}
+  },400);
+}
+function tpClearDraft(){ clearTimeout(tpDraftTimer); try{localStorage.removeItem(TP_DRAFT_KEY);}catch(e){} }
+/* On mount, an unsaved draft wins over the library: the last thing the user did
+   in here was write something and not save it, so that is where to put them
+   back. If the script it belonged to has since been deleted, it reopens as a
+   new one - the words are kept either way. */
+function tpRestoreDraft(){
+  var d=null;
+  try{d=JSON.parse(localStorage.getItem(TP_DRAFT_KEY)||"null");}catch(e){}
+  if(!d||typeof d.body!=="string")return false;
+  var s=d.id?tpFind(d.id):null;
+  tpEdit(s?s.id:null);
+  tpEditId=s?s.id:(d.id||null);
+  tpEl("tpTitle").value=d.t||"";
+  tpEl("tpBody").value=d.body;
+  tpEl("tpDel").hidden=!s;
+  tpEdSync();
+  return true;
+}
+function tpDelete(){
+  var s=tpEditId?tpFind(tpEditId):null;
+  if(!s){tpClearDraft();tpShowLib();return;}
+  if(!confirm("Delete the script “"+tpTitleOf(s.t,s.body)+"”?"))return;
+  S.scripts=S.scripts.filter(function(x){return x.id!==s.id;});
+  save();
+  tpEditId=null; tpClearDraft(); tpShowLib();
+}
+
+/* ---- mount ---- */
+function tpMount(){
+  tpLoadPrefs();
+  if(tpRestoreDraft())return;
+  // No scripts at all: straight to a blank editor. Showing an empty list with
+  // a button to press first is one more step between "open" and "use".
+  if(!(S.scripts||[]).length){tpEdit(null);return;}
+  tpShowLib();
+}
+function tpUnmount(){
+  if(!tpEl("tpEdit").hidden)tpCommit();
+  tpStageClose();
+}
+
+/* ---- the stage ----
+   Speed is measured in LINES, not pixels: speed n moves n*0.03 lines a second,
+   so at speed 8 you read ~14 lines a minute whatever the font size. A pixel
+   speed would make every change of text size also change your reading pace,
+   which is exactly the coupling a speaker adjusting size mid-rehearsal does not
+   want. */
+function tpLinePx(){ return tpPrefs.size*tpPrefs.gap; }
+function tpPxPerSec(){ return tpPrefs.speed*0.03*tpLinePx(); }
+function tpMaxPos(){
+  // The column carries 70vh of bottom padding, so its full travel ends with the
+  // last line sitting on the eye line rather than vanishing off the top.
+  return Math.max(0,tpEl("tpCol").offsetHeight-tpEl("tpView").clientHeight);
+}
+function tpApply(){ tpEl("tpCol").style.transform="translate3d(0,"+(-tpPos).toFixed(2)+"px,0)"; }
+function tpStyleText(){
+  var t=tpEl("tpTxt");
+  t.style.fontSize=tpPrefs.size+"px";
+  t.style.lineHeight=String(tpPrefs.gap);
+  tpEl("tpSpeed").value=tpPrefs.speed; tpEl("tpSpeedV").textContent=tpPrefs.speed;
+  tpEl("tpSize").value=tpPrefs.size;   tpEl("tpSizeV").textContent=tpPrefs.size;
+  tpEl("tpGap").value=tpPrefs.gap;     tpEl("tpGapV").textContent=tpPrefs.gap.toFixed(1);
+}
+/* Paragraphs on blank lines, <br> on single ones - how people actually lay out
+   a script. esc() first, always: this is user-typed text going into innerHTML. */
+function tpRenderText(body){
+  return String(body||"").trim().split(/\n\s*\n/).map(function(p){
+    return "<p>"+esc(p).replace(/\n/g,"<br>")+"</p>";
+  }).join("");
+}
+function tpStageOpen(id){
+  var s=tpFind(id);
+  if(!s||!s.body.trim())return;
+  tpLoadPrefs();
+  tpStageId=s.id;
+  tpEl("tpTxt").innerHTML=tpRenderText(s.body);
+  tpStyleText();
+  tpPos=0; tpApply();
+  tpEl("tpEndMsg").hidden=true;
+  tpEl("tpCd").hidden=true;
+  tpEl("tpStage").hidden=false;
+  tpSetOn(false);
+  tpSyncFsButtons();
+  setTimeout(function(){try{tpEl("tpPlay").focus();}catch(e){}},30);
+}
+function tpStageClose(){
+  if(tpEl("tpStage").hidden)return;
+  tpPause();
+  tpExitFs();
+  tpEl("tpStage").hidden=true;
+  tpStageId=null;
+  if(!tpEl("wgDock").hidden){ try{wgEl("wgDock").focus();}catch(e){} }
+}
+function tpSetOn(on){
+  tpOn=!!on;
+  var st=tpEl("tpStage");
+  st.classList.toggle("tp-on",tpOn);
+  var p=tpEl("tpPlay");
+  p.setAttribute("aria-label",tpOn?"Pause":"Play");
+  p.title=tpOn?"Pause (Space)":"Play (Space)";
+  tpWakeLock(tpOn);
+  tpPoke();
+}
+function tpFrame(ts){
+  if(!tpOn){tpRaf=0;return;}
+  /* dt is clamped to a tenth of a second. requestAnimationFrame stops in a
+     background tab, and the first frame back would otherwise carry the whole
+     time away as one enormous step and fling the script half a page. */
+  var dt=tpLastTs?Math.min(0.1,(ts-tpLastTs)/1000):0;
+  tpLastTs=ts;
+  tpPos+=tpPxPerSec()*dt;
+  var max=tpMaxPos();
+  if(tpPos>=max){
+    tpPos=max; tpApply(); tpPause();
+    tpEl("tpEndMsg").hidden=false;
+    return;
+  }
+  tpApply();
+  tpRaf=requestAnimationFrame(tpFrame);
+}
+function tpRun(){
+  tpEl("tpEndMsg").hidden=true;
+  tpSetOn(true);
+  tpLastTs=0;
+  if(!tpRaf)tpRaf=requestAnimationFrame(tpFrame);
+}
+/* Play from the very top gets a 3-2-1, because that is the moment the speaker
+   is still settling in front of the lens. Resuming from a pause does not: they
+   stopped mid-sentence and want the next word, not a countdown. */
+function tpPlay(){
+  if(tpOn||tpCdTimer)return;
+  if(tpPos>=tpMaxPos()-1){ tpPos=0; tpApply(); }   // at the end: Play means again
+  if(tpPos>0){tpRun();return;}
+  var n=3, cd=tpEl("tpCd");
+  cd.textContent=n; cd.hidden=false;
+  tpEl("tpStage").classList.add("tp-on");   // show Pause so the countdown can be cancelled
+  tpEl("tpPlay").setAttribute("aria-label","Cancel countdown");
+  tpCdTimer=setInterval(function(){
+    n--;
+    if(n<=0){ clearInterval(tpCdTimer); tpCdTimer=0; cd.hidden=true; tpRun(); return; }
+    cd.textContent=n;
+  },1000);
+}
+function tpPause(){
+  if(tpCdTimer){clearInterval(tpCdTimer);tpCdTimer=0;tpEl("tpCd").hidden=true;}
+  if(tpRaf){cancelAnimationFrame(tpRaf);tpRaf=0;}
+  tpSetOn(false);
+}
+function tpToggle(){ if(tpOn||tpCdTimer)tpPause(); else tpPlay(); }
+function tpRestart(){ tpPause(); tpPos=0; tpApply(); tpEl("tpEndMsg").hidden=true; tpPlay(); }
+function tpStop(){ tpPause(); tpPos=0; tpApply(); tpEl("tpEndMsg").hidden=true; }
+function tpNudge(px){
+  tpPos=Math.max(0,Math.min(tpMaxPos(),tpPos+px));
+  tpApply();
+  if(tpPos<tpMaxPos())tpEl("tpEndMsg").hidden=true;
+}
+
+/* Controls fade after 2.5s of stillness while playing, and come back on any
+   movement, tap or key. While paused they never hide - a paused speaker is
+   reaching for a control. See .tp-idle for the click-swallowing half. */
+function tpPoke(){
+  var st=tpEl("tpStage");
+  st.classList.remove("tp-idle");
+  clearTimeout(tpIdleTimer);
+  if(tpOn)tpIdleTimer=setTimeout(function(){
+    // Never hide controls out from under keyboard focus.
+    if(st.contains(document.activeElement)&&document.activeElement.tagName==="INPUT")return;
+    st.classList.add("tp-idle");
+  },2500);
+}
+
+/* Screen wake lock. A phone that dims and locks halfway through a speech is the
+   single most common way a prompter fails in practice. Released on pause, and
+   re-requested when the page comes back, because the browser drops the lock
+   whenever the tab is hidden. Absent API: nothing happens, nothing breaks. */
+function tpWakeLock(on){
+  if(!("wakeLock" in navigator))return;
+  if(on&&!tpWake){
+    navigator.wakeLock.request("screen").then(function(l){
+      tpWake=l; l.addEventListener("release",function(){tpWake=null;});
+    }).catch(function(){});
+  }else if(!on&&tpWake){
+    tpWake.release().catch(function(){}); tpWake=null;
+  }
+}
+document.addEventListener("visibilitychange",function(){
+  if(document.visibilityState==="visible"&&tpOn)tpWakeLock(true);
+});
+
+/* Full screen and orientation. Element fullscreen exists on desktop browsers
+   and Android; iPhone Safari only allows it for video, so there the button is
+   simply not shown and the stage - already covering the viewport - is the
+   full-screen view. Orientation lock is Android-only and only works while in
+   fullscreen, so Landscape enters fullscreen first and is hidden everywhere the
+   API is missing or the pointer is fine (a desktop has no orientation to lock). */
+function tpFsEl(){ return document.fullscreenElement||document.webkitFullscreenElement||null; }
+function tpCanFs(){ var s=tpEl("tpStage"); return !!(s.requestFullscreen||s.webkitRequestFullscreen); }
+function tpEnterFs(){
+  var s=tpEl("tpStage");
+  var r=s.requestFullscreen?s.requestFullscreen():(s.webkitRequestFullscreen?s.webkitRequestFullscreen():null);
+  return (r&&r.then)?r:Promise.resolve();
+}
+function tpExitFs(){
+  try{ if(screen.orientation&&screen.orientation.unlock)screen.orientation.unlock(); }catch(e){}
+  if(!tpFsEl())return;
+  try{ (document.exitFullscreen||document.webkitExitFullscreen).call(document); }catch(e){}
+}
+function tpSyncFsButtons(){
+  var fs=!!tpFsEl(), coarse=false;
+  try{coarse=window.matchMedia("(pointer:coarse)").matches;}catch(e){}
+  tpEl("tpFull").hidden=!tpCanFs()||tpFsRefused;
+  tpEl("tpFull").textContent=fs?"Exit full screen":"Full screen";
+  tpEl("tpFull").setAttribute("aria-pressed",fs?"true":"false");
+  tpEl("tpRotate").hidden=tpFsRefused||!(tpCanFs()&&coarse&&screen.orientation&&screen.orientation.lock);
+}
+document.addEventListener("fullscreenchange",tpSyncFsButtons);
+document.addEventListener("webkitfullscreenchange",tpSyncFsButtons);
+/* Pointer type can change under an open stage - a tablet docked to a keyboard,
+   a laptop with a touchscreen, a device emulator - and Landscape is offered by
+   pointer type, so re-evaluate when it does rather than trusting the answer
+   given at the moment the stage opened. */
+try{
+  var tpMqCoarse=window.matchMedia("(pointer:coarse)");
+  if(tpMqCoarse.addEventListener)tpMqCoarse.addEventListener("change",tpSyncFsButtons);
+  else if(tpMqCoarse.addListener)tpMqCoarse.addListener(tpSyncFsButtons);
+}catch(e){}
+
+/* ---- wiring ---- */
+tpEl("tpNew").addEventListener("click",function(){tpEdit(null);});
+tpEl("tpBack").addEventListener("click",function(){tpCommit();tpShowLib();});
+tpEl("tpSave").addEventListener("click",function(){
+  var id=tpCommit();
+  if(id)tpEl("tpState").textContent="Saved";
+});
+tpEl("tpStart").addEventListener("click",function(){
+  var id=tpCommit();
+  if(id)tpStageOpen(id);
+});
+tpEl("tpDel").addEventListener("click",tpDelete);
+["tpTitle","tpBody"].forEach(function(id){
+  tpEl(id).addEventListener("input",function(){tpEdSync();tpWriteDraft();});
+});
+
+tpEl("tpPlay").addEventListener("click",tpToggle);
+tpEl("tpRestart").addEventListener("click",tpRestart);
+tpEl("tpStop").addEventListener("click",tpStop);
+tpEl("tpExit").addEventListener("click",tpStageClose);
+/* A browser can advertise fullscreen and still refuse it - in-app browsers,
+   kiosk webviews and managed devices do, with "Permissions check failed". The
+   first version swallowed that rejection, so the button simply did nothing,
+   which reads as broken. A refusal now says why, and the button is withdrawn
+   for the rest of the session rather than inviting the same dead press again. */
+var tpToastTimer=0, tpFsRefused=false;
+function tpToast(msg){
+  var t=tpEl("tpToast");
+  t.textContent=msg; t.hidden=false;
+  clearTimeout(tpToastTimer);
+  tpToastTimer=setTimeout(function(){t.hidden=true;},4000);
+}
+tpEl("tpFull").addEventListener("click",function(){
+  if(tpFsEl()){tpExitFs();return;}
+  tpEnterFs().catch(function(){
+    tpFsRefused=true;
+    tpEl("tpFull").hidden=true; tpEl("tpRotate").hidden=true;
+    tpToast("This browser won't allow full screen here. The prompter already fills the window.");
+  });
+});
+tpEl("tpRotate").addEventListener("click",function(){
+  (tpFsEl()?Promise.resolve():tpEnterFs()).then(function(){
+    return screen.orientation.lock("landscape");
+  }).catch(function(){
+    tpEl("tpRotate").hidden=true;
+    tpToast("This browser can't lock the orientation. Turn your phone sideways instead.");
+  });
+});
+/* Sliders apply on "input" so the text changes under your thumb, and persist on
+   "change" so dragging does not write storage sixty times a second. Changing
+   size or spacing reflows the column, so the position is rescaled by the same
+   ratio - otherwise making the text bigger would jump you to a different
+   paragraph than the one you were reading. */
+function tpBindSlider(id,key,parse){
+  var el=tpEl(id);
+  el.addEventListener("input",function(){
+    var before=tpEl("tpCol").offsetHeight||1;
+    tpPrefs[key]=parse(el.value);
+    tpStyleText();
+    if(key!=="speed"){
+      var after=tpEl("tpCol").offsetHeight||1;
+      tpPos=Math.min(tpMaxPos(),tpPos*(after/before));
+      tpApply();
+    }
+    tpPoke();
+  });
+  el.addEventListener("change",tpSavePrefs);
+}
+tpBindSlider("tpSpeed","speed",function(v){return Math.round(+v);});
+tpBindSlider("tpSize","size",function(v){return Math.round(+v);});
+tpBindSlider("tpGap","gap",function(v){return Math.round(+v*10)/10;});
+
+/* Touch, mouse and wheel on the reading area. A TAP only reveals the controls -
+   it never pauses, because the most common accidental touch mid-speech is a
+   tap. A DRAG (past 6px) repositions the script, playing or not, so a speaker
+   who skipped ahead can catch the text up without stopping it. */
+(function(){
+  var view=tpEl("tpView"), y0=null, moved=false, pos0=0;
+  view.addEventListener("pointerdown",function(ev){
+    y0=ev.clientY; moved=false; pos0=tpPos;
+    try{view.setPointerCapture(ev.pointerId);}catch(e){}
+  });
+  view.addEventListener("pointermove",function(ev){
+    if(y0===null){tpPoke();return;}
+    var dy=ev.clientY-y0;
+    if(!moved&&Math.abs(dy)>6)moved=true;
+    if(moved){ tpPos=pos0; tpNudge(-dy); tpLastTs=0; }
+  });
+  function end(){ if(y0===null)return; y0=null; tpPoke(); }
+  view.addEventListener("pointerup",end);
+  view.addEventListener("pointercancel",end);
+  view.addEventListener("wheel",function(ev){
+    ev.preventDefault(); tpNudge(ev.deltaY); tpLastTs=0; tpPoke();
+  },{passive:false});
+  tpEl("tpStage").addEventListener("pointermove",function(ev){
+    if(ev.target.closest&&!ev.target.closest("#tpView"))tpPoke();
+  });
+})();
+
+/* Keyboard, only while the stage is up. Space is left alone on a focused
+   button or slider so it does its native job instead of firing twice; Escape
+   always exits. In browser fullscreen the FIRST Escape is consumed by the
+   browser to leave fullscreen and never reaches the page, which conveniently
+   means one stray Escape can never end a presentation outright. */
+document.addEventListener("keydown",function(ev){
+  if(tpEl("tpStage").hidden)return;
+  var tag=(ev.target&&ev.target.tagName)||"";
+  if(ev.key==="Escape"){ ev.preventDefault(); tpStageClose(); return; }
+  tpPoke();
+  if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT")return;
+  var k=ev.key;
+  if(k===" "||k==="Spacebar"||k==="k"){ if(tag==="BUTTON")return; ev.preventDefault(); tpToggle(); }
+  else if(k==="r"||k==="R"){ ev.preventDefault(); tpRestart(); }
+  else if(k==="ArrowUp"){ ev.preventDefault(); tpPrefs.speed=Math.min(20,tpPrefs.speed+1); tpStyleText(); tpSavePrefs(); }
+  else if(k==="ArrowDown"){ ev.preventDefault(); tpPrefs.speed=Math.max(1,tpPrefs.speed-1); tpStyleText(); tpSavePrefs(); }
+  else if(k==="PageDown"){ ev.preventDefault(); tpNudge(tpEl("tpView").clientHeight*0.5); }
+  else if(k==="PageUp"){ ev.preventDefault(); tpNudge(-tpEl("tpView").clientHeight*0.5); }
+  else if(k==="Home"){ ev.preventDefault(); tpNudge(-tpPos); }
+});
+// A resize or rotation changes the column's height, and with it the maximum
+// position; clamp so a paused script cannot end up scrolled into empty space.
+window.addEventListener("resize",function(){
+  if(tpEl("tpStage").hidden)return;
+  tpPos=Math.min(tpPos,tpMaxPos()); tpApply(); tpSyncFsButtons();
+});
+
 // console hooks:  dfDebug.dayBlocks("2026-08-15")  ·  dfDebug.state()
 window.dfDebug={dayBlocks:dayBlocks,today:today,norm:norm,state:function(){return S;},
   // Midnight is the awkward case, so the span layer is inspectable:
@@ -9198,6 +9969,11 @@ window.dfDebug={dayBlocks:dayBlocks,today:today,norm:norm,state:function(){retur
   // exposed so the editor's own defaulting can be exercised directly - it is
   // the thing that regressed, so it needs to be reachable.
   nextFreeHour:nextFreeHour,openActivity:openActivity,closeActivity:closeActivity,
+  // Teleprompter: dfDebug.tp().pos / .max / .on read the stage; wgOpen opens a
+  // widget by id, e.g. dfDebug.wgOpen("prompter").
+  wgOpen:wgOpen,wgClose:wgClose,
+  tp:function(){return {pos:tpPos,max:tpMaxPos(),on:tpOn,pxps:tpPxPerSec(),prefs:tpPrefs,
+    stage:tpStageId,editing:tpEditId,dirty:!tpEl("tpEdit").hidden&&tpDirty()};},
   xlsxBlob:xlsxBlob,buildZip:buildZip,crc32:crc32,
   // Board History hooks: dfDebug.hist() · dfDebug.stateAt("rev_…") · dfDebug.devices()
   hist:function(){return S.hist;}, devices:function(){return S.devices;},

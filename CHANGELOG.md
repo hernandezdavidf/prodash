@@ -2,6 +2,145 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-14 — Teleprompter widget (v4.12)
+
+A third App Widget, built entirely on the existing dock architecture: one
+`WG_LIST` entry, one `wgp-prompter` panel, `tpMount`/`tpUnmount`, prefix `tp*`.
+No new dialog idiom, no new colour, no dependency.
+
+### Three surfaces
+
+- **Library** (in the dock) — saved scripts, newest first, each with word count,
+  a spoken-duration estimate at 150 wpm, and a full-height ▶ quick start.
+- **Editor** (in the dock) — title, script, live stats, Start / Save / Delete.
+  With no scripts at all, mounting goes straight to a blank editor rather than
+  an empty list with a button to press first.
+- **Stage** (`#tpStage`) — a full-viewport layer beside `#wgDock`, outside
+  `.viewpanel` for the same containing-block reason the dock is. z 9995, above
+  the dock it was opened from.
+
+### What lives where
+
+- `S.scripts` `[{id,t,body,at}]` — **synced and KEYED**, so scripts written on
+  two offline devices both survive a merge. These are the user's own words; the
+  Bible text is cache and doesn't sync, scripts are content and do.
+- `TP_PREF_KEY` (speed, size, spacing) — **per device, deliberately not in S.**
+  They are properties of the screen: 64px is right on a laptop and unusable on
+  a phone. Also keeps slider drags out of Board History entirely.
+- `TP_DRAFT_KEY` — unsaved editor contents, per device, debounced 400ms.
+
+**Saving is on intent** — Save, Start, Back, switching widget, closing the dock
+— never per keystroke. Every `save()` writes a history revision carrying the
+whole changed script, so keystroke saves on a 3,000-word script would bury
+Board History in near-identical copies. The draft key is what makes that safe:
+a reload mid-paste restores the editor marked *Unsaved* without silently
+committing. A new script left completely empty is never created.
+
+### The scroll engine
+
+`requestAnimationFrame`, moving the column with **`translate3d`, never
+`scrollTop`**. `scrollTop` snaps to whole device pixels, so at a slow speed the
+text sits still for dozens of frames then jumps; a transform moves sub-pixel on
+the GPU. Measured: at the slowest speed each frame advances 0.036px with zero
+stalled and zero backward frames; per-frame jitter at speed 8 is 0.006px, and
+measured px/s matched the target exactly at speeds 1, 8 and 16.
+
+`dt` is **clamped to 0.1s**: rAF stops in a background tab and the first frame
+back would otherwise fling the script half a page.
+
+**Speed is in lines, not pixels** (`speed × 0.03` lines/s). A pixel speed would
+make every text-size change also change reading pace. Verified: 0.24 lines/s
+before and after resizing 48→72px. Size and spacing changes also **rescale the
+position by the column's height ratio**, so you stay on the same paragraph.
+
+Column padding (34vh top, 70vh bottom) makes the first line start on the eye
+line and lets the last line reach it rather than vanish off the top.
+
+### Interruption guards
+
+- **A tap reveals controls; it never pauses.** The most common accidental touch
+  mid-speech is a tap. A drag past 6px repositions the text, playing or not.
+- **Idle controls stop taking clicks.** After 2.5s of stillness while playing
+  the bar fades *and* goes `pointer-events:none`, so a brushed screen can only
+  bring controls back, not press one. Verified with `elementFromPoint` on the
+  Stop button's centre. Never hides out from under a focused slider.
+- **Countdown only from the top.** 3-2-1 on Play/Restart when the speaker is
+  settling; resuming from pause is instant. Cancellable.
+- **Screen Wake Lock** while playing, re-requested on `visibilitychange`
+  because the browser drops it when the tab hides.
+- **Escape:** in browser fullscreen the first press is consumed by the browser,
+  so one stray Escape can never end a presentation. The dock's capture-phase
+  Escape handler now stands down while the stage is open, the same rule it
+  already had for the profile and activity modals — otherwise one press closed
+  the stage *and* the dock under it.
+- Space is ignored on a focused button (native click would double-toggle) and
+  inside inputs; shortcuts don't exist while the stage is closed, so typing in
+  the editor is never hijacked.
+
+### Layout: the bar floats over the text
+
+First version stacked bar and reading area as flex siblings. **Wrong:** a bar
+that faded while playing still held its space, so a landscape phone lost 143px
+of 375 to an invisible band for the entire presentation. The reading area is now
+the whole stage and the bar overlays its bottom. Landscape: reading area 375 of
+375, bar 143→72px on one row.
+
+The overlay's first ground was a translucent black wash — also wrong: bold 48px
+text passed underneath still legible and ran into Play. It is now solid
+`--hdr-a` below a 26px fade, so text slides cleanly behind the controls.
+
+### Theme
+
+Light text on `--hdr-a`, the palette's deepest brand value, in every palette and
+both modes. Dark-ground prompting is functional (glare off glasses, reflections
+off a lens), and `--hdr-a` keeps it belonging to the chosen palette. Play takes
+`--forest`; eye-line markers are `--olive`, not terracotta, keeping orange
+meaning "commitment".
+
+### Full screen and orientation
+
+Element fullscreen where available; hidden where not (iPhone Safari). Landscape
+lock only where `screen.orientation.lock` exists **and** the pointer is coarse,
+entering fullscreen first since Android requires it; also re-evaluated on a
+pointer-type change. **Refusals are explained:** a browser can report
+`fullscreenEnabled` and still reject with "Permissions check failed" (in-app
+browsers, kiosk webviews, managed devices). The first version swallowed that and
+the button did nothing; it now shows a toast and withdraws the button for the
+session, staying withdrawn through resize and fullscreen events.
+
+### Accessibility
+
+Stage is `role=dialog aria-modal`; Play's label flips Play/Pause/Cancel
+countdown; countdown is `aria-live=assertive`; `:focus-visible` rings on every
+control; 44px touch targets on coarse pointers (Exit was 36px). Reduced motion
+disables the decorative bar transition only — the scroll is the feature the
+user deliberately started.
+
+### Integration touch points
+
+`norm()` drops malformed script rows and repairs partial ones; `wgLast` accepts
+`prompter`; `opText` describes add/edit/delete; `renderAll()` re-renders the
+*list only* when a sync lands (never the editor, which may be mid-sentence, nor
+the stage, which may be mid-speech). Untitled scripts are named by their first
+line identically in the library and in Board History. All user text is `esc()`d
+before `innerHTML` — verified with hostile HTML in both title and body: rendered
+as literal text, no elements injected, nothing executed.
+
+### Verified
+
+Create / edit / save / reopen; commit on Back and on switching widget; draft
+restore across reload; smooth scroll at three speeds; size, spacing, speed and
+their persistence; play, pause, resume, restart, stop, countdown cancel, end of
+script and play-again; tap vs drag; idle click-swallowing; keyboard; Escape
+layering; refusal handling; desktop 800/1100, tablet 768×1024, phone 375×812,
+phone landscape 812×375; Yacht club palette. Regression: Board, Now bar,
+outstanding bar, World Clocks, Bible, widget switching, activity-modal Escape,
+theme picker, Calendar tab.
+
+**Not verifiable in the test pane:** fullscreen actually engaging (the pane
+refuses the permission) and a real wake lock / orientation lock. Those need a
+real browser and a real phone.
+
 ## 2026-09-08 — Fix the time-reset bug; suggest the next free hour (v4.11)
 
 ### The reset bug, and where it actually was
