@@ -2,6 +2,48 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-16 — The server address is baked in (v4.13)
+
+A fresh device used to open on `#agSetup` — *"Connect to your ProDash server"*,
+one text field, no way past it — before it would show a login form. That screen
+existed because the app genuinely didn't know which Worker it belonged to. It
+was, in practice, one unchanging answer that only David could supply, demanded
+by a new phone, a reinstalled PWA, or any browser that had cleared its storage.
+
+`DEFAULT_URL` in the gate script now holds
+`https://prodash-sync.jobs-hernandezdavidf.workers.dev`, and `serverUrl` falls
+back to it:
+
+```js
+var serverUrl = (get(URL_KEY) || get("prodash.cloudUrl") || DEFAULT_URL)...
+```
+
+`openGate()` is unchanged — `show(serverUrl ? "agChoose" : "agSetup")` simply
+can no longer take the second branch. A new device lands on **Log in**.
+
+### Three deliberate choices
+
+- **A stored address still wins.** Device overrides, the old `prodash.cloudUrl`
+  key, and anyone running their own Worker are all untouched.
+- **The default is never written to storage.** Persisting it would pin each
+  device to whatever the address was on its first visit; leaving it unsaved
+  means editing that one line moves every device that hasn't overridden it.
+- **The screen survives behind "Change server"**, retitled *Point this device at
+  a different server*, and gains a **Use the built-in address** link that
+  deletes the override rather than overwriting it with `DEFAULT_URL`. That link
+  is the escape from a typo: previously one bad address saved here stranded the
+  device on a screen only clearing site data could escape — which on an
+  installed PWA also takes the session and the offline board.
+
+The URL is public by design. It is the address of a server that refuses every
+request without a signed token, and it was already sitting in plain sight in
+this file's line 2505 and in every device's localStorage.
+
+Verified on the local harness with storage cleared: fresh load → sign-in card;
+override → stored and used; **Use the built-in address** → key deleted, default
+restored, back on the sign-in card. No console errors.
+
+
 ## 2026-09-14 — Teleprompter widget (v4.12)
 
 A third App Widget, built entirely on the existing dock architecture: one

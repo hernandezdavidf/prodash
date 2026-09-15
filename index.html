@@ -1343,13 +1343,18 @@ body.reports-only .board-only:not(.bview):not(#view-reports){display:none}
     <!-- First run on a device: which Worker is this app talking to. Stored per
          device, never inside the board data, exactly like the old sync URL. -->
     <div class="ag-view" id="agSetup" hidden>
-      <p class="ag-h">Connect to your ProDash server</p>
-      <p class="ag-p">One-off on this device. Paste the address of your ProDash Worker &mdash; the same one from the setup workflow.</p>
+      <p class="ag-h">Point this device at a different server</p>
+      <p class="ag-p">ProDash already knows where its server lives, so you only need this to point this one device somewhere else &mdash; a test Worker, or a new address after a move. Get it wrong and the way back is below.</p>
       <div class="ag-f">
         <label for="agUrl">Server address</label>
         <input id="agUrl" type="url" placeholder="https://prodash-sync.yourname.workers.dev" autocomplete="off">
       </div>
       <div class="ag-btns"><button class="ag-btn" id="agUrlSave">Continue</button></div>
+      <!-- The way out of a typo. Without it, one wrong address saved here
+           would leave this device stuck on a screen that can only be escaped
+           by clearing site data - which on an installed PWA also takes the
+           session and the offline board with it. -->
+      <div class="ag-foot"><button class="ag-link" id="agUrlDefault">Use the built-in address</button></div>
     </div>
 
     <div class="ag-view" id="agChoose" hidden>
@@ -1512,7 +1517,25 @@ var URL_KEY="prodash.serverUrl", SESSION_KEY="prodash.session";
    storage is pure liability, so it is cleared on sight. */
 del("prodash.cloudPw");
 
-var serverUrl = (get(URL_KEY) || get("prodash.cloudUrl") || "").replace(/\/+$/,"");
+/* The Worker this copy of ProDash talks to, baked in.
+
+   Every device used to be asked for this before it would show a login form:
+   a new phone, a reinstalled PWA, a browser whose storage had been cleared.
+   "Paste the address of your ProDash Worker" is not a question you can answer
+   at 3am from a phone you just picked up, and it is the same answer every
+   time, so the app now knows it.
+
+   A stored address still wins, so nothing changes for a device already set
+   up, "Change server" on the sign-in card still works, and a copy of this
+   file pointed at someone else's Worker is unaffected. This is only the
+   answer for a device that has never been told. It is deliberately NOT
+   written to storage: leaving it unsaved means editing this line is enough
+   to move every device that hasn't overridden it.
+
+   Public by design - it is just the address of a server that refuses every
+   request without a signed token. */
+var DEFAULT_URL = "https://prodash-sync.jobs-hernandezdavidf.workers.dev";
+var serverUrl = (get(URL_KEY) || get("prodash.cloudUrl") || DEFAULT_URL).replace(/\/+$/,"");
 var session = null;
 try{ session = JSON.parse(get(SESSION_KEY) || "null"); }catch(e){ session = null; }
 
@@ -1644,6 +1667,14 @@ document.getElementById("agUrlSave").addEventListener("click", function(){
   var u = val("agUrl").trim().replace(/\/+$/,"");
   if(!/^https:\/\/.+\..+/.test(u)){ msg("Enter the full https:// address of your ProDash server."); return; }
   serverUrl = u; set(URL_KEY, u);
+  show("agChoose");
+});
+/* Forget this device's override and fall back to the baked-in address. The
+   key is deleted rather than overwritten with DEFAULT_URL, so this device
+   follows the app if the address is ever changed in this file again. */
+document.getElementById("agUrlDefault").addEventListener("click", function(){
+  del(URL_KEY); del("prodash.cloudUrl");
+  serverUrl = DEFAULT_URL;
   show("agChoose");
 });
 document.getElementById("agChangeUrl").addEventListener("click", function(){
@@ -4144,7 +4175,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="4.12";
+var APP_VERSION="4.13";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -4155,6 +4186,7 @@ var APP_VERSION="4.12";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-16T00:00:00+08:00",text:"Opening ProDash on a new device no longer starts with a question. The first screen used to ask for the address of your server before it would even show a login form -- on a new phone, after reinstalling the app, or any time a browser cleared its storage. It was the same answer every time, and it is the one thing you cannot look up from the phone you are holding at 3am. The app now knows its own address, so a fresh device goes straight to Log in. Nothing changed for a device you are already signed in on. The old screen is still there behind 'Change server' on the sign-in card, for pointing one device somewhere else, and it now has a 'Use the built-in address' link to undo a mistyped one."},
   {ts:"2026-09-14T15:00:00+08:00",text:"A new widget: Teleprompter. Open Widgets and it sits beside World Clocks and the Bible. Type or paste a script, give it a title if you like (it borrows the first line if you don't), and press Start prompter -- or tap the play button beside any saved script to go straight in. The script fills the screen in large type on your theme's deepest colour, with a line a third of the way down marking where your eye should be, and scrolls smoothly at a pace you set. Speed is measured in lines, so making the text bigger never changes how fast you have to read. Play from the top gives you a three-second countdown to get settled; resuming after a pause does not. Restart goes back to the top with a countdown, Stop goes back to the top and waits. Size and Spacing change as you drag them without losing your place. While it plays the controls fade away after a couple of seconds, and a stray tap only brings them back -- it will not pause you or press a button by accident. Drag the text to catch up or skip ahead without stopping it, and your phone's screen stays awake while it runs. On a keyboard: Space plays and pauses, R restarts, the up and down arrows change speed, and Escape exits. Full screen is there where your browser allows it, and on an Android phone there is a Landscape button too; if a browser refuses either, it tells you rather than doing nothing. Your scripts sync to your other devices and appear in Board History like everything else. Your speed, size and spacing do not -- they stay with each device, because the text size that is right on a laptop is far too big for a phone. Anything you were typing and had not saved is still there if the page reloads."},
   {ts:"2026-09-08T11:10:00+08:00",text:"Two things about scheduling. First, the bug: an activity's time could reset itself to 9:00-10:00. The cause was ticking \"All day\" -- doing that threw the times away rather than just ignoring them, so a 2pm meeting marked all-day came back as a 9am one, and the times were gone for good. The times are now always kept and the All day tick only decides how the activity is treated, so un-ticking it hands back exactly what was there. Editing an existing activity no longer has a default anywhere in its path: what you saved is what you see, whatever else you change. Second, new activities are now scheduled for you. Instead of always offering 9:00, the editor looks at what else you have booked that day and offers the next free hour -- if 9 to 10 is taken it offers 10, if there is a gap between two bookings it offers the gap, and on today it never offers an hour that has already gone. An empty day still starts at 9:00. The End time follows the Start an hour later, and once you set a length yourself that length is kept when you move the Start: a 30-minute activity dragged an hour later is still 30 minutes, not reset to an hour. Anything you type by hand is left alone from then on, including if you change the date afterwards. Your routine blocks are not counted as busy for this -- only real appointments -- otherwise there would be no free hour to find on a weekday."},
   {ts:"2026-09-08T07:30:00+08:00",text:"All-day activities are back on the Board. An activity you set as All day -- one with no start or end time, like \"Bills: Water District\" -- was showing only in your Calendar tab and nowhere on the Board at all. That was not a fault in the activity or in the Must attend switch, which is why toggling it changed nothing: \"What does my day look like?\" lays the day out by clock time, an all-day item has no clock time, and it was being left out. It used to be announced by the old notification strip in the green header, and when that strip was removed nothing was left to show it. There is now an All day band at the top of the list, above everything with a time on it, exactly where a calendar puts these. Each one shows its name, whether it is must-attend, and whether it repeats; tapping it opens the same editor as any other activity and the x removes it, asking first if it is a repeating one. Ticking it off in the Calendar shows it as done here too. The Now bar shows them as well, but only in the gaps -- where it used to say \"Unscheduled\" it now names your all-day activity instead, with two or more taking turns the way overlapping appointments already do. It will not do this at any other time: an appointment happening right now comes first, then the routine block you are inside, and only when there is neither does an all-day item take the space. That ordering is the point. Something that runs all day would otherwise win the bar every minute of every day and permanently hide the block you are actually working."},
