@@ -2,6 +2,126 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-16 — Sign in with Google, and a profile with controls in it (v4.14 / Worker 4.10)
+
+Google becomes a second front door to an ordinary ProDash account — not a
+second kind of account. Four decisions shaped the whole thing, and three of
+them are refusals.
+
+### Google is a full sign-up path, but it still asks for a password
+
+`POST /auth/google` verifies the ID token and answers one of three ways:
+`mode:"signin"` when `google_sub` matches a row, a 409 when it does not but the
+email does, and `mode:"signup"` with a signed ticket when neither matches. The
+ticket carries the subject id and the address so the browser cannot edit them
+on the way to `/auth/google/complete`.
+
+That completion step still collects a password and a secret question. A
+Google-only account would be unreachable whenever Google is (the script is a
+remote file from `accounts.google.com`), and its owner would be locked out the
+instant they disconnected it. Asking for both means there is exactly one kind of
+account in the system, the existing forgot-password chain keeps working for
+everyone, and disconnecting Google is always safe.
+
+### It will not merge accounts on a matching email
+
+`google_email_conflict`, deliberately. ProDash has never verified the email
+addresses people type into its sign-up form, so an email match proves nothing
+about who owns the address — anyone who registered using yours would receive
+your board the first time you tried Google. The refusal sends them through the
+front door instead: sign in with your password, then connect Google from
+Profile, where the password proves the account is theirs first.
+
+### Linking requires the password
+
+`/auth/google/link` and `/auth/google/unlink` both verify it. A session token is
+a thirty-day bearer credential sitting in `localStorage`; linking grants a
+permanent, password-free way in that survives the owner changing their password,
+so one look at that token would otherwise buy persistent access. Re-authenticating
+before adding an authentication factor is the standard rule and it costs one hash.
+
+### Verification is local, against Google's JWKS
+
+`verifyGoogleIdToken` checks `alg`, `kid`, the signature, `iss`, `exp`, `iat`,
+`sub` and `email_verified`, and pins `aud` to `GOOGLE_OAUTH_CLIENT_ID` — without
+that last one, a correctly-signed Google token minted for any other site would
+be accepted. Keys are cached in the isolate like `tokenCache`, with one forced
+refetch on a `kid` miss so a key rotation is not an outage. Google's own docs
+call the `tokeninfo` endpoint a debugging aid, and a round trip per sign-in
+would cost more than the verification.
+
+Every refusal returns the same 401 and logs the real reason. `/auth/google` runs
+no PBKDF2 at all, making it the cheapest authentication endpoint in the Worker.
+
+### Schema: five new columns, W through AA
+
+`google_sub`, `google_email`, `google_linked_at`, `google_picture`,
+`email_verified`. `COL_COUNT` 22 → 25 → 27, `SHEET_HEADERS` in lockstep;
+`LAST_COL` and `DATA_RANGE` derive, so `Users!A2:AA` needs no edit. `readUsers`
+already pads short rows, so existing rows read back with three empty cells and
+no backfill is needed.
+
+`cellSafe` gained a second clause: a run of 16+ digits also gets the apostrophe.
+A Google `sub` is ~21 digits, Sheets would store that as a number and hand back
+`1.07812345678901E+20`, and the failure would have looked like "Google sign-in
+randomly forgets my account."
+
+### Login accepts an email or a username
+
+One branch in a new `findLoginRow`. People type their address into a box
+labelled "username" regardless of what it says, and `email_key` has always been
+unique, so this can never be ambiguous.
+
+### Profile stopped being read-only
+
+It was a pure render of the cached session and called no endpoint at all. It now
+has: your own nickname (previously only a Super Admin could set it), your own
+password (previously only via Forgot password), connect/disconnect Google, sign
+out every other device, and delete your account — password plus your username
+typed back plus a confirm, because it destroys the board and there is no backup.
+
+`/auth/password` and `/auth/sessions/revoke` bump the session epoch to sign out
+other devices, then return a fresh token so the tab that did it stays signed in.
+Without that, "change my password" logs you out of the page you are standing on
+and everyone assumes that is normal.
+
+### Shipping in either order
+
+The app pushes to Pages; the Worker is pasted into Cloudflare by hand. They
+cannot land together, so the profile panel probes `/health`, and against a
+Worker older than `WORKER_MIN` it shows the stale banner and disables the five
+controls that would otherwise 404. `/health` also now carries `googleClientId`,
+so the client id is configured once in Cloudflare and `index.html` holds no copy
+to drift.
+
+### Email: written, and switched off
+
+`sendMail`, `verifySend`, `verifyConfirm` and `forgotEmail` are complete and
+inert. Nothing runs unless both `MAIL_API_KEY` and `MAIL_FROM` are set; until
+then those endpoints answer 503 `mail_not_configured` and the secret question
+remains the working recovery path. No provider account exists and nothing is
+billable. `forgotEmail` always answers 200 whether or not the address is
+registered — an unauthenticated recovery endpoint must not be an enumeration
+oracle — and swallows send failures for the same reason.
+
+### Refused as inapplicable, with reasons
+
+- **HttpOnly session cookies.** The app opens from `file://` and talks
+  cross-origin to the Worker under `Access-Control-Allow-Origin: *`. Cookies can
+  be sent under neither. Bearer token in `localStorage` stands; the XSS exposure
+  is real and mitigated by expiry, server-side revocation and the app's
+  `textContent` discipline.
+- **CSRF tokens.** Nothing attaches an `Authorization` header automatically, so
+  there is no ambient credential to forge against.
+
+### Deployment
+
+Worker 4.10 first (it is backward compatible — the live app never calls the new
+routes), then the sheet columns, `GOOGLE_OAUTH_CLIENT_ID`, and only then the
+app. Google sign-in stays hidden until a client id exists, so neither order
+breaks anything.
+
+
 ## 2026-09-16 — The server address is baked in (v4.13)
 
 A fresh device used to open on `#agSetup` — *"Connect to your ProDash server"*,

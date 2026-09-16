@@ -1328,10 +1328,18 @@ body.reports-only .board-only:not(.bview):not(#view-reports){display:none}
 .ag-msg.ok{background:var(--olive-lt);color:var(--forest-ink);border:1px solid var(--olive)}
 .ag-q{font-weight:600;color:var(--ink);font-size:13.5px;margin:0 0 14px;padding:10px 12px;
   background:var(--ivory);border-radius:8px;border:1px solid var(--line)}
-/* Signed-in identity in the header, so "whose board is this?" is answerable
-   at a glance on a shared machine. */
-.ag-who{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
-.ag-who b{color:var(--ink);font-weight:600}
+/* "or" rule between the app's own buttons and Google's. Hidden along with the
+   button whenever Google is unavailable, so nothing dangles. */
+.ag-or{display:flex;align-items:center;gap:10px;margin:14px 0 10px;
+  font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+/* display:flex on a class outranks the browser's own [hidden] rule, so the
+   divider needs to be told explicitly. Without this it hangs there over
+   nothing whenever Google is unavailable - which is every offline load. */
+.ag-or[hidden]{display:none}
+.ag-or::before,.ag-or::after{content:"";flex:1;height:1px;background:var(--line)}
+#agGoogleBtn{display:flex;justify-content:center}
+#agGoogleBtn:empty{display:none}
+.ag-readonly{opacity:.72}
 </style>
 
 <div id="authGate">
@@ -1364,6 +1372,15 @@ body.reports-only .board-only:not(.bview):not(#view-reports){display:none}
         <button class="ag-btn" id="agGoLogin">Log in</button>
         <button class="ag-btn ghost" id="agGoSignup">Sign up</button>
       </div>
+      <!-- Google renders its own button into this box, so it stays inside
+           their branding rules and we do not hand-roll a lookalike. It is
+           EMPTY and stays empty unless the page is on https, is online, and
+           the Worker reports a client id - see gsInit(). The note underneath
+           is what appears instead, so the absence is explained rather than
+           looking broken. -->
+      <div class="ag-or" id="agGoogleWrap" hidden><span>or</span></div>
+      <div id="agGoogleBtn"></div>
+      <div class="ag-hint" id="agGoogleNote" hidden></div>
       <div class="ag-foot"><button class="ag-link" id="agChangeUrl">Change server</button></div>
     </div>
 
@@ -1371,7 +1388,10 @@ body.reports-only .board-only:not(.bview):not(#view-reports){display:none}
       <p class="ag-h">Log in</p>
       <form id="agLoginForm" autocomplete="on">
         <div class="ag-f">
-          <label for="agLoginUser">Username</label>
+          <!-- Either works. People type their email into a box labelled
+               "username" no matter what it says, so the Worker now accepts
+               both and the label stops lying about it. -->
+          <label for="agLoginUser">Username or email</label>
           <input id="agLoginUser" name="username" autocomplete="username" autocapitalize="none" spellcheck="false">
         </div>
         <div class="ag-f">
@@ -1443,6 +1463,78 @@ body.reports-only .board-only:not(.bview):not(#view-reports){display:none}
         <div class="ag-btns"><button class="ag-btn" type="submit">Create account</button></div>
       </form>
       <div class="ag-foot"><button class="ag-link" id="agBack2">Back</button></div>
+    </div>
+
+    <!-- Finishing a Google sign-up.
+
+         Google has already proved who this is and at what address, so the name
+         and email arrive filled in and the email is not editable - it comes out
+         of a ticket the Worker signed, and typing a different one here would
+         change nothing but the label.
+
+         The password and secret question are still asked for, deliberately. An
+         account that can ONLY be reached through Google is one that cannot be
+         recovered when Google is unavailable, and one that would lock its owner
+         out the moment they disconnected it. This way a Google account is a
+         faster way to reach an ordinary ProDash account, not a different kind
+         of account with its own failure modes. -->
+    <div class="ag-view" id="agGoogleSignup" hidden>
+      <p class="ag-h">Finish setting up your account</p>
+      <p class="ag-p" id="agGsIntro">Google confirmed who you are. Two things left that Google cannot answer for you.</p>
+      <form id="agGoogleForm" autocomplete="on">
+        <div class="ag-f">
+          <label for="agGsEmail">Email address</label>
+          <input id="agGsEmail" type="email" readonly>
+          <div class="ag-hint">Confirmed by Google. This is the address your account is tied to.</div>
+        </div>
+        <div class="ag-row">
+          <div class="ag-f">
+            <label for="agGsFirst">First name</label>
+            <input id="agGsFirst" autocomplete="given-name">
+          </div>
+          <div class="ag-f">
+            <label for="agGsLast">Last name</label>
+            <input id="agGsLast" autocomplete="family-name">
+          </div>
+        </div>
+        <div class="ag-f">
+          <label for="agGsUser">Username</label>
+          <input id="agGsUser" autocomplete="username" autocapitalize="none" spellcheck="false">
+          <div class="ag-hint">Suggested from your email &mdash; change it if you like. 3&ndash;32 characters, letters, numbers, dots, underscores and hyphens.</div>
+        </div>
+        <div class="ag-f">
+          <label for="agGsNick">Nickname <span class="ag-optional">optional</span></label>
+          <input id="agGsNick" maxlength="24">
+        </div>
+        <div class="ag-f">
+          <label for="agGsPass">Password</label>
+          <input id="agGsPass" type="password" autocomplete="new-password">
+          <div class="ag-hint">At least 10 characters, with an uppercase letter, a lowercase letter and a number. This is how you get in if Google is ever unavailable.</div>
+        </div>
+        <div class="ag-f">
+          <label for="agGsPass2">Confirm password</label>
+          <input id="agGsPass2" type="password" autocomplete="new-password">
+        </div>
+        <div class="ag-f">
+          <label for="agGsQ">Secret question</label>
+          <select id="agGsQ">
+            <option value="">Choose a question&hellip;</option>
+            <option>What was the name of your first pet?</option>
+            <option>What street did you live on as a child?</option>
+            <option>What was the make of your first car?</option>
+            <option>What is your mother's maiden name?</option>
+            <option>What was the name of your first school?</option>
+            <option>What city were you born in?</option>
+          </select>
+        </div>
+        <div class="ag-f">
+          <label for="agGsA">Answer</label>
+          <input id="agGsA" autocapitalize="none">
+          <div class="ag-hint">This is how you recover the account without Google. Capitals and extra spaces are ignored.</div>
+        </div>
+        <div class="ag-btns"><button class="ag-btn" type="submit">Create account</button></div>
+      </form>
+      <div class="ag-foot"><button class="ag-link" id="agBack6">Back</button></div>
     </div>
 
     <!-- Recovery, step 1: username AND the registered email must both match
@@ -1630,7 +1722,7 @@ function ns(base){
 // ---- the gate UI -------------------------------------------------------
 var gate = document.getElementById("authGate");
 var msgEl = document.getElementById("agMsg");
-var VIEWS = ["agSetup","agChoose","agLogin","agSignup","agForgot1","agForgot2","agForgot3"];
+var VIEWS = ["agSetup","agChoose","agLogin","agSignup","agGoogleSignup","agForgot1","agForgot2","agForgot3"];
 var recovery = { username:"", email:"", ticket:"" };
 
 function show(id){
@@ -1649,9 +1741,184 @@ function busy(form, on){
 }
 function val(id){ return document.getElementById(id).value; }
 
+/* ---- Sign in with Google -------------------------------------------------
+
+   Three facts shape all of this.
+
+   1. Google's sign-in code is a REMOTE SCRIPT from accounts.google.com. It
+      cannot be self-hosted, and sw.js deliberately ignores cross-origin
+      requests so it is never cached. That makes it the one thing in ProDash
+      that simply is not there when the network is not.
+   2. Google will only run it on an origin registered in the Cloud console, and
+      "file://" cannot be registered. Opening index.html by double-clicking it
+      is a supported, load-bearing mode for this app - so Google sign-in is a
+      thing the hosted copy has and the local copy does not.
+   3. The Worker owns the client id. The app asks /health for it rather than
+      carrying its own copy, so there is exactly one place to configure it and
+      no second value to drift.
+
+   Therefore: nothing is injected unless the page is on https (or localhost),
+   the browser thinks it is online, and the Worker hands back a client id. When
+   any of those is false the button is absent and a line of text says why.
+   Password sign-in is untouched in every one of those cases. */
+var GS = { ready:false, tried:false, clientId:"", cb:null, note:"" };
+
+function gsPossible(){
+  // Google's own requirement, not ours: a registered https origin, or
+  // localhost for development.
+  var p = location.protocol, h = location.hostname;
+  if(p === "https:") return true;
+  if(p === "http:" && (h === "localhost" || h === "127.0.0.1")) return true;
+  return false;
+}
+
+/* Ask the Worker what it supports. Bare fetch, not api(): /health is
+   unauthenticated and this runs before anyone has signed in, so it must work
+   when the session is the thing that is broken. A Worker too old to know about
+   Google answers without the field, which is itself the answer. */
+function gsConfig(){
+  if(!serverUrl) return Promise.resolve(null);
+  return fetch(serverUrl + "/health", {method:"GET"})
+    .then(function(r){ return r.json(); })
+    .catch(function(){ return null; });
+}
+
+function gsLoadScript(){
+  return new Promise(function(resolve, reject){
+    if(window.google && window.google.accounts && window.google.accounts.id) return resolve();
+    var s = document.createElement("script");
+    s.src = "https://accounts.google.com/gsi/client";
+    s.async = true; s.defer = true;
+    s.onload = function(){ resolve(); };
+    // Blocked by an extension, a firewall, or a network that resolves but does
+    // not deliver. All the same to us: no button, and a reason on screen.
+    s.onerror = function(){ reject(new Error("blocked")); };
+    document.head.appendChild(s);
+  });
+}
+
+/* One initialisation for the whole page. Both the gate and the Profile screen
+   render buttons from it; `GS.cb` is re-pointed at whichever one asked, so the
+   same credential callback serves signing in and linking. */
+function gsInit(){
+  if(GS.tried) return Promise.resolve(GS.ready);
+  GS.tried = true;
+
+  if(!gsPossible()){
+    GS.note = location.protocol === "file:"
+      ? "Sign in with Google needs the hosted version of ProDash — it cannot run from a file on this device. Your username and password work here as normal."
+      : "Sign in with Google needs a secure (https) connection.";
+    return Promise.resolve(false);
+  }
+  if(navigator.onLine === false){
+    GS.note = "Sign in with Google needs a connection. Your username and password still work.";
+    return Promise.resolve(false);
+  }
+
+  return gsConfig().then(function(h){
+    if(!h){ GS.note = "Can't reach the ProDash server to set up Google sign-in."; return false; }
+    if(!h.googleClientId){
+      // Distinguishes "the server has no client id" from "the server is too
+      // old to have heard of one" - different fixes, so different sentences.
+      GS.note = (h.version === undefined)
+        ? "The server is running an old version that does not support Google sign-in yet."
+        : "Sign in with Google is not switched on for this server yet.";
+      return false;
+    }
+    GS.clientId = h.googleClientId;
+    return gsLoadScript().then(function(){
+      window.google.accounts.id.initialize({
+        client_id: GS.clientId,
+        callback: function(res){ if(GS.cb) GS.cb(res && res.credential); },
+        // The ID token goes to a JavaScript callback and from there straight to
+        // our Worker. No redirect, so no redirect URI to register and no
+        // chance of a credential landing on a page we did not write.
+        ux_mode: "popup",
+        auto_select: false,
+        cancel_on_tap_outside: true,
+      });
+      GS.ready = true;
+      return true;
+    }).catch(function(){
+      GS.note = "Google's sign-in script could not load. Your username and password still work.";
+      return false;
+    });
+  });
+}
+
+/* Draw a Google button into `el` and route its credential to `cb`. Returns a
+   promise resolving true if a button actually appeared, so every caller can
+   decide for itself what to show when one did not. */
+function gsButton(el, text, cb){
+  return gsInit().then(function(ok){
+    if(!ok) return false;
+    GS.cb = cb;
+    el.innerHTML = "";
+    window.google.accounts.id.renderButton(el, {
+      type:"standard", theme:"outline", size:"large",
+      text: text || "signin_with", shape:"rectangular",
+      logo_alignment:"left", width: Math.min(360, Math.max(200, el.offsetWidth || 320)),
+    });
+    return true;
+  });
+}
+
+// The gate's own button, plus the explanatory line when there isn't one.
+function gsMountGate(){
+  var wrap = document.getElementById("agGoogleWrap");
+  var host = document.getElementById("agGoogleBtn");
+  var note = document.getElementById("agGoogleNote");
+  if(!host) return;
+  gsButton(host, "continue_with", gsGateCredential).then(function(ok){
+    wrap.hidden = !ok;
+    note.hidden = ok || !GS.note;
+    if(!ok && GS.note) note.textContent = GS.note;
+  });
+}
+
+/* The credential came back. Everything from here is the Worker's decision -
+   the browser is not trusted to know whether this Google account already has a
+   ProDash account, and deliberately cannot find out except by asking. */
+function gsGateCredential(idToken){
+  if(!idToken) return;
+  msg("Checking with Google…", "ok");
+  api("/auth/google", { method:"POST", body:{ idToken: idToken } })
+    .then(function(res){
+      if(res.mode === "signin") return enter(res);
+      if(res.mode === "signup") return gsStartSignup(res);
+      msg("Unexpected answer from the server.");
+    })
+    .catch(function(err){
+      if(err.code === "google_email_conflict"){
+        /* The deliberate refusal. Explained on the login form rather than as a
+           bare error, because the next step is a thing they can actually do. */
+        show("agLogin");
+        document.getElementById("agLoginUser").value = "";
+        msg(err.message);
+        return;
+      }
+      msg(err.offline ? "Can't reach the ProDash server. Check your connection." : err.message);
+    });
+}
+
+var gsTicket = "";
+function gsStartSignup(res){
+  var p = res.prefill || {};
+  gsTicket = res.ticket || "";
+  show("agGoogleSignup");
+  document.getElementById("agGsEmail").value = p.email || "";
+  document.getElementById("agGsFirst").value = p.firstName || "";
+  document.getElementById("agGsLast").value = p.lastName || "";
+  document.getElementById("agGsUser").value = p.suggestedUsername || "";
+  document.getElementById("agGsIntro").textContent =
+    "Google confirmed you as " + (p.email || "this account") + ". Two things left that Google cannot answer for you: a password, and a way back in if you ever lose both.";
+}
+
 function openGate(){
   gate.hidden = false;
   show(serverUrl ? "agChoose" : "agSetup");
+  // Mounted after the card is visible so renderButton can measure its width.
+  gsMountGate();
 }
 
 /* One place decides what happens after any successful authentication, so
@@ -1690,6 +1957,45 @@ document.getElementById("agGoForgot").addEventListener("click", function(){ show
 ["agBack3","agBack4","agBack5"].forEach(function(id){
   document.getElementById(id).addEventListener("click", function(){ show("agLogin"); });
 });
+
+/* Abandoning a Google sign-up drops the ticket. It would still be valid for
+   fifteen minutes, but keeping it would mean a stray "Back" leaves a signed
+   identity sitting in a variable for no reason. */
+document.getElementById("agBack6").addEventListener("click", function(){
+  gsTicket = "";
+  show("agChoose");
+  gsMountGate();
+});
+
+document.getElementById("agGoogleForm").addEventListener("submit", function(e){
+  e.preventDefault();
+  var f = e.target;
+  if(!gsTicket){ msg("That sign-up has expired. Start again with the Google button."); return; }
+  // Same two courtesy checks the ordinary signup form does, for the same
+  // reason: the Worker re-checks everything, these just save a round trip.
+  if(val("agGsPass") !== val("agGsPass2")){ msg("The two passwords don't match."); return; }
+  if(!val("agGsQ")){ msg("Choose a secret question."); return; }
+  busy(f, true); msg("");
+  api("/auth/google/complete", { method:"POST", body:{
+    ticket: gsTicket,
+    firstName: val("agGsFirst"), lastName: val("agGsLast"),
+    username: val("agGsUser"), nickname: val("agGsNick"),
+    password: val("agGsPass"),
+    secretQuestion: val("agGsQ"), secretAnswer: val("agGsA")
+  }})
+    .then(enter)
+    .catch(function(err){
+      busy(f, false);
+      msg(err.message);
+      // Point at the field that caused it, exactly as the signup form does.
+      if(err.code === "username_taken"){ try{ document.getElementById("agGsUser").select(); }catch(e2){} }
+      // The ticket is single-use only once an account is actually created, so
+      // a rejected attempt can simply be corrected and resubmitted. An expired
+      // or already-used one is the exception, and has to start over.
+      if(err.code === "bad_ticket"){ gsTicket = ""; }
+    });
+});
+
 
 document.getElementById("agLoginForm").addEventListener("submit", function(e){
   e.preventDefault();
@@ -1820,6 +2126,18 @@ return {
      the gate uses - one place that attaches the token, handles the JSON and
      tells a transport failure apart from a refusal. */
   api: api,
+  /* Google, for the Profile screen. The gate owns the one initialise call for
+     the whole page - doing it twice would mean two client-id sources and two
+     places to be wrong - so Profile borrows it rather than repeating it.
+     `googleButton` resolves false when no button could be drawn, and
+     `googleNote` then says why in a sentence fit to show the user. */
+  googleButton: function(el, text, cb){ return gsButton(el, text, cb); },
+  googleNote: function(){ return GS.note; },
+  /* Swap in a token the Worker just re-issued (after a password change, or
+     signing other devices out) so the current tab keeps working instead of
+     being logged out by its own success. */
+  adoptToken: function(tok, user){ save(tok, user || (session && session.user)); },
+  signedOutReload: function(){ clear(); location.reload(); },
   /* Merge fresher fields into the stored session user and tell the app.
 
      Exactly the merge /auth/me performs at boot, exposed so a change the admin
@@ -2804,6 +3122,34 @@ return {
     font-weight:800;text-transform:uppercase;letter-spacing:.6px}
   .pf-sec .sub{margin:0 0 10px}
   .pf-caps{display:flex;flex-wrap:wrap;gap:5px}
+  /* The editable half of the profile panel. Inputs borrow the gate's field
+     look rather than inventing a third one. */
+  .pf-row{display:flex;gap:8px;align-items:center}
+  .pf-stack{display:flex;flex-direction:column;gap:8px}
+  .pf-row input,.pf-stack input{flex:1;min-width:0;box-sizing:border-box;
+    padding:8px 10px;font:inherit;font-size:13px;color:var(--ink);
+    background:var(--paper);border:1px solid var(--line);border-radius:9px}
+  .pf-row input:focus,.pf-stack input:focus{outline:2px solid var(--forest);
+    outline-offset:-1px;border-color:var(--forest)}
+  .pf-msg{margin-top:9px;padding:8px 10px;border-radius:8px;font-size:12px;line-height:1.45;
+    background:var(--olive-lt);color:var(--forest-ink);border:1px solid var(--olive)}
+  .pf-msg.err{background:var(--alert-lt);color:var(--alert-ink);border-color:var(--alert)}
+  /* Terracotta is this app's attention colour and is kept for exactly this
+     kind of thing: the one irreversible control on the screen. */
+  .um-btn.danger{border-color:var(--alert);color:var(--alert-ink)}
+  .um-btn.danger:hover:not(:disabled){background:var(--alert-ink);color:#fff;border-color:var(--alert-ink)}
+  .pf-danger{border-top-color:var(--alert)}
+  .pf-glink{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--ink);
+    padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:var(--ivory)}
+  .pf-glink img{width:26px;height:26px;border-radius:50%;flex:none}
+  .pf-glink b{font-weight:600}
+  .pf-glink .sp{margin-left:auto}
+  /* Same look as the admin screen's stale-Worker banner, deliberately: it is
+     the same condition and the same remedy, so it should not look like a
+     different kind of problem. */
+  .pf-stale{margin:14px 0 0;padding:10px 12px;border-radius:8px;font-size:12.5px;line-height:1.55;
+    background:var(--terra-lt);color:var(--ink);border:1px solid var(--terra);border-left-width:4px}
+  .pf-stale[hidden]{display:none}
   .pf-cap{font-size:10.5px;font-weight:600;padding:3px 9px;border-radius:999px;
     background:var(--olive-lt);color:var(--forest-ink);border:1px solid var(--olive)}
   .pf-cap.off{background:var(--ivory);color:var(--muted);border-color:var(--line);
@@ -3032,6 +3378,71 @@ return {
         <h4>What you can reach</h4>
         <div class="sub">Set by your role. Anything struck through is not available to you.</div>
         <div class="pf-caps" id="pfCaps"></div>
+      </div>
+
+      <!-- Everything below this line is new ground for this panel: until now it
+           was a pure read-only render of the cached session and called no
+           endpoint at all. Each section owns its own message line, because one
+           shared banner at the top would leave you scrolling to find out
+           whether the thing you just pressed worked. -->
+      <!-- Shown only when the deployed Worker is older than this app. The app
+           ships by git push and the Worker is pasted into Cloudflare by hand,
+           so the two genuinely can be out of step for a while - and every
+           control below this line needs an endpoint 4.9 has never heard of.
+           Without this they would simply answer "not found" and look broken. -->
+      <div class="pf-stale" id="pfStale" hidden></div>
+
+      <div class="pf-sec">
+        <h4>Your details</h4>
+        <div class="sub">The name the app greets you by. Yours to change &mdash; it used to take a Super Admin.</div>
+        <div class="pf-row">
+          <input id="pfNick" maxlength="24" placeholder="Leave blank for a silly one">
+          <button type="button" class="um-btn" id="pfNickSave">Save</button>
+        </div>
+        <div class="pf-msg" id="pfNickMsg" hidden></div>
+      </div>
+
+      <div class="pf-sec">
+        <h4>Password</h4>
+        <div class="sub">Changing it signs you out on every other device. This one stays signed in.</div>
+        <div class="pf-stack">
+          <input id="pfPwOld" type="password" autocomplete="current-password" placeholder="Current password">
+          <input id="pfPwNew" type="password" autocomplete="new-password" placeholder="New password">
+          <input id="pfPwNew2" type="password" autocomplete="new-password" placeholder="Confirm new password">
+          <div class="um-acts"><button type="button" class="um-btn" id="pfPwSave">Change password</button></div>
+        </div>
+        <div class="pf-msg" id="pfPwMsg" hidden></div>
+      </div>
+
+      <div class="pf-sec" id="pfGoogleSec">
+        <h4>Connected accounts</h4>
+        <div class="sub" id="pfGoogleSub">Connect Google to sign in with one tap. Your password keeps working either way.</div>
+        <div id="pfGoogleState"></div>
+        <!-- Google draws its own button in here when linking is possible. -->
+        <div id="pfGoogleBtn"></div>
+        <div class="pf-msg" id="pfGoogleMsg" hidden></div>
+      </div>
+
+      <div class="pf-sec">
+        <h4>Other devices</h4>
+        <div class="sub">Signs out every other browser and phone that is still signed in as you. Useful if you left yourself logged in somewhere you no longer have.</div>
+        <div class="um-acts"><button type="button" class="um-btn" id="pfRevoke">Sign out other devices</button></div>
+        <div class="pf-msg" id="pfRevokeMsg" hidden></div>
+      </div>
+
+      <div class="pf-sec pf-danger" id="pfDangerSec">
+        <h4>Delete this account</h4>
+        <div class="sub">Permanent. Your board, your history and every task on it are destroyed, and there is no backup anywhere. Your password and your exact username are both required.</div>
+        <button type="button" class="um-btn danger" id="pfDelOpen">Delete my account&hellip;</button>
+        <div class="pf-stack" id="pfDelForm" hidden>
+          <input id="pfDelPw" type="password" autocomplete="current-password" placeholder="Your password">
+          <input id="pfDelUser" autocapitalize="none" spellcheck="false" placeholder="Type your username to confirm">
+          <div class="um-acts">
+            <button type="button" class="um-btn danger" id="pfDelGo">Delete permanently</button>
+            <button type="button" class="um-btn" id="pfDelCancel">Cancel</button>
+          </div>
+        </div>
+        <div class="pf-msg" id="pfDelMsg" hidden></div>
       </div>
 
       <div class="pf-sec" id="pfAdminSec" hidden>
@@ -4175,7 +4586,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="4.13";
+var APP_VERSION="4.14";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -4186,6 +4597,7 @@ var APP_VERSION="4.13";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-16T12:00:00+08:00",text:"Sign in with Google, and a profile you can actually edit. The sign-in card now offers Google as well as a password, and a new person can start an account that way -- Google fills in the name and email, and you finish with a username, a password and a secret question. The password is still asked for on purpose: an account that only Google can open is one you cannot get into when Google is unavailable, and one you would be locked out of the moment you disconnected it. If you try Google with an address that already has a ProDash account, it will not merge them -- it asks you to sign in with your password first and connect Google from your profile, because anyone could have typed your address into the sign-up form and nobody ever checked. The login box now takes your email as well as your username. Your profile page has grown up: you can change your own nickname at last, change your own password, disconnect Google, sign out every other device you have left yourself logged in on, and delete your account outright if you want to -- that one is permanent and asks for your password and your username typed back. Google's button only appears on the hosted app with a connection; opening the file directly still works exactly as it always did, with your password. Needs the Worker redeployed -- until it is, the profile page says so and leaves those controls switched off."},
   {ts:"2026-09-16T00:00:00+08:00",text:"Opening ProDash on a new device no longer starts with a question. The first screen used to ask for the address of your server before it would even show a login form -- on a new phone, after reinstalling the app, or any time a browser cleared its storage. It was the same answer every time, and it is the one thing you cannot look up from the phone you are holding at 3am. The app now knows its own address, so a fresh device goes straight to Log in. Nothing changed for a device you are already signed in on. The old screen is still there behind 'Change server' on the sign-in card, for pointing one device somewhere else, and it now has a 'Use the built-in address' link to undo a mistyped one."},
   {ts:"2026-09-14T15:00:00+08:00",text:"A new widget: Teleprompter. Open Widgets and it sits beside World Clocks and the Bible. Type or paste a script, give it a title if you like (it borrows the first line if you don't), and press Start prompter -- or tap the play button beside any saved script to go straight in. The script fills the screen in large type on your theme's deepest colour, with a line a third of the way down marking where your eye should be, and scrolls smoothly at a pace you set. Speed is measured in lines, so making the text bigger never changes how fast you have to read. Play from the top gives you a three-second countdown to get settled; resuming after a pause does not. Restart goes back to the top with a countdown, Stop goes back to the top and waits. Size and Spacing change as you drag them without losing your place. While it plays the controls fade away after a couple of seconds, and a stray tap only brings them back -- it will not pause you or press a button by accident. Drag the text to catch up or skip ahead without stopping it, and your phone's screen stays awake while it runs. On a keyboard: Space plays and pauses, R restarts, the up and down arrows change speed, and Escape exits. Full screen is there where your browser allows it, and on an Android phone there is a Landscape button too; if a browser refuses either, it tells you rather than doing nothing. Your scripts sync to your other devices and appear in Board History like everything else. Your speed, size and spacing do not -- they stay with each device, because the text size that is right on a laptop is far too big for a phone. Anything you were typing and had not saved is still there if the page reloads."},
   {ts:"2026-09-08T11:10:00+08:00",text:"Two things about scheduling. First, the bug: an activity's time could reset itself to 9:00-10:00. The cause was ticking \"All day\" -- doing that threw the times away rather than just ignoring them, so a 2pm meeting marked all-day came back as a 9am one, and the times were gone for good. The times are now always kept and the All day tick only decides how the activity is treated, so un-ticking it hands back exactly what was there. Editing an existing activity no longer has a default anywhere in its path: what you saved is what you see, whatever else you change. Second, new activities are now scheduled for you. Instead of always offering 9:00, the editor looks at what else you have booked that day and offers the next free hour -- if 9 to 10 is taken it offers 10, if there is a gap between two bookings it offers the gap, and on today it never offers an hour that has already gone. An empty day still starts at 9:00. The End time follows the Start an hour later, and once you set a length yourself that length is kept when you move the Start: a 30-minute activity dragged an hour later is still 30 minutes, not reset to an hour. Anything you type by hand is left alone from then on, including if you change the date afterwards. Your routine blocks are not counted as busy for this -- only real appointments -- otherwise there would be no free hour to find on a weekday."},
@@ -6517,6 +6929,176 @@ function pfWhen(v){
 }
 function roleClass(r){ return r==="superadmin"?"sa":(r==="guest"?"guest":""); }
 
+/* ---- Profile: the parts that write something ----------------------------
+
+   This panel was read-only for its whole life - a render of the cached session
+   and nothing else. Everything below is the first code in it that calls an
+   endpoint, so it follows the pattern the admin screen already settled on:
+   each control re-reads the truth after it acts rather than patching what it
+   thinks changed, and each section says what happened in its own line. */
+function pfMsg(id, text, bad){
+  var el = pfEl(id);
+  if(!el) return;
+  el.textContent = text || "";
+  el.className = "pf-msg" + (bad ? " err" : "");
+  el.hidden = !text;
+}
+function pfErr(id, err){
+  pfMsg(id, err && err.offline
+    ? "Can't reach the ProDash server — this needs a connection."
+    : (err && err.message) || "Something went wrong.", true);
+}
+function pfBusy(id, on){ var b = pfEl(id); if(b) b.disabled = !!on; }
+
+// ---- nickname -------------------------------------------------------------
+function pfSaveNick(){
+  pfBusy("pfNickSave", true); pfMsg("pfNickMsg", "");
+  PDAuth.api("/auth/nickname", { method:"POST", body:{ nickname: pfEl("pfNick").value } })
+    .then(function(res){
+      var nick = (res.user && res.user.nickname) || "";
+      /* Read the value BACK from the Worker rather than echoing what was
+         typed: it clamps the field, so this is the only way the box and the
+         greeting can be guaranteed to agree with the sheet. */
+      pfEl("pfNick").value = nick;
+      PDAuth.mergeUser({ nickname: nick });
+      pfMsg("pfNickMsg", nick ? "Saved. The app will call you " + nick + "." : "Cleared — back to a different silly name each time.");
+    })
+    .catch(function(err){ pfErr("pfNickMsg", err); })
+    .then(function(){ pfBusy("pfNickSave", false); });
+}
+
+// ---- password -------------------------------------------------------------
+function pfChangePw(){
+  var a = pfEl("pfPwOld").value, b = pfEl("pfPwNew").value, c = pfEl("pfPwNew2").value;
+  if(!a || !b){ pfMsg("pfPwMsg", "Fill in your current and new password.", true); return; }
+  if(b !== c){ pfMsg("pfPwMsg", "The two new passwords don't match.", true); return; }
+  pfBusy("pfPwSave", true); pfMsg("pfPwMsg", "");
+  PDAuth.api("/auth/password", { method:"POST", body:{ currentPassword:a, newPassword:b } })
+    .then(function(res){
+      /* The Worker bumped the session epoch, which invalidates every token
+         including this tab's. It minted a replacement; adopting it is what
+         stops "change my password" logging you out of the page you are
+         standing on. */
+      if(res.token) PDAuth.adoptToken(res.token, res.user);
+      pfEl("pfPwOld").value = pfEl("pfPwNew").value = pfEl("pfPwNew2").value = "";
+      pfMsg("pfPwMsg", "Password changed. Every other device has been signed out.");
+    })
+    .catch(function(err){ pfErr("pfPwMsg", err); })
+    .then(function(){ pfBusy("pfPwSave", false); });
+}
+
+// ---- other devices --------------------------------------------------------
+function pfRevokeOthers(){
+  pfBusy("pfRevoke", true); pfMsg("pfRevokeMsg", "");
+  PDAuth.api("/auth/sessions/revoke", { method:"POST", body:{} })
+    .then(function(res){
+      if(res.token) PDAuth.adoptToken(res.token);
+      pfMsg("pfRevokeMsg", "Done. Every other device has been signed out.");
+    })
+    .catch(function(err){ pfErr("pfRevokeMsg", err); })
+    .then(function(){ pfBusy("pfRevoke", false); });
+}
+
+// ---- Google ---------------------------------------------------------------
+/* Renders one of three states: connected, connectable, or a sentence saying
+   why it cannot be. `google` comes from the session user, which /auth/me
+   refreshes on every load - and is deliberately NULL rather than
+   "not connected" when the Worker could not read the sheet, because offering
+   Connect on an already-connected account would be a trap. */
+function pfRenderGoogle(){
+  var u = PDAuth.user() || {};
+  var g = u.google;
+  var state = pfEl("pfGoogleState"), host = pfEl("pfGoogleBtn");
+  if(!state) return;
+  host.innerHTML = "";
+  pfMsg("pfGoogleMsg", "");
+
+  if(g === null || g === undefined){
+    state.innerHTML = "";
+    pfEl("pfGoogleSub").textContent = "Couldn't check whether Google is connected. Reload when you have a connection.";
+    return;
+  }
+
+  if(g.linked){
+    pfEl("pfGoogleSub").textContent = "You can sign in with this Google account on any device.";
+    var av = g.picture
+      ? '<img src="' + esc(g.picture) + '" alt="" referrerpolicy="no-referrer">'
+      : '';
+    state.innerHTML = '<div class="pf-glink">' + av +
+      '<span>Connected as <b>' + esc(g.email || "your Google account") + '</b></span>' +
+      '<button type="button" class="um-btn sp" id="pfGUnlink">Disconnect</button></div>' +
+      '<div class="pf-stack" id="pfGUnlinkForm" hidden style="margin-top:9px">' +
+      '<input id="pfGUnlinkPw" type="password" autocomplete="current-password" placeholder="Your password, to confirm">' +
+      '<div class="um-acts"><button type="button" class="um-btn danger" id="pfGUnlinkGo">Disconnect Google</button>' +
+      '<button type="button" class="um-btn" id="pfGUnlinkCancel">Cancel</button></div></div>';
+    pfEl("pfGUnlink").addEventListener("click", function(){ pfEl("pfGUnlinkForm").hidden = false; });
+    pfEl("pfGUnlinkCancel").addEventListener("click", function(){ pfEl("pfGUnlinkForm").hidden = true; });
+    pfEl("pfGUnlinkGo").addEventListener("click", pfGoogleUnlink);
+    return;
+  }
+
+  pfEl("pfGoogleSub").textContent = "Connect Google to sign in with one tap. Your password keeps working either way.";
+  /* Ask for the password BEFORE the Google popup. Linking adds a permanent way
+     into this account, and a session token alone must not be enough to do
+     that - anyone who got one look at it would otherwise have persistent
+     access that survives a password change. The Worker enforces this; the
+     field is here so the popup is not opened only to fail. */
+  state.innerHTML = '<div class="pf-stack">' +
+    '<input id="pfGLinkPw" type="password" autocomplete="current-password" placeholder="Your password, to confirm it is you">' +
+    '</div>';
+  PDAuth.googleButton(host, "continue_with", pfGoogleLinkCredential).then(function(ok){
+    if(ok) return;
+    state.innerHTML = "";
+    /* Why-there-is-no-button goes on the SUBTITLE, never the message line.
+       That line reports what the last button press did, and this arrives
+       asynchronously - it was overwriting "Google disconnected." a
+       heartbeat after the user earned it. */
+    pfEl("pfGoogleSub").textContent = PDAuth.googleNote() || "Google sign-in is not available here.";
+  });
+}
+
+function pfGoogleLinkCredential(idToken){
+  var pw = (pfEl("pfGLinkPw") || {}).value || "";
+  if(!pw){ pfMsg("pfGoogleMsg", "Type your password first, then press the Google button.", true); return; }
+  pfMsg("pfGoogleMsg", "Connecting…");
+  PDAuth.api("/auth/google/link", { method:"POST", body:{ idToken: idToken, password: pw } })
+    .then(function(res){
+      PDAuth.mergeUser({ google: res.google });
+      pfRenderGoogle();
+      pfMsg("pfGoogleMsg", res.alreadyLinked ? "That account was already connected." : "Google connected.");
+    })
+    .catch(function(err){ pfErr("pfGoogleMsg", err); });
+}
+
+function pfGoogleUnlink(){
+  var pw = (pfEl("pfGUnlinkPw") || {}).value || "";
+  if(!pw){ pfMsg("pfGoogleMsg", "Type your password to confirm.", true); return; }
+  pfBusy("pfGUnlinkGo", true);
+  PDAuth.api("/auth/google/unlink", { method:"POST", body:{ password: pw } })
+    .then(function(res){
+      PDAuth.mergeUser({ google: res.google });
+      pfRenderGoogle();
+      pfMsg("pfGoogleMsg", "Google disconnected. Sign in with your username and password from now on.");
+    })
+    .catch(function(err){ pfBusy("pfGUnlinkGo", false); pfErr("pfGoogleMsg", err); });
+}
+
+// ---- delete ---------------------------------------------------------------
+function pfDeleteAccount(){
+  var pw = pfEl("pfDelPw").value, un = pfEl("pfDelUser").value;
+  if(!pw || !un){ pfMsg("pfDelMsg", "Both fields are required.", true); return; }
+  /* A native confirm on top of the password and the typed username. Three
+     gates for the one action here that cannot be undone and has no backup. */
+  if(!confirm("Delete your account and destroy your board permanently?\n\nThis cannot be undone and there is no backup.")) return;
+  pfBusy("pfDelGo", true); pfMsg("pfDelMsg", "");
+  PDAuth.api("/auth/account/delete", { method:"POST", body:{ password: pw, confirmUsername: un } })
+    .then(function(){
+      alert("Your account and board have been deleted.");
+      PDAuth.signedOutReload();
+    })
+    .catch(function(err){ pfBusy("pfDelGo", false); pfErr("pfDelMsg", err); });
+}
+
 function openProfile(){
   var u=PDAuth.user()||{}, role=myRole();
   var nm=((u.firstName||"")+" "+(u.lastName||"")).trim()||u.username||"—";
@@ -6546,7 +7128,43 @@ function openProfile(){
   }).join("");
 
   pfEl("pfAdminSec").hidden=!can("admin");
+
+  // The editable half. Every field starts from the stored session, and every
+  // message line starts blank so a previous visit's result is never mistaken
+  // for this one's.
+  pfEl("pfNick").value=u.nickname||"";
+  ["pfNickMsg","pfPwMsg","pfGoogleMsg","pfRevokeMsg","pfDelMsg"].forEach(function(id){ pfMsg(id,""); });
+  pfEl("pfPwOld").value=pfEl("pfPwNew").value=pfEl("pfPwNew2").value="";
+  pfEl("pfDelForm").hidden=true;
+  pfEl("pfDelPw").value=pfEl("pfDelUser").value="";
+  /* A Super Admin cannot delete themselves - the Worker refuses it, because it
+     could leave nobody able to manage anyone. Hiding the section is a courtesy
+     so the refusal is never reached, not the control. */
+  pfEl("pfDangerSec").hidden=(role==="superadmin");
+  pfRenderGoogle();
+  pfStaleCheck();
+
   pfEl("profModal").hidden=false;
+}
+
+/* Disable everything that needs an endpoint the deployed Worker may not have,
+   and say so once, at the top, instead of letting five separate controls each
+   fail with "not found". A network failure says nothing - offline is not the
+   same claim as out-of-date. */
+function pfStaleCheck(){
+  var host=pfEl("pfStale");
+  var controls=["pfNickSave","pfPwSave","pfRevoke","pfDelOpen","pfDelGo"];
+  pdHealth().then(function(h){
+    var v=(h&&h.version)||"";
+    var stale=!!h&&(!v||verLt(v,WORKER_MIN));
+    host.hidden=!stale;
+    if(stale){
+      host.innerHTML='<b>The server is running an old version'+(v?" ("+esc(v)+")":"")+'.</b> '+
+        'Changing your nickname or password, signing other devices out and deleting your account all need the newer one. '+
+        'Paste <code>cloud-worker/worker.js</code> into the Worker’s Quick Edit, press Deploy, then promote that version to Active — the promote step is the one that is easy to miss.';
+    }
+    controls.forEach(function(id){ var b=pfEl(id); if(b) b.disabled=stale; });
+  });
 }
 function closeProfile(){ pfEl("profModal").hidden=true; }
 
@@ -6604,7 +7222,25 @@ function umMsg(t,kind){var m=umEl("umMsg");if(!m)return;
    control on this screen to do what it says. Bump it in lockstep with
    WORKER_VERSION over there whenever the app starts depending on something new.
    It is a plain string compare on dotted numbers, so keep both numeric. */
-var WORKER_MIN="4.9";
+var WORKER_MIN="4.10";
+/* One /health probe for the whole page, shared by the admin screen and the
+   profile panel. It used to be admin-only, which was fine while the admin
+   screen was the only thing that could outrun the Worker. The profile panel
+   now calls six endpoints that a 4.9 Worker has never heard of, so it needs
+   the same answer - and asking twice would mean two probes on every load.
+
+   The promise is cached, not the value: a failed probe should not be
+   remembered as "old", it should simply say nothing. */
+var PD_HEALTH=null;
+function pdHealth(){
+  if(PD_HEALTH) return PD_HEALTH;
+  var base=PDAuth.serverUrl();
+  if(!base) return Promise.resolve(null);
+  PD_HEALTH=fetch(base+"/health",{method:"GET"})
+    .then(function(r){return r.json();})
+    .catch(function(){ PD_HEALTH=null; return null; });
+  return PD_HEALTH;
+}
 function verLt(a,b){
   var x=String(a||"0").split("."),y=String(b||"0").split("."),i;
   for(i=0;i<Math.max(x.length,y.length);i++){
@@ -6629,7 +7265,10 @@ function verLt(a,b){
 function umWorkerCheck(){
   var host=umEl("umStale"),base=PDAuth.serverUrl();
   if(!host||!base)return;
-  fetch(base+"/health",{method:"GET"}).then(function(r){return r.json();}).then(function(h){
+  // Shares the one cached probe with the profile panel rather than making a
+  // second identical request.
+  pdHealth().then(function(h){
+    if(!h) return;              // offline or blocked: says nothing about the version
     var v=(h&&h.version)||"";
     if(v&&!verLt(v,WORKER_MIN)){host.hidden=true;return;}
     host.hidden=false;
@@ -6974,6 +7613,20 @@ document.getElementById("whoBtn").addEventListener("click",openProfile);
 document.getElementById("pfGoAdmin").addEventListener("click",function(){
   closeProfile(); setView("admin");
 });
+/* The controls that write. Bound once here; the Google section rebinds its own
+   inner buttons on every render, because it rebuilds that markup. */
+document.getElementById("pfNickSave").addEventListener("click",pfSaveNick);
+document.getElementById("pfPwSave").addEventListener("click",pfChangePw);
+document.getElementById("pfRevoke").addEventListener("click",pfRevokeOthers);
+document.getElementById("pfDelOpen").addEventListener("click",function(){
+  document.getElementById("pfDelForm").hidden=false;
+});
+document.getElementById("pfDelCancel").addEventListener("click",function(){
+  document.getElementById("pfDelForm").hidden=true;
+  document.getElementById("pfDelPw").value=document.getElementById("pfDelUser").value="";
+  pfMsg("pfDelMsg","");
+});
+document.getElementById("pfDelGo").addEventListener("click",pfDeleteAccount);
 document.getElementById("pfClose").addEventListener("click",closeProfile);
 document.getElementById("profModal").addEventListener("click",function(ev){
   if(ev.target===this)closeProfile();});

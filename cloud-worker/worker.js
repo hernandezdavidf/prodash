@@ -38,6 +38,25 @@
 //   LEGACY_CLAIM        optional "1" — lets the first account adopt the old
 //                       single-user blob stored under the KV key "state"
 //
+//   GOOGLE_OAUTH_CLIENT_ID  optional — the Web client id from Google Cloud
+//                       Console. Public by design (it appears in the page
+//                       source of every site using Google sign-in) and served
+//                       to the app from /health, so index.html holds no copy.
+//                       Without it, Sign in with Google answers 503 and the
+//                       app hides the button; everything else works untouched.
+//                       Deliberately NOT in requireConfig for that reason.
+//
+//   Email is off until BOTH of the next two are set. Until then verification
+//   and reset-links answer 503 `mail_not_configured` and the secret question
+//   remains the only recovery path — which is the shipped, working behaviour.
+//   MAIL_API_KEY        optional — bearer key for the mail provider
+//   MAIL_FROM           optional — the From address, e.g. "ProDash <no-reply@…>"
+//   MAIL_PROVIDER_URL   optional — defaults to Resend's endpoint
+//   APP_URL             optional — where emailed links point, e.g.
+//                       "https://hernandezdavidf.github.io/prodash". Configured
+//                       rather than taken from the Origin header, or anyone
+//                       could have the Worker mail someone a link to their site.
+//
 // Bindings: KV namespace bound as PRODASH_KV.
 //
 // ---------------------------------------------------------------------------
@@ -90,12 +109,12 @@
 // nickname save returned "Nothing to change." for weeks because the deployed
 // Worker predated the nickname field and quietly ignored it. There was no way
 // to ask what version was running. Now there is.
-const WORKER_VERSION = "4.9";
+const WORKER_VERSION = "4.10";
 
 // ===========================================================================
 // The Users sheet
 // ===========================================================================
-// Columns A..S, row 1 headers, data from row 2. Keep this list and
+// Columns A..AA, row 1 headers, data from row 2. Keep this list and
 // SHEET_HEADERS in lockstep with the sheet itself; the Worker addresses
 // columns positionally, so inserting a column in the middle of the sheet
 // without updating here would silently shift every field.
@@ -122,8 +141,26 @@ const F = {
   perms: 19,            // T  JSON overrides on top of the role defaults, or ""
   activatedAt: 20,      // U  ISO. For a guest this starts the 48-hour clock.
   nickname: 21,         // V  what the app calls them. Display only; "" is fine.
+  /* W..Y — Sign in with Google. googleSub is Google's permanent subject id and
+     is the ONLY thing a sign-in is matched on. Never the email: Google
+     addresses can be changed by their owner and, on Workspace domains, reissued
+     to a different person entirely, so an email match proves nothing about
+     identity. googleEmail is stored purely so the profile screen can say WHICH
+     account is connected; it is never used to find a row. */
+  googleSub: 22,        // W  Google "sub" claim, or "" when not linked
+  googleEmail: 23,      // X  the Google address, for display only
+  googleLinkedAt: 24,   // Y  ISO
+  googlePicture: 25,    // Z  avatar URL Google supplied, or ""
+  /* AA — "1" once the address in column F has been proven. Google-created and
+     Google-linked accounts are born verified, because Google only hands us an
+     address it has verified itself (email_verified is checked, not trusted).
+     A password signup starts unverified and stays that way until the mail
+     subsystem is switched on - see sendMail(). Nothing is gated on this yet;
+     it is recorded from the start so that turning verification on later does
+     not have to guess about accounts created before it existed. */
+  emailVerified: 26,    // AA "1" or ""
 };
-const COL_COUNT = 22;
+const COL_COUNT = 27;
 const SHEET_TAB = "Users";
 /* Every range is DERIVED from COL_COUNT rather than written out. The three used
    to be independent literals, and when the schema widened from 19 columns to 21
@@ -146,6 +183,7 @@ const SHEET_HEADERS = [
   "role", "status", "failed_attempts", "locked_until", "board_id",
   "created_at", "last_login_at", "password_updated_at", "session_epoch",
   "perms", "activated_at", "nickname",
+  "google_sub", "google_email", "google_linked_at", "google_picture", "email_verified",
 ];
 
 /* ---------------------------------------------------------------------------
@@ -230,7 +268,21 @@ export default {
       // exactly that. This is the endpoint that makes the drift answerable, and
       // it is deliberately unauthenticated: a version string tells an attacker
       // nothing they could not learn by reading the public repo.
-      if (path === "/health") return json({ ok: true, version: WORKER_VERSION });
+      /* The app reads googleClientId from here rather than carrying its own
+         copy. One place to configure it (the Cloudflare variable), no second
+         value in index.html to drift out of step, and the app can tell the
+         difference between "Google is off" and "this Worker is too old to know
+         what Google is". The client id is public by design - it appears in the
+         page source of every site that uses Google sign-in. */
+      if (path === "/health") {
+        return json({
+          ok: true,
+          version: WORKER_VERSION,
+          google: !!env.GOOGLE_OAUTH_CLIENT_ID,
+          googleClientId: env.GOOGLE_OAUTH_CLIENT_ID || "",
+          mail: mailEnabled(env),
+        });
+      }
 
       if (path === "/auth/signup" && request.method === "POST") return await signup(request, env);
       if (path === "/auth/login" && request.method === "POST") return await login(request, env);
@@ -239,6 +291,22 @@ export default {
       if (path === "/auth/forgot/start" && request.method === "POST") return await forgotStart(request, env);
       if (path === "/auth/forgot/verify" && request.method === "POST") return await forgotVerify(request, env);
       if (path === "/auth/forgot/reset" && request.method === "POST") return await forgotReset(request, env);
+
+      /* Sign in with Google, and managing your own account. Matching is exact
+         equality, so /auth/google cannot shadow /auth/google/complete and the
+         order of these lines carries no meaning. Every one of them is `return
+         await` for the reason given above - do not tidy the await away. */
+      if (path === "/auth/google" && request.method === "POST") return await googleAuth(request, env);
+      if (path === "/auth/google/complete" && request.method === "POST") return await googleComplete(request, env);
+      if (path === "/auth/google/link" && request.method === "POST") return await googleLink(request, env);
+      if (path === "/auth/google/unlink" && request.method === "POST") return await googleUnlink(request, env);
+      if (path === "/auth/nickname" && request.method === "POST") return await changeNickname(request, env);
+      if (path === "/auth/password" && request.method === "POST") return await changePassword(request, env);
+      if (path === "/auth/sessions/revoke" && request.method === "POST") return await signOutOthers(request, env);
+      if (path === "/auth/account/delete" && request.method === "POST") return await deleteAccount(request, env);
+      if (path === "/auth/verify/send" && request.method === "POST") return await verifySend(request, env);
+      if (path === "/auth/verify/confirm" && request.method === "POST") return await verifyConfirm(request, env);
+      if (path === "/auth/forgot/email" && request.method === "POST") return await forgotEmail(request, env);
 
       if (path === "/data") return await boardData(request, env);
 
@@ -285,20 +353,35 @@ function requireConfig(env) {
 // ===========================================================================
 // Endpoints — registration
 // ===========================================================================
-async function signup(request, env) {
-  const body = await readJson(request);
-  await throttle(env, request, "signup", 10, 3600);
+/* Everything it takes to bring an account into existence, in one place.
 
-  const firstName = requireText(body.firstName, "First name", 1, 60);
-  const lastName = requireText(body.lastName, "Last name", 1, 60);
-  const username = requireUsername(body.username);
-  const email = requireEmail(body.email);
-  const password = requirePassword(body.password);
-  const secretQuestion = requireText(body.secretQuestion, "Secret question", 5, 200);
-  const secretAnswer = requireText(body.secretAnswer, "Secret answer", 2, 200);
+   Extracted when Sign in with Google arrived, because that path creates an
+   account too and the alternative was a second copy of the uniqueness checks,
+   the KV reservation, the row provisioning and the first-session issue. Two
+   copies of security logic that must never disagree is the exact failure this
+   file keeps a museum of - see the column-drift note above normUsername's
+   "both routes go through here so they cannot drift" comment. One copy.
+
+   `google` is optional: {sub, email} when Google vouched for this person,
+   omitted for an ordinary signup. Everything else is identical either way -
+   same role, same password requirement, same secret question. A Google account
+   is not a different KIND of account here, only a faster way to reach one.
+
+   `preflight` runs after every check has passed and before the first write. It
+   is where the caller burns a single-use ticket: do it earlier and a taken
+   username costs the user their whole Google handshake instead of one retry. */
+async function createAccount(env, fields, preflight) {
+  const firstName = requireText(fields.firstName, "First name", 1, 60);
+  const lastName = requireText(fields.lastName, "Last name", 1, 60);
+  const username = requireUsername(fields.username);
+  const email = requireEmail(fields.email);
+  const password = requirePassword(fields.password);
+  const secretQuestion = requireText(fields.secretQuestion, "Secret question", 5, 200);
+  const secretAnswer = requireText(fields.secretAnswer, "Secret answer", 2, 200);
 
   const usernameKey = normUsername(username);
   const emailKey = email.toLowerCase();
+  const google = fields.google || null;
 
   // Reserve the username in KV *before* reading the sheet. Two signups racing
   // for the same name would both pass a read-then-append check against Sheets,
@@ -318,6 +401,13 @@ async function signup(request, env) {
   if (rows.some((r) => r[F.emailKey] === emailKey)) {
     fail(409, "An account already exists for that email address.", "email_taken");
   }
+  /* The last line of defence against one Google identity owning two accounts.
+     The ticket is single-use, but KV is eventually consistent, so two completes
+     racing with DIFFERENT usernames could both clear the reservation above.
+     This is what stops them. */
+  if (google && rows.some((r) => r[F.googleSub] === google.sub)) {
+    fail(409, "That Google account is already connected to a ProDash account.", "google_sub_taken");
+  }
   // Duplicate-person check: same first + last name AND same email domain is a
   // strong hint the person already registered under another username. This is
   // advisory rather than fatal — real families share a surname and a domain —
@@ -327,6 +417,8 @@ async function signup(request, env) {
   if (rows.some((r) => `${(r[F.firstName] || "").toLowerCase()} ${(r[F.lastName] || "").toLowerCase()}` === nameKey)) {
     fail(409, "An account already exists for that name. Try logging in, or use Forgot password.", "duplicate_person");
   }
+
+  if (preflight) await preflight();
 
   await env.PRODASH_KV.put(reservationKey, "pending", { expirationTtl: 120 });
 
@@ -355,7 +447,14 @@ async function signup(request, env) {
   row[F.sessionEpoch] = "1";
   row[F.perms] = "";                       // no overrides; the role defaults apply
   row[F.activatedAt] = now.toISOString();  // starts the clock if this becomes a guest
-  row[F.nickname] = cleanNickname(body.nickname);
+  row[F.nickname] = cleanNickname(fields.nickname);
+  row[F.emailVerified] = fields.emailVerified ? "1" : "";
+  if (google) {
+    row[F.googleSub] = google.sub;
+    row[F.googleEmail] = google.email;
+    row[F.googleLinkedAt] = now.toISOString();
+    row[F.googlePicture] = google.picture || "";
+  }
 
   await appendUser(env, row);
   await env.PRODASH_KV.put(reservationKey, userId);
@@ -372,6 +471,13 @@ async function signup(request, env) {
     userId, boardId, role: "user", username, epoch: 1,
     caps: capsFor(row), gexp: guestExpiry(row), nick: row[F.nickname] || "",
   });
+  return { token, row };
+}
+
+async function signup(request, env) {
+  const body = await readJson(request);
+  await throttle(env, request, "signup", 10, 3600);
+  const { token, row } = await createAccount(env, body);
   return json({ ok: true, token, user: publicUser(row) }, 201);
 }
 
@@ -392,35 +498,43 @@ async function maybeClaimLegacyBoard(env, boardId) {
 // ===========================================================================
 // Endpoints — login
 // ===========================================================================
-async function login(request, env) {
-  const body = await readJson(request);
-  await throttle(env, request, "login", 30, 900);
+/* Who is trying to sign in, given whatever they typed in the one box.
 
-  const usernameKey = normUsername(String(body.username || ""));
-  const password = String(body.password || "");
-  if (!usernameKey || !password) fail(400, "Enter your username and password.");
+   ProDash asked for a username for its whole life, and a lot of people type
+   their email address into a box labelled "username" regardless. Accepting
+   both costs one branch and removes an entire category of "it says my password
+   is wrong" support. An address is anything containing "@" - that is not a
+   validity test, just a routing decision, and a malformed address simply finds
+   no row like a malformed username does.
 
-  const found = await findUser(env, (r) => r[F.usernameKey] === usernameKey);
-
-  // No such user: burn roughly the same amount of time a real verification
-  // costs, so response timing does not disclose whether the account exists.
-  if (!found) {
-    await hashSecret(password, env);
-    fail(401, "Incorrect username or password.", "bad_credentials");
+   Email is matched on emailKey, which signup has always enforced as unique
+   (see createAccount), so this can never be ambiguous. */
+async function findLoginRow(env, identifier) {
+  const raw = String(identifier || "").trim();
+  if (!raw) return null;
+  if (raw.includes("@")) {
+    const key = raw.toLowerCase();
+    return findUser(env, (r) => r[F.emailKey] === key);
   }
+  const key = normUsername(raw);
+  return key ? findUser(env, (r) => r[F.usernameKey] === key) : null;
+}
 
-  const { row, rowNumber } = found;
+/* Everything that decides whether an account may open a session AT ALL, before
+   any credential is considered. Extracted so the password path and the Google
+   path cannot drift: a door that is shut must be shut to both, or Google
+   becomes a way around a lockout.
 
+   Deliberately runs before the password check. An expired guest gets an honest
+   answer instead of being told their password is wrong, and by this point the
+   account has already been matched, so it discloses nothing the lockout
+   message below does not. */
+async function assertLoginable(env, row, rowNumber) {
   if (row[F.status] !== "active") {
     fail(403, "This account is not active. Please contact the administrator.", "disabled");
   }
 
-  /* The guest clock, enforced at the door. Checked BEFORE the password so an
-     expired guest gets an honest answer instead of being told their password is
-     wrong; the username has already been matched at this point, so this leaks
-     nothing that the lockout message below does not.
-
-     Flipping the row to "deactivated" as a side effect is what makes the expiry
+  /* Flipping the row to "deactivated" as a side effect is what makes the expiry
      VISIBLE to the Super Admin in the user list, rather than being silently
      recomputed on every read and never recorded anywhere. */
   const gexp = guestExpiry(row);
@@ -441,6 +555,55 @@ async function login(request, env) {
   if (lockedUntil && Date.now() < lockedUntil) {
     fail(423, lockoutMessage(lockedUntil), "locked");
   }
+  return lockedUntil;
+}
+
+/* The successful-sign-in bookkeeping, shared by password and Google. */
+async function completeLogin(env, row, rowNumber, extraPatch) {
+  const epoch = Number(row[F.sessionEpoch] || 1);
+  const patch = Object.assign({
+    [F.failedAttempts]: "0",
+    [F.lockedUntil]: "",
+    [F.lastLoginAt]: new Date().toISOString(),
+  }, extraPatch || {});
+  const next = await updateUserRow(env, rowNumber, row, patch);
+  await env.PRODASH_KV.put(epochKey(row[F.userId]), String(epoch));
+
+  const token = await issueSession(env, {
+    userId: next[F.userId],
+    boardId: next[F.boardId],
+    role: normRole(next[F.role]),
+    username: next[F.username],
+    epoch,
+    caps: capsFor(next),
+    gexp: guestExpiry(next),
+    nick: next[F.nickname] || "",
+  });
+  return { token, row: next };
+}
+
+async function login(request, env) {
+  const body = await readJson(request);
+  await throttle(env, request, "login", 30, 900);
+
+  // `username` is still the field name on the wire: the live app sends it, and
+  // renaming it would break every client that has not reloaded yet. It now
+  // carries a username OR an email address.
+  const identifier = String(body.username || body.email || "");
+  const password = String(body.password || "");
+  if (!identifier.trim() || !password) fail(400, "Enter your username or email, and your password.");
+
+  const found = await findLoginRow(env, identifier);
+
+  // No such user: burn roughly the same amount of time a real verification
+  // costs, so response timing does not disclose whether the account exists.
+  if (!found) {
+    await hashSecret(password, env);
+    fail(401, "Incorrect username or password.", "bad_credentials");
+  }
+
+  const { row, rowNumber } = found;
+  const lockedUntil = await assertLoginable(env, row, rowNumber);
 
   const ok = await verifySecret(password, row[F.passwordHash], env);
   if (!ok) {
@@ -467,42 +630,580 @@ async function login(request, env) {
     fail(401, `Incorrect username or password. ${left} attempt${left === 1 ? "" : "s"} left before a temporary lock.`, "bad_credentials");
   }
 
-  const epoch = Number(row[F.sessionEpoch] || 1);
-  const patch = {
-    [F.failedAttempts]: "0",
-    [F.lockedUntil]: "",
-    [F.lastLoginAt]: new Date().toISOString(),
-  };
-
   // Transparent upgrade: if this hash was made with weaker parameters than the
   // Worker now uses, re-hash it here — the only moment the plaintext password
   // is legitimately in hand. This is what makes changing PBKDF2_ITERATIONS, or
   // later swapping the algorithm outright, a config change instead of a
   // password reset for every user.
+  const extra = {};
   if (needsRehash(row[F.passwordHash], env)) {
-    patch[F.passwordHash] = await hashSecret(password, env);
-    patch[F.passwordUpdatedAt] = new Date().toISOString();
+    extra[F.passwordHash] = await hashSecret(password, env);
+    extra[F.passwordUpdatedAt] = new Date().toISOString();
   }
-  await updateUserRow(env, rowNumber, row, patch);
-  await env.PRODASH_KV.put(epochKey(row[F.userId]), String(epoch));
-
-  const token = await issueSession(env, {
-    userId: row[F.userId],
-    boardId: row[F.boardId],
-    role: normRole(row[F.role]),
-    username: row[F.username],
-    epoch,
-    caps: capsFor(row),
-    gexp: guestExpiry(row),
-    nick: row[F.nickname] || "",
-  });
-  return json({ ok: true, token, user: publicUser(row) });
+  const { token, row: next } = await completeLogin(env, row, rowNumber, extra);
+  return json({ ok: true, token, user: publicUser(next) });
 }
 
 function lockoutMessage(until) {
   const mins = Math.max(1, Math.ceil((until - Date.now()) / 60000));
   const at = new Date(until).toISOString();
   return `Too many failed attempts. This account is locked for about ${mins} more minute${mins === 1 ? "" : "s"}. Try again after ${at}.`;
+}
+
+// ===========================================================================
+// Endpoints — Sign in with Google
+// ===========================================================================
+/* GOOGLE_OAUTH_CLIENT_ID is deliberately NOT in requireConfig. That list is
+   what the Worker cannot serve anything without; a missing Google client id
+   must not take password login down with it. Instead every Google route asks
+   here and answers 503 with a code the app uses to hide the button. */
+function requireGoogleConfig(env) {
+  if (!env.GOOGLE_OAUTH_CLIENT_ID) {
+    fail(503, "Sign in with Google is not set up on this server yet.", "google_not_configured");
+  }
+}
+
+const GOOGLE_SIGNUP_TICKET_TTL_MS = 15 * 60 * 1000;  // 15 minutes
+
+/* A username to put in the box, not a decision. The authoritative answer comes
+   from createAccount, which is the only place that can be right about it.
+
+   Deliberately does NOT reserve the name in KV: the reservation has a 120s TTL
+   and exists to bracket a single append. Holding a name for the life of a
+   15-minute ticket would burn names on every abandoned signup and still not be
+   a guarantee. */
+function suggestUsername(email, rows) {
+  let base = normUsername(String(email || "").split("@")[0] || "");
+  base = base.replace(/[^a-z0-9._-]/g, "").replace(/^[._-]+/, "");
+  if (base.length > 32) base = base.slice(0, 32);
+  if (base.length < 3) base = (`pd${base}`).padEnd(3, "0");
+  const taken = (u) => rows.some((r) => r[F.usernameKey] === u);
+  if (!taken(base)) return base;
+  for (let n = 2; n <= 9; n++) {
+    const cand = `${base.slice(0, 31)}${n}`;
+    if (!taken(cand)) return cand;
+  }
+  return `${base.slice(0, 26)}${randomId("").slice(-4)}`;
+}
+
+function googleFacts(row) {
+  return {
+    linked: !!row[F.googleSub],
+    email: row[F.googleEmail] || "",
+    picture: row[F.googlePicture] || "",
+    linkedAt: row[F.googleLinkedAt] || "",
+  };
+}
+
+/* Sign in with Google, or find out that signing up is what is needed.
+
+   Three outcomes, one of which is a refusal by design. See the linking rule:
+   an email match is NOT proof of ownership here, because ProDash has never
+   verified the email addresses people type into its signup form. If it were
+   treated as proof, anyone who registered using your address would receive
+   your board the first time you tried Google. So a match refuses and sends the
+   person through the front door, where their password proves the account is
+   theirs before Google is attached to it. */
+async function googleAuth(request, env) {
+  requireGoogleConfig(env);
+  const body = await readJson(request);
+  await throttle(env, request, "google", 30, 900);
+
+  const id = await verifyGoogleIdToken(env, body.idToken);
+  const rows = await readUsers(env);
+
+  const hit = rows.findIndex((r) => r[F.googleSub] === id.sub);
+  if (hit !== -1) {
+    const row = rows[hit];
+    const rowNumber = hit + 2;
+    await assertLoginable(env, row, rowNumber);
+    /* Google just told us this address is verified, so heal a row that predates
+       the column. The picture is refreshed at the same time because this is the
+       only moment we are handed a current one. */
+    const { token, row: next } = await completeLogin(env, row, rowNumber, {
+      [F.emailVerified]: row[F.emailKey] === id.emailKey ? "1" : row[F.emailVerified],
+      [F.googleEmail]: id.email,
+      [F.googlePicture]: id.picture || row[F.googlePicture],
+    });
+    return json({ ok: true, mode: "signin", token, user: publicUser(next) });
+  }
+
+  if (rows.some((r) => r[F.emailKey] === id.emailKey)) {
+    fail(409,
+      "An account already exists for that email address. Sign in with your password, then connect Google from your profile.",
+      "google_email_conflict");
+  }
+
+  /* Run the duplicate-person check HERE as well as inside createAccount. It is
+     the same refusal either way, but finding out now costs the person nothing,
+     whereas finding out after they have invented a password and a secret
+     question wastes all of it. */
+  const nameKey = `${id.firstName.toLowerCase()} ${id.lastName.toLowerCase()}`;
+  if (id.firstName && id.lastName &&
+      rows.some((r) => `${(r[F.firstName] || "").toLowerCase()} ${(r[F.lastName] || "").toLowerCase()}` === nameKey)) {
+    fail(409, "An account already exists for that name. Try logging in, or use Forgot password.", "duplicate_person");
+  }
+
+  /* The ticket carries the only two facts that matter - who Google said this
+     is, and at what address - signed, so the browser cannot edit them on the
+     way to /auth/google/complete. It is signed, NOT encrypted: the same values
+     come back in `prefill` anyway, so there is nothing to hide, and anyone
+     tempted to "harden" this by encrypting it should know it would buy nothing.
+     The signature is the entire point. */
+  const ticket = await signPayload(env, {
+    p: "gsignup",
+    jti: randomId("gst"),
+    gsub: id.sub,
+    gem: id.email,
+    gek: id.emailKey,
+    gfn: id.firstName,
+    gln: id.lastName,
+    gpic: id.picture,
+    iat: Date.now(),
+    exp: Date.now() + GOOGLE_SIGNUP_TICKET_TTL_MS,
+  });
+
+  return json({
+    ok: true,
+    mode: "signup",
+    ticket,
+    expiresInSeconds: Math.floor(GOOGLE_SIGNUP_TICKET_TTL_MS / 1000),
+    prefill: {
+      firstName: id.firstName,
+      lastName: id.lastName,
+      email: id.email,
+      suggestedUsername: suggestUsername(id.email, rows),
+    },
+  });
+}
+
+/* Finish a Google signup. The account created here is an ordinary ProDash
+   account in every respect - same role, same password rules, same secret
+   question - because a Google-only account would be one that cannot be
+   recovered when Google is unavailable, and one that would lock its owner out
+   the moment they disconnected Google. */
+async function googleComplete(request, env) {
+  requireGoogleConfig(env);
+  const body = await readJson(request);
+  await throttle(env, request, "signup", 10, 3600);
+
+  const claims = await verifyPayload(env, String(body.ticket || ""));
+  if (!claims || claims.p !== "gsignup" || !claims.gsub || Date.now() > Number(claims.exp || 0)) {
+    fail(401, "That Google sign-up has expired. Please start again.", "bad_ticket");
+  }
+
+  const usedKey = `gsignup:${claims.jti}`;
+  if (await env.PRODASH_KV.get(usedKey)) {
+    fail(401, "That Google sign-up has already been used. Please start again.", "bad_ticket");
+  }
+
+  /* The ticket is burned inside createAccount's preflight - after every
+     validation and uniqueness check has passed, immediately before the first
+     write. Burning it earlier would mean a taken username costs the person
+     their whole Google handshake instead of one retry. */
+  const { token, row } = await createAccount(env, {
+    firstName: body.firstName || claims.gfn,
+    lastName: body.lastName || claims.gln,
+    username: body.username,
+    email: claims.gem,              // from the ticket, never the body
+    password: body.password,
+    secretQuestion: body.secretQuestion,
+    secretAnswer: body.secretAnswer,
+    nickname: body.nickname,
+    emailVerified: true,            // Google verified it; we checked the claim
+    google: { sub: claims.gsub, email: claims.gem, picture: claims.gpic || "" },
+  }, async () => {
+    await env.PRODASH_KV.put(usedKey, "1", { expirationTtl: 900 });
+  });
+
+  return json({ ok: true, token, user: publicUser(row) }, 201);
+}
+
+/* Connect Google to the account you are already signed in to.
+
+   The password is required, and that is the most important line in this file's
+   Google support. A session token is a thirty-day bearer credential sitting in
+   localStorage; linking grants a permanent, password-free way in that survives
+   the owner changing their password. Anyone who got one look at that token
+   would have persistent access. Re-authenticating before ADDING an
+   authentication factor is the standard rule, and here it costs one hash. */
+async function googleLink(request, env) {
+  requireGoogleConfig(env);
+  const session = await requireSession(request, env);
+  const body = await readJson(request);
+  await throttle(env, request, "glink", 20, 900);
+
+  const found = await findUser(env, (r) => r[F.userId] === session.uid);
+  if (!found) fail(404, "Account not found.", "no_account");
+  const { row, rowNumber } = found;
+
+  /* A guest row is deactivated within 48 hours, and a Google identity attached
+     to a dead row would be permanently unable to sign up for real without
+     someone editing the sheet by hand. */
+  if (normRole(row[F.role]) === "guest") {
+    fail(403, "Guest access cannot be connected to a Google account.", "guest_no_link");
+  }
+
+  const ok = await verifySecret(String(body.password || ""), row[F.passwordHash], env);
+  if (!ok) fail(401, "That password is not correct.", "bad_credentials");
+
+  const id = await verifyGoogleIdToken(env, body.idToken);
+
+  if (row[F.googleSub] === id.sub) {
+    return json({ ok: true, alreadyLinked: true, google: googleFacts(row) });
+  }
+  if (row[F.googleSub]) {
+    fail(409, "This account is already connected to a different Google account. Disconnect that one first.", "google_link_exists");
+  }
+  const rows = await readUsers(env);
+  if (rows.some((r) => r[F.googleSub] === id.sub)) {
+    fail(409, "That Google account is already connected to another ProDash account.", "google_sub_taken");
+  }
+
+  /* No epoch bump. Nothing about role, status or capability changed, so there
+     is no reason to sign the person out of their other devices. */
+  const next = await updateUserRow(env, rowNumber, row, {
+    [F.googleSub]: id.sub,
+    [F.googleEmail]: id.email,
+    [F.googleLinkedAt]: new Date().toISOString(),
+    [F.googlePicture]: id.picture || "",
+    [F.emailVerified]: row[F.emailKey] === id.emailKey ? "1" : row[F.emailVerified],
+  });
+  return json({ ok: true, google: googleFacts(next) });
+}
+
+/* Disconnect Google. Password required for the same reason as linking, in
+   reverse: quietly detaching someone's link is also an attack. Always safe to
+   do, because every account has a password - the no_password branch cannot
+   fire today and exists so that a future "Google-only signup" shortcut trips
+   over it instead of stranding somebody. */
+async function googleUnlink(request, env) {
+  const session = await requireSession(request, env);
+  const body = await readJson(request);
+
+  const found = await findUser(env, (r) => r[F.userId] === session.uid);
+  if (!found) fail(404, "Account not found.", "no_account");
+  const { row, rowNumber } = found;
+
+  if (!row[F.passwordHash]) {
+    fail(409, "Set a password before disconnecting Google, or you will not be able to sign in.", "no_password");
+  }
+  const ok = await verifySecret(String(body.password || ""), row[F.passwordHash], env);
+  if (!ok) fail(401, "That password is not correct.", "bad_credentials");
+
+  if (!row[F.googleSub]) return json({ ok: true, google: googleFacts(row) });
+
+  const next = await updateUserRow(env, rowNumber, row, {
+    [F.googleSub]: "",
+    [F.googleEmail]: "",
+    [F.googleLinkedAt]: "",
+    [F.googlePicture]: "",
+  });
+  return json({ ok: true, google: googleFacts(next) });
+}
+
+// ===========================================================================
+// Endpoints — managing your own account
+// ===========================================================================
+/* Until now the only person who could change YOUR nickname was a Super Admin,
+   and the only way to change your own password was to go through Forgot
+   password. Both of those are answered here. */
+async function changeNickname(request, env) {
+  const session = await requireSession(request, env);
+  const body = await readJson(request);
+
+  const found = await findUser(env, (r) => r[F.userId] === session.uid);
+  if (!found) fail(404, "Account not found.", "no_account");
+
+  // No epoch bump - the reasoning is the same one /auth/me documents at length.
+  const next = await updateUserRow(env, found.rowNumber, found.row, {
+    [F.nickname]: cleanNickname(body.nickname),
+  });
+  return json({ ok: true, user: { nickname: next[F.nickname] || "" } });
+}
+
+/* Change your own password.
+
+   Bumping sessionEpoch signs out every OTHER device, which is the correct
+   behaviour: changing a password is what you do when you think someone else
+   has it. The catch is that it would also sign out the tab doing the changing,
+   because requireSession compares the epoch on the very next request. So a
+   fresh token is minted at the new epoch and returned. Without that, "change
+   my password" logs you out of the page you are sitting on, and everyone
+   assumes that is normal and never reports it. */
+async function changePassword(request, env) {
+  const session = await requireSession(request, env);
+  const body = await readJson(request);
+  await throttle(env, request, "chpw", 10, 900);
+
+  const nextPassword = requirePassword(body.newPassword);
+  const found = await findUser(env, (r) => r[F.userId] === session.uid);
+  if (!found) fail(404, "Account not found.", "no_account");
+  const { row, rowNumber } = found;
+
+  const ok = await verifySecret(String(body.currentPassword || ""), row[F.passwordHash], env);
+  if (!ok) fail(401, "Your current password is not correct.", "bad_credentials");
+  if (String(body.currentPassword) === nextPassword) {
+    fail(400, "That is the password you are already using.", "same_password");
+  }
+
+  /* Deliberately no failedAttempts bump on a wrong current password, unlike
+     login. The caller already holds a valid session, so guessing the old
+     password buys them nothing they do not already have, and locking the
+     account would punish the legitimate owner mid-session. The throttle above
+     is the right control here. */
+  const epoch = Number(row[F.sessionEpoch] || 1) + 1;
+  const next = await updateUserRow(env, rowNumber, row, {
+    [F.passwordHash]: await hashSecret(nextPassword, env),
+    [F.passwordUpdatedAt]: new Date().toISOString(),
+    [F.failedAttempts]: "0",
+    [F.lockedUntil]: "",
+    [F.sessionEpoch]: String(epoch),
+  });
+  await env.PRODASH_KV.put(epochKey(row[F.userId]), String(epoch));
+
+  const token = await issueSession(env, {
+    userId: next[F.userId], boardId: next[F.boardId], role: normRole(next[F.role]),
+    username: next[F.username], epoch, caps: capsFor(next),
+    gexp: guestExpiry(next), nick: next[F.nickname] || "",
+  });
+  return json({ ok: true, token, user: publicUser(next) });
+}
+
+/* Sign out everywhere else. Same epoch mechanism as a password change, without
+   the password change - for "I left myself signed in on a machine I no longer
+   have". The calling device keeps working, because it gets a new token. */
+async function signOutOthers(request, env) {
+  const session = await requireSession(request, env);
+  const found = await findUser(env, (r) => r[F.userId] === session.uid);
+  if (!found) fail(404, "Account not found.", "no_account");
+  const { row, rowNumber } = found;
+
+  const epoch = Number(row[F.sessionEpoch] || 1) + 1;
+  const next = await updateUserRow(env, rowNumber, row, { [F.sessionEpoch]: String(epoch) });
+  await env.PRODASH_KV.put(epochKey(row[F.userId]), String(epoch));
+
+  const token = await issueSession(env, {
+    userId: next[F.userId], boardId: next[F.boardId], role: normRole(next[F.role]),
+    username: next[F.username], epoch, caps: capsFor(next),
+    gexp: guestExpiry(next), nick: next[F.nickname] || "",
+  });
+  return json({ ok: true, token });
+}
+
+/* Delete your own account, permanently.
+
+   Three gates, because this is the one irreversible thing a user can do to
+   themselves here and there is no backup of a board anywhere: the password,
+   the username typed back exactly, and the client's own confirmation. The
+   board in KV goes first - a row with no board is a broken account, but a
+   board with no row is an orphan nobody can ever reach or delete.
+
+   The sheet row is CLEARED rather than removed. Deleting a row shifts every
+   row below it up by one, and this Worker addresses rows by number within a
+   single request (findUser returns rowNumber, updateUserRow writes to it), so
+   a concurrent request holding a stale number would write one person's data
+   over another's. Blanking is the safe operation: readUsers keeps returning a
+   row, but with no username_key, no email_key and no google_sub it can never
+   be found by any lookup, and its board is gone. */
+async function deleteAccount(request, env) {
+  const session = await requireSession(request, env);
+  const body = await readJson(request);
+  await throttle(env, request, "delacct", 5, 900);
+
+  const found = await findUser(env, (r) => r[F.userId] === session.uid);
+  if (!found) fail(404, "Account not found.", "no_account");
+  const { row, rowNumber } = found;
+
+  const ok = await verifySecret(String(body.password || ""), row[F.passwordHash], env);
+  if (!ok) fail(401, "That password is not correct.", "bad_credentials");
+
+  if (normUsername(String(body.confirmUsername || "")) !== row[F.usernameKey]) {
+    fail(400, "Type your username exactly to confirm.", "confirm_mismatch");
+  }
+
+  /* A Super Admin deleting themselves could leave nobody able to manage
+     anyone. The same reasoning already stops one demoting themselves. */
+  if (normRole(row[F.role]) === "superadmin") {
+    fail(403, "A Super Admin cannot delete their own account. Ask another Super Admin, or change your role first.", "self_delete_superadmin");
+  }
+
+  await env.PRODASH_KV.delete(boardKey(row[F.boardId]));
+  await env.PRODASH_KV.delete(`uname:${row[F.usernameKey]}`);
+
+  const blank = {};
+  for (let i = 0; i < COL_COUNT; i++) blank[i] = "";
+  blank[F.userId] = row[F.userId];                      // keeps the row identifiable in an audit
+  blank[F.status] = "deleted";
+  blank[F.createdAt] = row[F.createdAt] || "";
+  blank[F.sessionEpoch] = String(Number(row[F.sessionEpoch] || 1) + 1);
+  await updateUserRow(env, rowNumber, row, blank);
+
+  // Kills every session this account still has open anywhere.
+  await env.PRODASH_KV.put(epochKey(row[F.userId]), blank[F.sessionEpoch]);
+
+  return json({ ok: true, deleted: true });
+}
+
+// ===========================================================================
+// Email — built, and switched off until someone provides a key
+// ===========================================================================
+/* ProDash has never sent an email. Recovery is the secret question, which needs
+   no provider, costs nothing and works when the rest of the internet does not.
+   That remains the working path.
+
+   This exists so that turning verification and reset-links on later is a
+   configuration change rather than a feature to design under pressure. Nothing
+   below runs until BOTH MAIL_API_KEY and MAIL_FROM are set on the Worker; until
+   then every mail-dependent endpoint answers 503 `mail_not_configured` and the
+   app hides the controls that would need it. No stub sender, no "pretend it
+   worked" branch - an account that believes it sent a verification email it
+   never sent is worse than one that says it cannot.
+
+   Written against Resend's API because its free tier needs no card, but it is
+   one fetch to one URL: MAIL_PROVIDER_URL can point at anything that accepts
+   {from,to,subject,text} and a Bearer key.
+
+   Deliverability warning for whoever switches this on: mail sent from a domain
+   you do not own lands in spam. This wants a custom domain with SPF and DKIM
+   before it is worth trusting for password resets. */
+const MAIL_URL_DEFAULT = "https://api.resend.com/emails";
+const VERIFY_TICKET_TTL_MS = 24 * 60 * 60 * 1000;  // 24 hours
+
+function mailEnabled(env) {
+  return !!(env && env.MAIL_API_KEY && env.MAIL_FROM);
+}
+
+function requireMail(env) {
+  if (!mailEnabled(env)) {
+    fail(503, "Email is not switched on for this server yet.", "mail_not_configured");
+  }
+}
+
+async function sendMail(env, { to, subject, text }) {
+  requireMail(env);
+  const res = await fetch(env.MAIL_PROVIDER_URL || MAIL_URL_DEFAULT, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.MAIL_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ from: env.MAIL_FROM, to: [to], subject, text }),
+  });
+  if (!res.ok) {
+    // Never the provider's body to the client: it echoes the recipient address
+    // and would turn a failed send into an enumeration oracle.
+    console.error("mail send failed", res.status, await res.text());
+    fail(502, "Could not send the email just now. Please try again.", "mail_failed");
+  }
+}
+
+/* The address the links in those emails point back at. It has to be configured
+   rather than taken from the Origin header, or anyone could have the Worker
+   mail a victim a link to a site the attacker controls. */
+function appUrl(env, path) {
+  const base = String(env.APP_URL || "").replace(/\/+$/, "");
+  if (!base) fail(503, "Email is not switched on for this server yet.", "mail_not_configured");
+  return `${base}${path}`;
+}
+
+/* Send yourself a verification link. Requires a session, so this is not an
+   enumeration oracle - you can only ask about the address on your own row. */
+async function verifySend(request, env) {
+  const session = await requireSession(request, env);
+  requireMail(env);
+  await throttle(env, request, "verifysend", 5, 900);
+
+  const found = await findUser(env, (r) => r[F.userId] === session.uid);
+  if (!found) fail(404, "Account not found.", "no_account");
+  const { row } = found;
+
+  if (row[F.emailVerified] === "1") return json({ ok: true, alreadyVerified: true });
+
+  const ticket = await signPayload(env, {
+    p: "verify",
+    uid: row[F.userId],
+    ek: row[F.emailKey],          // pinned, so changing the address voids the link
+    exp: Date.now() + VERIFY_TICKET_TTL_MS,
+  });
+
+  await sendMail(env, {
+    to: row[F.email],
+    subject: "Confirm your ProDash email address",
+    text: `Confirm this address so ProDash can reach you about your account:\n\n`
+      + `${appUrl(env, `/?verify=${encodeURIComponent(ticket)}`)}\n\n`
+      + `The link works for 24 hours. If you did not create a ProDash account, ignore this email.`,
+  });
+  return json({ ok: true, sent: true });
+}
+
+/* Confirm an address from the link. Deliberately does NOT require a session:
+   people open email on a different device from the one they signed up on. The
+   ticket is the credential, and it grants exactly one thing - setting a flag
+   on the row it names. */
+async function verifyConfirm(request, env) {
+  const body = await readJson(request);
+  await throttle(env, request, "verifyconfirm", 20, 900);
+
+  const claims = await verifyPayload(env, String(body.ticket || ""));
+  if (!claims || claims.p !== "verify" || Date.now() > Number(claims.exp || 0)) {
+    fail(401, "That confirmation link has expired. Send yourself a new one.", "bad_ticket");
+  }
+
+  const found = await findUser(env, (r) => r[F.userId] === claims.uid);
+  if (!found) fail(404, "Account not found.", "no_account");
+  // The address is pinned into the ticket: if it changed after the link was
+  // sent, the link confirms nothing.
+  if (found.row[F.emailKey] !== claims.ek) {
+    fail(409, "That address has changed since the link was sent.", "email_changed");
+  }
+  if (found.row[F.emailVerified] === "1") return json({ ok: true, alreadyVerified: true });
+
+  await updateUserRow(env, found.rowNumber, found.row, { [F.emailVerified]: "1" });
+  return json({ ok: true, verified: true });
+}
+
+/* Password reset by emailed link — the alternative to the secret question, for
+   when mail is switched on. It mints exactly the same `p:"reset"` ticket the
+   secret-question path produces, so /auth/forgot/reset serves both and there is
+   only one place that can set a password from a ticket.
+
+   Always answers 200. Whether an address is registered is precisely the thing
+   an unauthenticated recovery endpoint must not disclose, so a miss sends
+   nothing and says the same sentence as a hit. */
+async function forgotEmail(request, env) {
+  requireMail(env);
+  const body = await readJson(request);
+  await throttle(env, request, "forgotemail", 10, 900);
+
+  const same = json({ ok: true, sent: true });
+  const key = String(body.email || "").trim().toLowerCase();
+  if (!key) return same;
+
+  const found = await findUser(env, (r) => r[F.emailKey] === key);
+  if (!found || found.row[F.status] !== "active") return same;
+
+  const ticket = await signPayload(env, {
+    p: "reset",
+    uid: found.row[F.userId],
+    epoch: Number(found.row[F.sessionEpoch] || 1),
+    exp: Date.now() + RESET_TICKET_TTL_MS,
+  });
+
+  try {
+    await sendMail(env, {
+      to: found.row[F.email],
+      subject: "Reset your ProDash password",
+      text: `Someone asked to reset the password for ${found.row[F.username]}.\n\n`
+        + `${appUrl(env, `/?reset=${encodeURIComponent(ticket)}`)}\n\n`
+        + `The link works for 10 minutes. If this was not you, nothing has changed and you can ignore this.`,
+    });
+  } catch (e) {
+    // Swallowed on purpose: a send failure must not become the one response
+    // shape that proves an address exists.
+    console.error("reset mail failed", e && e.message);
+  }
+  return same;
 }
 
 async function logout(request, env) {
@@ -543,9 +1244,19 @@ async function me(request, env) {
      on any path the user waits for. Wrapped, because a Sheets hiccup must
      degrade to the token's copy rather than fail the confirmation outright. */
   let nickname = session.nick || "";
+  /* google stays NULL, not {linked:false}, when the sheet could not be read.
+     "Unknown" and "not connected" are different answers, and the Profile screen
+     needs to tell them apart: degrading to not-connected would offer a Connect
+     Google button on an already-connected account, and someone would press it. */
+  let google = null;
+  let emailVerified = null;
   try {
     const found = await findUser(env, (r) => r[F.userId] === session.uid);
-    if (found) nickname = found.row[F.nickname] || "";
+    if (found) {
+      nickname = found.row[F.nickname] || "";
+      google = googleFacts(found.row);
+      emailVerified = found.row[F.emailVerified] === "1";
+    }
   } catch (e) { /* keep the token's copy */ }
 
   return json({
@@ -558,6 +1269,8 @@ async function me(request, env) {
       nickname: nickname,
       guestExpiresAt: session.gexp || null,
       boardId: session.bid,
+      google: google,
+      emailVerified: emailVerified,
     },
   });
 }
@@ -769,6 +1482,14 @@ async function adminUsers(request, env) {
         guestExpiresAt: gexp,
         guestExpired: gexp !== null && Date.now() > gexp,
         lockedUntil: Number(r[F.lockedUntil] || 0) || null,
+        /* Whether Google is connected, and to which address. The email is
+           already in this projection, so this discloses nothing new to someone
+           who can already read the list - and without it, the only way to break
+           a link for someone who has lost their Google account is to edit the
+           sheet by hand. */
+        googleLinked: !!r[F.googleSub],
+        googleEmail: r[F.googleEmail] || "",
+        emailVerified: r[F.emailVerified] === "1",
       };
     }),
     // So the admin screen can render the same capability list the server uses
@@ -822,6 +1543,21 @@ async function adminUpdateUser(request, env) {
     // back already expired and bounce straight out again.
     if (s === "active" && normRole(patch[F.role] || row[F.role]) === "guest")
       patch[F.activatedAt] = new Date().toISOString();
+  }
+
+  /* The operator escape hatch for Google. Someone who has lost access to the
+     Google account they connected cannot unlink it themselves - the unlink
+     endpoint needs their password, which they have, but the link is only half
+     the problem: that Google identity also stays blocked from ever signing up
+     again, because a sub can only be attached to one row. This releases it.
+
+     No killSessions: they can still sign in with their password, so there is
+     nothing to revoke. Same reasoning as the nickname case below. */
+  if (body.unlinkGoogle) {
+    patch[F.googleSub] = "";
+    patch[F.googleEmail] = "";
+    patch[F.googleLinkedAt] = "";
+    patch[F.googlePicture] = "";
   }
 
   // Explicit "give them another 48 hours" without touching role or status.
@@ -1178,6 +1914,135 @@ async function sheetsFetch(env, path, init = {}) {
   return res.json();
 }
 
+// ===========================================================================
+// Sign in with Google — ID token verification
+// ===========================================================================
+/* The browser runs Google's own sign-in UI and receives an ID token: a JWT
+   signed by Google with RS256. Everything below exists to answer one question
+   — did GOOGLE really say this, about this person, TO THIS APP — because the
+   token arrives from the browser, which is exactly the place we cannot trust.
+
+   Verified locally rather than by calling Google's /tokeninfo endpoint on every
+   sign-in. Google's own documentation calls tokeninfo a debugging aid and says
+   not to use it in production, and a round trip per login would cost more than
+   the verification itself: RS256 verification is trivial next to the PBKDF2
+   this Worker already runs inside the free plan's CPU budget.
+
+   Note the direction. googleAccessToken() above SIGNS an RS256 assertion with
+   our own private key; this VERIFIES one signed with Google's. Same algorithm,
+   opposite halves of the key pair, and no shared code beyond the b64url
+   helpers. */
+const GOOGLE_CERTS_URL = "https://www.googleapis.com/oauth2/v3/certs";
+const GOOGLE_ISSUERS = ["accounts.google.com", "https://accounts.google.com"];
+
+/* Google publishes a Cache-Control max-age on the certs response and rotates
+   the keys behind it. Cached in the isolate exactly like tokenCache, and
+   deliberately re-fetched ONCE when a kid is missing: that is what a rotation
+   looks like from here, and refusing a valid sign-in until the isolate happens
+   to recycle would be an outage nobody could explain. */
+let certsCache = { keys: null, expiresAt: 0 };
+
+async function googleCerts(force) {
+  if (!force && certsCache.keys && Date.now() < certsCache.expiresAt) return certsCache.keys;
+  const res = await fetch(GOOGLE_CERTS_URL);
+  if (!res.ok) {
+    console.error("google certs fetch failed", res.status);
+    fail(502, "Could not reach Google to check your sign-in. Please try again.");
+  }
+  const body = await res.json();
+  const maxAge = Number(/max-age=(\d+)/.exec(res.headers.get("cache-control") || "")?.[1] || 3600);
+  certsCache = { keys: body.keys || [], expiresAt: Date.now() + Math.max(60, maxAge) * 1000 };
+  return certsCache.keys;
+}
+
+async function verifyRs256(kid, signingInput, sigBytes) {
+  for (const force of [false, true]) {
+    const keys = await googleCerts(force);
+    const jwk = keys.find((k) => k.kid === kid);
+    if (!jwk) {
+      if (force) return false;   // genuinely unknown key, not a stale cache
+      continue;                  // might be a rotation: refetch once and retry
+    }
+    const key = await crypto.subtle.importKey(
+      "jwk", jwk,
+      { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+      false, ["verify"],
+    );
+    return crypto.subtle.verify(
+      "RSASSA-PKCS1-v1_5", key, sigBytes,
+      new TextEncoder().encode(signingInput),
+    );
+  }
+  return false;
+}
+
+/* Returns the identity Google vouched for, or throws. Every refusal is the
+   same 401 with the same wording: the client can do nothing differently with a
+   more specific reason, and a detailed "why your forged token failed" is a gift
+   to whoever forged it. The real reason goes to the log, matching how
+   sheetsFetch collapses Google's errors. */
+async function verifyGoogleIdToken(env, idToken) {
+  if (!env.GOOGLE_OAUTH_CLIENT_ID) {
+    fail(503, "Sign in with Google is not set up on this server yet.", "google_not_configured");
+  }
+  const bad = (why) => {
+    console.error("google id token rejected:", why);
+    fail(401, "Google sign-in could not be verified. Please try again.", "invalid_google_token");
+  };
+
+  const parts = String(idToken || "").split(".");
+  if (parts.length !== 3) bad("not three parts");
+
+  let header, claims;
+  try {
+    header = JSON.parse(new TextDecoder().decode(b64urlDecode(parts[0])));
+    claims = JSON.parse(new TextDecoder().decode(b64urlDecode(parts[1])));
+  } catch (e) { bad("undecodable"); }
+
+  // alg is pinned. A token whose header says "none" or names an HMAC algorithm
+  // is the oldest JWT attack there is, and the check costs one comparison.
+  if (header.alg !== "RS256") bad(`alg was ${header.alg}`);
+  if (!header.kid) bad("no kid");
+
+  const ok = await verifyRs256(header.kid, `${parts[0]}.${parts[1]}`, b64urlDecode(parts[2]));
+  if (!ok) bad("signature did not verify");
+
+  // aud is the load-bearing one. Without it, an ID token minted for ANY other
+  // site that uses Google sign-in would be accepted here — every one of them
+  // is a real, correctly-signed Google token for a real person.
+  if (claims.aud !== env.GOOGLE_OAUTH_CLIENT_ID) bad("aud is a different client");
+  if (!GOOGLE_ISSUERS.includes(claims.iss)) bad(`iss was ${claims.iss}`);
+
+  const now = Math.floor(Date.now() / 1000);
+  if (!claims.exp || now >= Number(claims.exp)) bad("expired");
+  // A little slack for a client whose clock runs fast; the token is short-lived
+  // regardless, and exp above is the check that actually bounds it.
+  if (claims.iat && Number(claims.iat) > now + 300) bad("issued in the future");
+
+  if (!claims.sub) bad("no sub");
+  // An unverified address would let anyone claim any email by signing up to
+  // Google with it. It is also the claim the whole link/refuse decision rests
+  // on, so it has to be Google's assertion and not merely Google's echo.
+  if (claims.email_verified !== true && claims.email_verified !== "true") bad("email not verified");
+  if (!claims.email) bad("no email");
+
+  /* given_name/family_name are absent on some accounts, so fall back to
+     splitting `name`. Both are clamped before they can reach the sheet by
+     requireText in createAccount, and neutralised by cellSafe on the way in. */
+  const whole = String(claims.name || "").trim();
+  const first = String(claims.given_name || "") || whole.split(/\s+/)[0] || "";
+  const last = String(claims.family_name || "") || whole.split(/\s+/).slice(1).join(" ") || "";
+
+  return {
+    sub: String(claims.sub),
+    email: String(claims.email),
+    emailKey: String(claims.email).trim().toLowerCase(),
+    firstName: first,
+    lastName: last,
+    picture: String(claims.picture || ""),
+  };
+}
+
 async function readUsers(env) {
   const data = await sheetsFetch(env, `/values/${encodeURIComponent(DATA_RANGE)}`);
   const rows = data.values || [];
@@ -1227,7 +2092,19 @@ async function updateUserRow(env, rowNumber, currentRow, patch) {
 // apostrophe forces text.
 function cellSafe(value) {
   const s = value === null || value === undefined ? "" : String(value);
-  return /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+  /* Two reasons to prefix an apostrophe, and Sheets strips it again on read.
+
+     1. A leading =+-@ makes Sheets treat the cell as a FORMULA. A display name
+        of "=IMPORTXML(...)" would otherwise run inside the accounts sheet.
+
+     2. A run of 16+ digits gets stored as a NUMBER and handed back as
+        "1.07812345678901E+20". A Google `sub` is around 21 digits, and it is
+        the key every Google sign-in is matched on - so without this, linking
+        would appear to work and then silently never match again, and two
+        different Google accounts could even round to the same string. Nothing
+        else in the schema is a long number (lockedUntil is 13 digits), so this
+        clause only ever fires for the column it was written for. */
+  return /^[=+\-@\t\r]/.test(s) || /^\d{16,}$/.test(s) ? `'${s}` : s;
 }
 
 // ===========================================================================
@@ -1318,6 +2195,22 @@ function publicUser(row) {
     caps: capsFor(row),
     nickname: row[F.nickname] || "",
     guestExpiresAt: guestExpiry(row),
+    /* The connected-account facts, so the Profile screen can render without a
+       second round trip and so login, signup and /auth/me cannot disagree
+       about the same account - which is what the note above insists on.
+
+       Yes, this puts an email address in a browser-facing payload, against the
+       first line of this comment. It is the person's OWN linked Google address,
+       in a response only ever sent to that same person, and Profile cannot say
+       WHICH account is connected without it. /admin/users builds its own
+       narrower projection and deliberately does not gain this. */
+    google: {
+      linked: !!row[F.googleSub],
+      email: row[F.googleEmail] || "",
+      picture: row[F.googlePicture] || "",
+      linkedAt: row[F.googleLinkedAt] || "",
+    },
+    emailVerified: row[F.emailVerified] === "1",
   };
 }
 
