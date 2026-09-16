@@ -422,3 +422,147 @@ spaces. Wrong answers count toward the same three-strike lockout.
 - **A name shows up in the sheet with a leading apostrophe** (`'=hello`) — that
   is deliberate. Values starting with `=`, `+`, `-` or `@` are neutralised so a
   registration can't plant a live formula in a sheet you open.
+
+---
+
+# Sign in with Google (added 2026-09-16, app v4.14 / Worker 4.10)
+
+Everything above still applies unchanged — this is additional setup, not a
+replacement. Password sign-in keeps working with none of it done.
+
+**Nothing here costs anything and nothing needs a card.** Sign in with Google is
+authentication, not a metered API: there is no API to enable, no quota to buy,
+and no client secret anywhere in this design.
+
+## What changed that the steps above don't mention
+
+Two things in the existing setup are now out of date, and are corrected here
+rather than rewritten above:
+
+- **The header row is no longer 22 columns.** It runs to **AA**, not V. The five
+  added columns are listed in G.2 below.
+- **The environment list gained entries.** `GOOGLE_OAUTH_CLIENT_ID`, and the
+  four mail variables, all optional. See G.4.
+
+## G.1 — Google Cloud Console
+
+Reuse the same `prodash` project that already holds the service account. This
+is an OAuth **client**, which is a different thing from the service account: the
+service account is the Worker acting as itself against your sheet; this is a
+person proving who they are.
+
+1. **APIs & Services → OAuth consent screen** → **External**. App name, user
+   support email, developer contact. No API to enable.
+2. Leave publishing status on **Testing**, and add each person's Google address
+   under **Test users**. See G.5 before considering Production.
+3. **Credentials → Create credentials → OAuth client ID → Web application.**
+4. **Authorized JavaScript origins** — scheme and host only, Google rejects
+   paths:
+   - `https://hernandezdavidf.github.io`
+   - `http://localhost` and `http://localhost:8761` for the test harness
+5. **Authorized redirect URIs — leave empty.** The popup flow hands the token to
+   a JavaScript callback in the page. There is no redirect, so no redirect URI,
+   and no client secret to keep anywhere.
+6. Copy the **Client ID** (ends `.apps.googleusercontent.com`). It is public by
+   design — it appears in the page source of every site that uses Google
+   sign-in — but it is still configured in exactly one place: Cloudflare.
+
+## G.2 — Five new sheet columns
+
+In the `Users` tab, **W1** through **AA1**:
+
+```
+google_sub	google_email	google_linked_at	google_picture	email_verified
+```
+
+`google_sub` is Google's permanent subject id and is the only thing a sign-in is
+matched on. Never the email — Google addresses can be changed by their owner
+and, on Workspace domains, reissued to someone else entirely.
+
+**The Table trap from the column-width warning above applies here too.** If the
+tab is a Google *Table*, typing into W1 does not always widen it: drag the
+bottom-right handle out to column AA first. A width mismatch breaks every row
+*update* while reads and appends keep working, which is the fault that once
+looked like an intermittent database outage.
+
+No backfill is needed. `readUsers` pads short rows, so existing accounts read
+back with empty cells in the new columns.
+
+## G.3 — Deploy the Worker
+
+Exactly as step 3 and step 4's gotcha above: paste `cloud-worker/worker.js` into
+**Edit code**, **Deploy**, then **Deployments → ⋯ → promote to Active**.
+
+Confirm with `/health`, which now answers more than `ok`:
+
+```json
+{"ok":true,"version":"4.10","google":true,"googleClientId":"…","mail":false}
+```
+
+`google:true` is what the app reads to decide whether to draw the Google button
+at all. If it says `false`, the variable in G.4 is missing or was never promoted.
+
+## G.4 — New Worker variables
+
+| Name | Required | What it does |
+|---|---|---|
+| `GOOGLE_OAUTH_CLIENT_ID` | for Google sign-in | The Web client id from G.1.6. Served to the app from `/health`, so `index.html` holds no copy of it and the two cannot drift. **Deliberately not in `requireConfig`** — a missing client id must not take password login down with it; the Google routes answer 503 and the app hides the button. |
+| `MAIL_API_KEY` | no | Bearer key for a mail provider. |
+| `MAIL_FROM` | no | The From address. |
+| `MAIL_PROVIDER_URL` | no | Defaults to Resend's endpoint. |
+| `APP_URL` | no | Where emailed links point, e.g. `https://hernandezdavidf.github.io/prodash`. Configured rather than read from the Origin header, or anyone could have the Worker mail someone a link to a site they control. |
+
+**Email is off until both `MAIL_API_KEY` and `MAIL_FROM` exist.** Verification
+and reset-link endpoints answer 503 `mail_not_configured`, and the secret
+question remains the working recovery path — which needs no provider, costs
+nothing, and works offline. That is the shipped behaviour, not a gap.
+
+## G.5 — Before moving to Production
+
+Not needed for Testing, and Testing works indefinitely for sign-in.
+
+Production requires a public homepage, a Privacy Policy and Terms of Service, on
+a domain **verified in Search Console**. Google verification review is *not*
+required for `openid`/`email`/`profile` — those are non-sensitive scopes — so
+publishing is self-service. Only a logo on the consent screen needs the lighter
+brand-verification.
+
+**The likely blocker:** `github.io` is a shared public-suffix domain and Google
+may refuse it as an authorized domain. That would mean the custom domain this
+project has already noted wanting. Try adding the domain in the console before
+committing to a launch date — it costs nothing to find out.
+
+## G.6 — Order of deployment
+
+The app ships by git push to Pages, the Worker is pasted by hand. They cannot
+land together, so the app was built to survive either order: the profile panel
+probes `/health` and disables what an old Worker cannot serve, showing the same
+stale-Worker banner the admin screen uses. Google's button stays hidden until a
+client id exists.
+
+Preferred order anyway: columns → variable → Worker → promote → confirm
+`/health` → push the app.
+
+## If something looks wrong — Google edition
+
+- **No Google button, and a line saying it is not switched on** — `/health`
+  reported no `googleClientId`. The variable is missing, or was saved but never
+  promoted to Active.
+- **No Google button, and a line about the hosted version** — the page is open
+  from `file://`. Google will only run its script on a registered https origin
+  and `file://` cannot be registered. This is expected; password sign-in is
+  unaffected, and it is the reason Google sign-in is a hosted-app affordance
+  only.
+- **"That Google sign-in could not be verified"** — one 401 covers every
+  verification failure on purpose; a detailed reason would help whoever forged
+  the token. The real cause is in the Worker's live logs. The most common one is
+  an `aud` mismatch: the client id in Cloudflare is not the one the page used.
+- **"An account already exists for that email address"** on a Google sign-in —
+  working as designed. ProDash never verified the addresses typed into its
+  signup form, so an email match is not proof of ownership. Sign in with the
+  password, then connect Google from Profile.
+- **Profile controls greyed out with an orange banner** — the deployed Worker
+  predates the app. Redeploy and promote.
+- **A `google_sub` cell showing `1.078E+20`** — an old Worker wrote it before
+  `cellSafe` learned to quote long digit runs. Re-link the account; the current
+  code stores it as text.
