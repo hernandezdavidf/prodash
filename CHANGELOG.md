@@ -2,6 +2,82 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-22 — A workout library, and schedules that derive themselves (v4.17)
+
+Three ideas, deliberately kept apart:
+
+| | | |
+|---|---|---|
+| `S.wtpl` | a **template** | "Leg day is squats 3×8 and lunges 3×10" |
+| `S.wsched` | a **schedule** | "Leg day, every Monday and Thursday" |
+| `S.workouts` | a **session** | "on the 14th I did it, and here is what happened" |
+
+Only the third records anything. The first two are intent, and editing what you
+did must never rewrite what you meant to do — so a session carries `tpl`/`sch`
+as *provenance* rather than pointing at its template for data.
+
+### The recurrence engine already existed
+
+`S.wsched` uses the exact `{date, rr, ex}` shape `S.events` does, so
+`occursOn()` — the Personal Calendar's engine — answers "does this fall on that
+day" for a workout schedule **unchanged**. That engine already handles
+intervals, named weekdays, an end date, the 31st clamping in February, and the
+week-alignment drift that catches everyone. Writing a second one would have
+meant maintaining two, and the second would have been the worse one. "Custom
+recurrence" was therefore free.
+
+### Occurrences are derived, never written ahead
+
+A daily schedule does not fill the board with a thousand rows. Nothing enters
+`S.workouts` until you press **Start**, which means changing a rule fixes every
+future occurrence retroactively, and a plan you never got to leaves no false
+record in your history. **Skip today** excludes one date via `ex` rather than
+deleting the schedule — the same per-occurrence exclusion the activity calendar
+uses.
+
+### Today
+
+A progress bar over **sets, not sessions**. Sessions are too coarse to be
+encouraging — a workout is 0% until the last set, then 100% — and this bar
+exists to show movement while you are still moving. Planned-but-unstarted work
+counts in the denominator, or the bar would read 100% with a scheduled workout
+sitting untouched below it. Terracotta while there is work left, forest green
+when the day is in.
+
+Plus an **Add from library** picker, and **Add to today** in the library that
+means *today* — not whichever day the Today tab happens to be showing. Someone
+browsing back through last week and tapping it means "do this now"; filing it
+under a past date would be a quiet, hard-to-notice wrong answer.
+
+### The one-way rule, made explicit
+
+Editing a session never touches its template. Pushing today's numbers back is a
+button that says so (**Save to library**), shown only on sessions that came from
+one. Verified both directions: editing an instance to 999kg left the template at
+80; the explicit push then moved it to 999.
+
+### The bug this found
+
+**Planned days have never been painted on the Exercise calendar.** `exDayState`
+returns `"planned"`, the renderer built the class as `"st-" + state`, and the
+stylesheet defines `st-plan` — so `st-planned` matched nothing, silently, since
+the calendar shipped. Two vocabularies that agreed by coincidence everywhere
+except one word. Now there is one explicit map.
+
+### Verified
+
+Driven in a browser: template created, exercises and target sets added with no
+Done column; weekly Mon+Thu schedule saved and rendering as "Weekly on Mon,
+Thu" with the right next date; the occurrence appearing in Today and on the
+calendar; Start materialising it with the template's weights copied; progress
+0% → 50% → 100% with the bar and label tracking; the card finishing and the
+streak incrementing; Skip removing exactly one date and leaving the rest;
+template independence in both directions. Checked at 375px — no horizontal
+scroll, and the weekday picker holds seven across on one row.
+
+Analytics remains the outstanding half.
+
+
 ## 2026-09-21 — Today's workout, rebuilt around the exercise (v4.16)
 
 The exercise becomes the unit of the screen: a collapsible card with a set

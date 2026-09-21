@@ -2637,6 +2637,10 @@ return {
           <svg class="bv-i bv-i-s" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><rect x="1.8" y="3" width="12.4" height="11.2" rx="1.6"/><path d="M1.8 6.6h12.4M5.2 1.8v2.4M10.8 1.8v2.4"/></svg>
           <span>Calendar</span>
         </button>
+        <button class="sub-tab" id="exNavLib" data-xt="lib" role="tab" aria-selected="false" aria-controls="ex-pane-lib">
+          <svg class="bv-i bv-i-s" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="M2.4 2.6h3v10.8h-3zM6.6 2.6h3v10.8h-3z"/><path d="M11.2 3.4l2.6.7-2.4 9.5-2.6-.7z"/></svg>
+          <span>Library</span>
+        </button>
       </div>
     </div>
 
@@ -2651,9 +2655,24 @@ return {
         </h2>
         <div class="sub" id="exDaySub"></div>
 
+        <!-- Progress over the day's SETS, planned work included in the
+             denominator. It fills as you tick, which is the point: a bar that
+             only moved when a whole workout finished would sit at nothing for
+             most of the session. -->
+        <div class="ex-prog" id="exProg" hidden>
+          <div class="ex-prog-top">
+            <span class="ex-prog-pct" id="exProgPct">0%</span>
+            <span class="ex-prog-lbl" id="exProgLbl"></span>
+          </div>
+          <div class="ex-bar"><div class="ex-bar-fill" id="exProgFill"
+            role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"
+            aria-label="Today's workout progress"></div></div>
+        </div>
+
         <div class="ex-acts">
           <button class="um-btn ex-primary" id="exAddWorkout">+ Add a workout</button>
           <button class="um-btn" id="exAddRest">Mark as a rest day</button>
+          <select class="ex-pick" id="exFromLib" aria-label="Add a saved workout"></select>
         </div>
 
         <div id="exSessions"></div>
@@ -2675,6 +2694,26 @@ return {
           <button class="um-btn" type="submit">Add</button>
         </form>
         <div id="exMeals"></div>
+      </div>
+    </div>
+
+    <!-- ---------------- Library ----------------
+         Saved workouts and when they are planned. A template here is intent;
+         nothing in it changes because of anything you did on a given day. -->
+    <div id="ex-pane-lib" role="tabpanel" aria-labelledby="exNavLib" tabindex="-1" hidden>
+      <div class="card">
+        <h2>Saved workouts <span class="cnt" id="exLibCount">0</span></h2>
+        <div class="sub">Build a workout once and reuse it. Add one to today in a tap, or put it on a repeating schedule &mdash; changing it here never rewrites a session you have already done.</div>
+        <div class="ex-acts">
+          <button class="um-btn ex-primary" id="exTplNew">+ New saved workout</button>
+        </div>
+        <div id="exLib"></div>
+      </div>
+
+      <div class="card">
+        <h2>Scheduled <span class="cnt" id="exSchCount">0</span></h2>
+        <div class="sub">Repeating plans fill themselves in on the calendar and in Today. Nothing is recorded until you actually start one.</div>
+        <div id="exSchList"></div>
       </div>
     </div>
 
@@ -3593,6 +3632,73 @@ return {
 
   .ex-empty{padding:22px 14px;text-align:center;color:var(--muted);font-size:13px;
     border:1px dashed var(--line);border-radius:12px}
+
+  /* ---- the day's progress ----
+     Terracotta while there is work left, forest green the moment it is all in.
+     The colour change is the reward; the number is only the detail. */
+  .ex-prog{margin:2px 0 14px}
+  .ex-prog[hidden]{display:none}
+  .ex-prog-top{display:flex;align-items:baseline;gap:9px;margin-bottom:6px;flex-wrap:wrap}
+  .ex-prog-pct{font-family:var(--serif);font-size:26px;font-weight:800;line-height:1;
+    color:var(--terra-ink);font-variant-numeric:tabular-nums}
+  .ex-prog.full .ex-prog-pct{color:var(--forest-ink)}
+  .ex-prog-lbl{font-size:12px;color:var(--muted)}
+  .ex-bar{height:9px;border-radius:99px;background:var(--ivory);
+    border:1px solid var(--line);overflow:hidden}
+  .ex-bar-fill{height:100%;width:0;border-radius:99px;background:var(--terra);
+    transition:width .28s ease}
+  .ex-prog.full .ex-bar-fill{background:var(--forest)}
+  @media (prefers-reduced-motion:reduce){ .ex-bar-fill{transition:none} }
+
+  .ex-pick{padding:6px 10px;font:inherit;font-size:12px;font-weight:600;
+    border:1px solid var(--line);border-radius:9px;background:var(--paper);color:var(--ink)}
+  .ex-pick:disabled{opacity:.5}
+  .ex-pick:focus{outline:2px solid var(--terra);outline-offset:-1px}
+
+  /* ---- a planned, unstarted occurrence ----
+     Dashed and quiet: it is intent, not a record. Nothing here can be ticked,
+     because nothing has happened yet. */
+  .ex-sess.planned{border-style:dashed;border-color:var(--terra);background:var(--terra-lt)}
+  .ex-sess.planned .ex-sess-n{color:var(--terra-ink)}
+  .ex-plan-sum{font-size:12.5px;color:var(--terra-ink);margin-bottom:6px}
+  .ex-plan-ex{font-size:12.5px;color:var(--ink);padding:3px 0}
+  .ex-plan-ex span{color:var(--muted)}
+
+  /* ---- library ---- */
+  .ex-lib-acts{display:flex;gap:7px;flex-wrap:wrap;padding:10px 0 4px}
+  .um-btn.danger{border-color:var(--alert);color:var(--alert-ink)}
+  .um-btn.danger:hover:not(:disabled){background:var(--alert-ink);color:#fff;border-color:var(--alert-ink)}
+
+  /* One exercise inside a template. Deliberately lighter than a session's
+     card - these are targets, and the screen should not look like something
+     you can tick. */
+  .ex-sub{border-top:1px solid var(--line);padding:9px 0 4px}
+  .ex-sub-h{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+  .ex-sub-n{font-weight:700;font-size:13px;color:var(--ink);flex:1;min-width:0}
+
+  .ex-sch-form{border:1px solid var(--terra);background:var(--terra-lt);
+    border-radius:10px;padding:11px;margin:8px 0}
+  .ex-f{margin-bottom:9px}
+  .ex-f label{display:block;font-size:11.5px;font-weight:700;color:var(--ink);margin-bottom:3px}
+  .ex-f input,.ex-f select{width:100%;box-sizing:border-box;padding:8px 10px;font:inherit;
+    font-size:13px;border:1px solid var(--line);border-radius:9px;
+    background:var(--paper);color:var(--ink)}
+  .ex-f input:focus,.ex-f select:focus{outline:2px solid var(--terra);outline-offset:-1px}
+  .ex-f[hidden]{display:none}
+  /* Seven across at 375px or it is not a week, it is a list. No wrap, equal
+     columns, and the labels shrink rather than the row breaking. */
+  .ex-dow-pick{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+  .ex-dowb{min-width:0;padding:7px 1px;font:inherit;font-size:10.5px;font-weight:700;
+    cursor:pointer;border:1px solid var(--line);border-radius:8px;
+    background:var(--paper);color:var(--muted)}
+  .ex-dowb.on{background:var(--terra);border-color:var(--terra);color:var(--on-warm)}
+
+  .ex-sch{display:flex;align-items:center;gap:10px;padding:10px 2px;
+    border-bottom:1px solid var(--line);font-size:13px;flex-wrap:wrap}
+  .ex-sch:last-child{border-bottom:0}
+  .ex-sch-n{font-weight:700;color:var(--ink)}
+  .ex-sch-r{color:var(--terra-ink);font-size:12px}
+  .ex-sch-x{color:var(--muted);font-size:11.5px;margin-left:auto}
 
   /* ---- food and drink ---- */
   .ex-meal-form{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}
@@ -4543,7 +4649,35 @@ var BOARD_VIEWS={classic:1,checklist:1,reports:1,exercise:1};
    reopens where you left it - the same courtesy S.boardView does for the Board.
    The DATE you were looking at deliberately is NOT kept: coming back to the app
    tomorrow and landing on yesterday would be wrong every time. */
-var EX_NAVS={today:1,cal:1};
+var EX_NAVS={today:1,cal:1,lib:1};
+
+/* One exercise, cleaned. Shared by sessions and by library templates so the
+   two shapes cannot drift: a template is the same object minus `done`, and the
+   moment those are normalised by two different functions, one of them starts
+   accepting something the other rejects.
+
+   reps, weight and duration are all OPTIONAL and INDEPENDENT: a set may be 12
+   reps, or 40kg x 8, or a 20-minute hold with neither. Absent stays absent
+   rather than becoming 0, because "0 reps" and "reps not tracked for this
+   movement" are different claims and the reports have to tell them apart. */
+function exCleanExercise(e,withDone){
+  var o={id:e.id,n:(typeof e.n==="string"?e.n:"").slice(0,EX_NAME_MAX),sets:[]};
+  if(Array.isArray(e.sets)){
+    o.sets=e.sets.filter(function(x){
+      return x&&typeof x==="object"&&typeof x.id==="string"&&x.id;
+    }).map(function(x){
+      var t={id:x.id};
+      if(withDone)t.done=!!x.done;
+      if(typeof x.reps==="number"&&isFinite(x.reps)&&x.reps>0)t.reps=Math.min(9999,Math.round(x.reps));
+      if(typeof x.w==="number"&&isFinite(x.w)&&x.w>0)t.w=Math.round(x.w*100)/100;
+      if(t.w!==undefined)t.u=EX_UNITS[x.u]?x.u:"kg";
+      if(typeof x.dur==="number"&&isFinite(x.dur)&&x.dur>0)t.dur=Math.min(1440,Math.round(x.dur));
+      return t;
+    });
+  }
+  if(!o.sets.length)delete o.sets;
+  return o;
+}
 var EX_UNITS={kg:1,lb:1};
 // Longest a workout, exercise or food entry name may be. Same reasoning as
 // NOTE_MAX: these reach the sheet-free local store, but they also travel
@@ -4700,29 +4834,16 @@ function norm(s){
     if(!Array.isArray(w.ex)){ delete w.ex; return; }
     w.ex=w.ex.filter(function(e){
       return e&&typeof e==="object"&&typeof e.id==="string"&&e.id;
-    }).map(function(e){
-      var o={id:e.id,n:(typeof e.n==="string"?e.n:"").slice(0,EX_NAME_MAX),sets:[]};
-      if(Array.isArray(e.sets)){
-        o.sets=e.sets.filter(function(x){
-          return x&&typeof x==="object"&&typeof x.id==="string"&&x.id;
-        }).map(function(x){
-          var t={id:x.id,done:!!x.done};
-          /* reps, weight and duration are all OPTIONAL and independent: a set
-             may be 12 reps, or 40kg x 8, or a 20-minute hold with neither.
-             Absent stays absent rather than becoming 0, because "0 reps" and
-             "reps not tracked for this movement" are different claims and the
-             progress report has to tell them apart. */
-          if(typeof x.reps==="number"&&isFinite(x.reps)&&x.reps>0)t.reps=Math.min(9999,Math.round(x.reps));
-          if(typeof x.w==="number"&&isFinite(x.w)&&x.w>0)t.w=Math.round(x.w*100)/100;
-          if(t.w!==undefined)t.u=EX_UNITS[x.u]?x.u:"kg";
-          if(typeof x.dur==="number"&&isFinite(x.dur)&&x.dur>0)t.dur=Math.min(1440,Math.round(x.dur));
-          return t;
-        });
-      }
-      if(!o.sets.length)delete o.sets;
-      return o;
-    });
+    }).map(function(e){ return exCleanExercise(e,true); });
     if(!w.ex.length)delete w.ex;
+    /* Provenance. A session started from the library keeps the template id it
+       came from and, if it was planned rather than added by hand, the schedule
+       id and the occurrence date. `sch` is what stops a materialised occurrence
+       being drawn twice - once as itself and once as the plan that produced
+       it - and it is how completing a planned workout is recognised as
+       completing THAT plan rather than as an unrelated session. */
+    if(typeof w.tpl!=="string"||!w.tpl)delete w.tpl;
+    if(typeof w.sch!=="string"||!w.sch)delete w.sch;
   });
 
   /* meals: food and drink notes, deliberately NOT a nutrition tracker. No
@@ -4743,6 +4864,71 @@ function norm(s){
     if(typeof m.note!=="string"||!m.note.trim())delete m.note;
     else m.note=m.note.slice(0,NOTE_MAX);
     if(typeof m.at!=="number")m.at=0;
+  });
+
+  /* ---- the workout library ----
+     wtpl: reusable workout TEMPLATES. Same exercise/set shape as a session,
+     minus `done` - a template records targets, not what happened. KEYED.
+
+     A template is never edited by working out. Editing a scheduled instance
+     changes that instance only; pushing a change back to the library is an
+     explicit action, because the alternative is that a light day on the bike
+     quietly rewrites what "Leg day" means forever. */
+  if(!Array.isArray(s.wtpl))s.wtpl=[];
+  s.wtpl=s.wtpl.filter(function(t){
+    return t&&typeof t==="object"&&typeof t.id==="string"&&t.id;
+  });
+  s.wtpl.forEach(function(t){
+    t.n=(typeof t.n==="string"?t.n:"").slice(0,EX_NAME_MAX);
+    if(typeof t.at!=="number")t.at=0;
+    if(typeof t.note!=="string"||!t.note.trim())delete t.note;
+    else t.note=t.note.slice(0,NOTE_MAX);
+    if(!Array.isArray(t.ex)){ delete t.ex; return; }
+    t.ex=t.ex.filter(function(e){
+      return e&&typeof e==="object"&&typeof e.id==="string"&&e.id;
+    }).map(function(e){ return exCleanExercise(e,false); });
+    if(!t.ex.length)delete t.ex;
+  });
+
+  /* wsched: when a template is planned.
+
+     The shape is DELIBERATELY the one S.events uses - {date, rr, ex} - so
+     occursOn() answers "does this fall on that day" for a workout schedule
+     without a second recurrence engine being written. That engine already
+     handles intervals, named weekdays, an end date, the 31st clamping in
+     February and the week-alignment drift that catches everyone; writing a
+     second one would have meant maintaining two, and the second would have
+     been the worse one.
+
+       tpl  - which library workout
+       date - the anchor date
+       rr   - null for one-off, else {f,int,days,until}
+       ex   - occurrence dates skipped by hand
+
+     Occurrences are NOT written out in advance. They are derived on demand, so
+     a daily schedule does not fill the board with a thousand rows, changing the
+     rule retroactively fixes every future occurrence, and a day you never
+     trained leaves no trace. A row appears in S.workouts only when you actually
+     start that workout. */
+  if(!Array.isArray(s.wsched))s.wsched=[];
+  s.wsched=s.wsched.filter(function(c){
+    return c&&typeof c==="object"&&typeof c.id==="string"&&c.id&&
+           typeof c.tpl==="string"&&c.tpl&&
+           typeof c.date==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(c.date);
+  });
+  s.wsched.forEach(function(c){
+    if(typeof c.at!=="number")c.at=0;
+    if(!Array.isArray(c.ex))delete c.ex;
+    else { c.ex=c.ex.filter(function(k){return typeof k==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(k);});
+           if(!c.ex.length)delete c.ex; }
+    if(!c.rr||typeof c.rr!=="object"){ delete c.rr; return; }
+    if(["daily","weekly","monthly","yearly"].indexOf(c.rr.f)<0){ delete c.rr; return; }
+    var r={f:c.rr.f,int:Math.max(1,Math.min(99,Math.round(+c.rr.int||1)))};
+    if(r.f==="weekly"&&Array.isArray(c.rr.days)){
+      r.days=c.rr.days.filter(function(d){return typeof d==="number"&&d>=0&&d<=6;});
+    }
+    if(typeof c.rr.until==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(c.rr.until))r.until=c.rr.until;
+    c.rr=r;
   });
 
   if(!EX_NAVS[s.exNav])s.exNav="today";
@@ -5005,7 +5191,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="4.16";
+var APP_VERSION="4.17";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -5016,6 +5202,7 @@ var APP_VERSION="4.16";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-22T00:30:00+08:00",text:"Exercise has a Library now, so you stop rebuilding the same workout. Save a workout once with its exercises and target sets, then add it to today in a single tap, or put it on a schedule -- every day, certain weekdays, monthly, every other week, with an end date if you want one. It uses the same repeat rules your Personal Calendar already uses, so it knows about things like the 31st in February. Scheduled workouts show up on the Exercise calendar and at the top of Today before you have done anything, with what you are in for; press Start and it becomes a real workout you can tick through. If you are not doing it today, Skip today drops just that one date and leaves the rest of the schedule alone. Today now has a progress bar: it counts sets rather than whole workouts so it actually moves while you are training, it counts anything still planned so it cannot read 100% while something waits below, and it turns green when the day is done. The important rule: changing sets on a workout you are doing never changes the saved one. If you want today's numbers to become the new targets, there is a Save to library button that says so. Nothing is written to your history for a scheduled workout until you actually start it, so a plan you never got to leaves no false record."},
   {ts:"2026-09-21T23:30:00+08:00",text:"Today's workout has been rebuilt around the exercise. Each exercise is now its own card you can fold away, with a proper table underneath it -- set number, weight, reps and a tick box -- instead of a row of chips. The card header tells you where you are at a glance: \"3 sets, 1/3\". Tick a set and the whole row is crossed out. Tick the last one and the card turns green, crosses out its own name, says done and folds itself shut, so what is left to do is what stays in front of you; tap it to open it again if you need to correct something. The biggest change is that adding a set no longer asks you three questions in three pop-up boxes. It just adds the row, copied from the set above, and you type over whatever is different -- which is how it should have worked from the start, because the old way was unusable one-handed between reps and made fixing a typo mean deleting the set. Weight and reps are now edited straight in the table, and leaving a box empty means \"not tracked\" rather than zero. The three dots on each card hold rename and remove. Minutes only get a column when you actually use them, and the weight column is headed with the unit you are using rather than always saying KG."},
   {ts:"2026-09-21T20:00:00+08:00",text:"A new Exercise section on the Board, beside Classic view, Consolidated checklist and Reports. It has its own day view and its own calendar, and it does not touch your lanes or tasks at all. On any day you can add a workout, put exercises under it, and add sets carrying reps, weight and minutes -- each set is a button you tap as you finish it, and the whole workout ticks itself off when the last set goes in. A workout you did not plan can be added to today in two taps. You can also mark a day as a rest day, which matters for the streak. The streak counts days you completed something, and a day you marked as rest is skipped rather than counted against you -- so planning a rest no longer looks like giving up. Today is never counted as a break while it is still today. Beside the streak are your longest run, sessions this week and total sessions, because a streak that has just ended should not read as though nothing happened. The calendar fills a day you trained, outlines a rest day, and marks a day you planned something and did not do it; tapping any day opens it. Underneath the day there is a place to jot what you ate and drank, with a time -- deliberately just a note, not a calorie counter. Graphs and the written reports are still to come."},
   {ts:"2026-09-16T12:00:00+08:00",text:"Sign in with Google, and a profile you can actually edit. The sign-in card now offers Google as well as a password, and a new person can start an account that way -- Google fills in the name and email, and you finish with a username, a password and a secret question. The password is still asked for on purpose: an account that only Google can open is one you cannot get into when Google is unavailable, and one you would be locked out of the moment you disconnected it. If you try Google with an address that already has a ProDash account, it will not merge them -- it asks you to sign in with your password first and connect Google from your profile, because anyone could have typed your address into the sign-up form and nobody ever checked. The login box now takes your email as well as your username. Your profile page has grown up: you can change your own nickname at last, change your own password, disconnect Google, sign out every other device you have left yourself logged in on, and delete your account outright if you want to -- that one is permanent and asks for your password and your username typed back. Google's button only appears on the hosted app with a connection; opening the file directly still works exactly as it always did, with your password. Needs the Worker redeployed -- until it is, the profile page says so and leaves those controls switched off."},
@@ -5081,8 +5268,8 @@ var APP_VERSION_HISTORY=[
    pushed" is per-account, though - it tracks a specific board's revisions. */
 var DEV_KEY="prodash.deviceId", DEV_NAME_KEY="prodash.deviceName", PUSHED_KEY=PDAuth.ns("prodash.pushedUpTo");
 var HIST_CAP=400, CKPT_EVERY=25, BATCH_MS=2500;
-var BOARD_KEYS=["tasks","log","days","events","lanes","rituals","theme","palette","hiddenBlocks","plans","roll","boardView","expenses","cur","subs","subSkip","zones","scripts","bibleVer","bibleAt","bibleSize","wgLast","workouts","meals","exNav"];
-var KEYED=["tasks","events","lanes","rituals","expenses","subs","zones","scripts","workouts","meals"], MAPS=["log","days","plans"], SCALARS=["theme","palette","roll","boardView","cur","bibleVer","bibleAt","bibleSize","wgLast","exNav"];
+var BOARD_KEYS=["tasks","log","days","events","lanes","rituals","theme","palette","hiddenBlocks","plans","roll","boardView","expenses","cur","subs","subSkip","zones","scripts","bibleVer","bibleAt","bibleSize","wgLast","workouts","meals","exNav","wtpl","wsched"];
+var KEYED=["tasks","events","lanes","rituals","expenses","subs","zones","scripts","workouts","meals","wtpl","wsched"], MAPS=["log","days","plans"], SCALARS=["theme","palette","roll","boardView","cur","bibleVer","bibleAt","bibleSize","wgLast","exNav"];
 // Plain arrays of primitive ids (not objects with their own .id, so KEYED's
 // per-item union doesn't apply) compared by CONTENT, not reference - a
 // cloned snapshot never shares object identity with the live array even
@@ -7183,6 +7370,27 @@ exEl("exMealForm").addEventListener("submit",exAddMeal);
 
 exEl("exSessions").addEventListener("click",function(ev){
   var t;
+  /* Planned occurrences first: they are not sessions yet, so none of the
+     handlers below apply to them. */
+  if((t=ev.target.closest("[data-planstart]"))){
+    var ps=t.dataset.planstart.split("|");
+    if(exMaterialise(ps[0],ps[1])){ exSave(); stamp("Workout started"); }
+    return;
+  }
+  if((t=ev.target.closest("[data-planskip]"))){
+    var sk=t.dataset.planskip.split("|"), sc=exSched(sk[0]);
+    if(sc){
+      /* Skipping excludes this ONE date from the rule rather than deleting the
+         schedule - exactly what the activity calendar's per-occurrence
+         exclusion does, and the reason `ex` exists on the shape. */
+      if(!Array.isArray(sc.ex))sc.ex=[];
+      if(sc.ex.indexOf(sk[1])<0)sc.ex.push(sk[1]);
+      exSave();
+      stamp("Skipped for this day");
+    }
+    return;
+  }
+  if((t=ev.target.closest("[data-wpush]"))){ exPushToTpl(t.dataset.wpush); return; }
   if((t=ev.target.closest("[data-set]"))){
     var p=t.dataset.set.split("|"); exToggleSet(p[0],p[1],p[2]); return;
   }
@@ -7276,6 +7484,122 @@ exEl("exMeals").addEventListener("click",function(ev){
 /* Tapping a day on the calendar opens it in Today rather than editing in
    place: the day view already knows how to show sessions, sets and food, and
    a second editor would be a second thing to keep in step. */
+/* ---- library, scheduling and the planned-occurrence controls ---- */
+exEl("exTplNew").addEventListener("click",exTplAdd);
+
+exEl("exFromLib").addEventListener("change",function(){
+  var id=this.value;
+  this.value="";
+  if(id)exAddFromTpl(id,exDate);
+});
+
+exEl("exLib").addEventListener("click",function(ev){
+  var t;
+  if((t=ev.target.closest("[data-tadd]"))){
+    /* "Add to today" means TODAY, not whichever day the Today tab happens to
+       be showing. Someone browsing back through last week and tapping this on
+       a library card means "do this now", and silently filing it under a past
+       date would be a quiet, hard-to-notice wrong answer. */
+    exAddFromTpl(t.dataset.tadd,today());
+    exDate=today(); exSetNav("today");
+    stamp("Added to today");
+    return;
+  }
+  if((t=ev.target.closest("[data-tsch]"))){
+    exLibUI.sch=(exLibUI.sch===t.dataset.tsch)?null:t.dataset.tsch;
+    exLibUI.open[t.dataset.tsch]=true;
+    renderExLib();
+    return;
+  }
+  if((t=ev.target.closest("[data-tren]"))){
+    var tr=exTpl(t.dataset.tren);
+    if(tr){
+      var n=(prompt("Rename this saved workout",tr.n||"")||"").trim();
+      if(n){ tr.n=n.slice(0,EX_NAME_MAX); exSave(); }
+    }
+    return;
+  }
+  if((t=ev.target.closest("[data-tdup]"))){ exTplDup(t.dataset.tdup); return; }
+  if((t=ev.target.closest("[data-tdel]"))){ exTplDel(t.dataset.tdel); return; }
+  if((t=ev.target.closest("[data-teadd]"))){ exTplAddEx(t.dataset.teadd); return; }
+  if((t=ev.target.closest("[data-tsadd]"))){
+    var q=t.dataset.tsadd.split("|"); exTplAddSet(q[0],q[1]); return;
+  }
+  if((t=ev.target.closest("[data-tedel]"))){
+    var r=t.dataset.tedel.split("|"), tt=exTpl(r[0]);
+    if(tt&&tt.ex&&confirm("Remove this exercise from the saved workout?")){
+      tt.ex=tt.ex.filter(function(e){return e.id!==r[1];});
+      if(!tt.ex.length)delete tt.ex;
+      exSave();
+    }
+    return;
+  }
+  // Weekday buttons and the repeat select live inside this container too, so
+  // they are handled here rather than bound to markup that gets rebuilt.
+  if((t=ev.target.closest("[data-wsday]"))){ t.classList.toggle("on"); return; }
+  if((t=ev.target.closest("#wsSave"))){ exSchSave(); return; }
+  if((t=ev.target.closest("[data-ttog]"))){
+    var k=t.dataset.ttog;
+    exLibUI.open[k]=!exLibUI.open[k];
+    renderExLib();
+    return;
+  }
+});
+
+/* The repeat select changes which parts of the form apply. Bound by delegation
+   on `change` for the same reason as everything else here: the form is rebuilt
+   by renderExLib() and a direct listener would not survive it. */
+exEl("exLib").addEventListener("change",function(ev){
+  if(ev.target.id==="wsRepeat"){
+    var f=ev.target.value;
+    exEl("wsIntWrap").hidden=!f;
+    exEl("wsUntilWrap").hidden=!f;
+    exEl("wsDaysWrap").hidden=(f!=="weekly");
+    var u=exEl("wsIntUnit");
+    if(u)u.textContent=(f==="daily"?"day(s)":f==="weekly"?"week(s)":
+                        f==="monthly"?"month(s)":f==="yearly"?"year(s)":"");
+    return;
+  }
+  var el=ev.target.closest(".ex-in");
+  if(!el)return;
+  var row=el.closest("[data-trow]");
+  if(!row)return;
+  var p=row.dataset.trow.split("|");
+  exTplEditSet(p[0],p[1],p[2],el.dataset.f,el.value);
+});
+
+function exSchSave(){
+  var tid=exLibUI.sch; if(!tid)return;
+  var date=exEl("wsDate").value;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){ alert("Pick a start date."); return; }
+  var f=exEl("wsRepeat").value;
+  var c={id:rid("sc_"),tpl:tid,date:date,at:Date.now()};
+  if(f){
+    var days=[];
+    document.querySelectorAll("[data-wsday].on").forEach(function(b){ days.push(+b.dataset.wsday); });
+    // A weekly rule with nothing ticked falls back to the start date's own
+    // weekday - the same default the activity editor uses, so "weekly" never
+    // silently means "never".
+    if(f==="weekly"&&!days.length)days=[dowOf(date)];
+    c.rr={f:f,int:Math.max(1,Math.min(99,+exEl("wsInt").value||1))};
+    if(f==="weekly")c.rr.days=days;
+    var until=exEl("wsUntil").value;
+    if(/^\d{4}-\d{2}-\d{2}$/.test(until))c.rr.until=until;
+  }
+  S.wsched.push(c);
+  exLibUI.sch=null;
+  exSave();
+  stamp("Scheduled");
+}
+
+exEl("exSchList").addEventListener("click",function(ev){
+  var t=ev.target.closest("[data-schdel]");
+  if(!t)return;
+  if(!confirm("Remove this schedule? Workouts you have already done are kept."))return;
+  S.wsched=S.wsched.filter(function(c){return c.id!==t.dataset.schdel;});
+  exSave();
+});
+
 exEl("exCalBody").addEventListener("click",function(ev){
   var t=ev.target.closest("[data-exday]");
   if(!t)return;
@@ -8651,7 +8975,13 @@ function exDoneSess(w){ return !w.rest && w.done; }
    marked as rest, you trained. */
 function exDayState(k){
   var list=exOn(k);
-  if(!list.length)return "empty";
+  /* Scheduled occurrences count as planned work even though no row exists for
+     them yet - see S.wsched on why they are derived rather than written out.
+     Without this a recurring plan would be invisible to the calendar and to
+     the streak until the day it was started, which is precisely backwards:
+     the whole point of planning is that it shows up before you do it. */
+  var planned=exPlanOn(k).length;
+  if(!list.length&&!planned)return "empty";
   if(list.some(exDoneSess))return "done";
   if(list.some(function(w){return w.rest;}))return "rest";
   return (k<today())?"missed":"planned";
@@ -8713,6 +9043,216 @@ function exPretty(k){
   return d.toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"});
 }
 
+/* ===================== The workout library & scheduling ==============
+
+   Three ideas, kept apart on purpose:
+
+     a TEMPLATE (S.wtpl)   - "Leg day is squats 3x8 and lunges 3x10"
+     a SCHEDULE (S.wsched) - "Leg day, every Monday and Thursday"
+     a SESSION  (S.workouts) - "on the 14th I actually did it, and here is what"
+
+   Only the third is a record of anything. The first two are intent, and
+   editing what you did must never rewrite what you meant to do - which is why
+   a session carries `tpl`/`sch` as provenance rather than pointing at the
+   template for its data.
+
+   Occurrences are derived, never written ahead. See the note on S.wsched. */
+
+function exTpl(id){
+  var out=null;
+  (S.wtpl||[]).forEach(function(t){ if(t.id===id)out=t; });
+  return out;
+}
+function exSched(id){
+  var out=null;
+  (S.wsched||[]).forEach(function(c){ if(c.id===id)out=c; });
+  return out;
+}
+
+/* Everything PLANNED for a day that has not been started yet.
+
+   occursOn() is the Personal Calendar's recurrence engine, used here unchanged
+   - a workout schedule is the same {date, rr, ex} shape an activity is, so
+   "every other Tuesday until March" already works, correctly, including the
+   awkward parts nobody gets right first time.
+
+   A schedule whose session already exists for that date drops out: once you
+   have started it, the session IS the occurrence. */
+function exPlanOn(k){
+  var started={};
+  (S.workouts||[]).forEach(function(w){ if(w.d===k&&w.sch)started[w.sch]=true; });
+  var out=[];
+  (S.wsched||[]).forEach(function(c){
+    if(started[c.id])return;
+    if(!occursOn(c,k))return;
+    var t=exTpl(c.tpl);
+    if(!t)return;                 // template deleted out from under it
+    out.push({sch:c,tpl:t});
+  });
+  return out;
+}
+
+/* Turn a planned occurrence into a real session you can tick.
+
+   The template's exercises and sets are DEEP COPIED with fresh ids. Sharing
+   ids with the template would mean two sessions from the same template on the
+   same day collided, and it would make "edit this instance" indistinguishable
+   from "edit the library" the moment anything walked the ids. */
+function exMaterialise(schId,k){
+  var c=exSched(schId); if(!c)return null;
+  var t=exTpl(c.tpl); if(!t)return null;
+  var w=exFromTemplate(t,k);
+  w.sch=c.id;
+  S.workouts.push(w);
+  return w;
+}
+
+function exFromTemplate(t,k){
+  var w={id:rid("wk_"),d:k,n:t.n||"Workout",rest:false,done:false,at:Date.now(),tpl:t.id};
+  if(t.note)w.note=t.note;
+  if(t.ex&&t.ex.length){
+    w.ex=t.ex.map(function(e){
+      var o={id:rid("ee_"),n:e.n||"Exercise"};
+      if(e.sets&&e.sets.length){
+        o.sets=e.sets.map(function(x){
+          var s={id:rid("st_"),done:false};
+          if(x.reps!==undefined)s.reps=x.reps;
+          if(x.w!==undefined){ s.w=x.w; s.u=x.u||"kg"; }
+          if(x.dur!==undefined)s.dur=x.dur;
+          return s;
+        });
+      }
+      return o;
+    });
+  }
+  return w;
+}
+
+/* Today's progress, over SETS rather than sessions.
+
+   Sessions are too coarse to be encouraging - a workout is 0% until the last
+   set, then 100% - and this bar exists to show movement while you are still
+   moving. Planned-but-unstarted work counts in the denominator, or the bar
+   would read 100% while a scheduled workout sat untouched below it. */
+function exDayProgress(k){
+  var sets=0,done=0,wk=0,wdone=0;
+  exOn(k).forEach(function(w){
+    if(w.rest)return;
+    wk++; if(exDoneSess(w))wdone++;
+    var t=exSets(w);
+    // A session with no sets is all-or-nothing, so it counts as a single unit.
+    sets+=t||1; done+=t?exSetsDone(w):(w.done?1:0);
+  });
+  exPlanOn(k).forEach(function(p){
+    wk++;
+    var t=0;
+    (p.tpl.ex||[]).forEach(function(e){ t+=(e.sets||[]).length; });
+    sets+=t||1;
+  });
+  return {sets:sets,done:done,workouts:wk,wdone:wdone,
+          pct:sets?Math.round(done/sets*100):0};
+}
+
+// ---- library actions -----------------------------------------------------
+function exTplAdd(){
+  var n=(prompt("Name this workout","")||"").trim();
+  if(!n)return;
+  S.wtpl.push({id:rid("tp_"),n:n.slice(0,EX_NAME_MAX),at:Date.now()});
+  exSave();
+}
+function exTplDup(id){
+  var t=exTpl(id); if(!t)return;
+  var c=JSON.parse(JSON.stringify(t));
+  c.id=rid("tp_"); c.at=Date.now();
+  c.n=(t.n||"Workout")+" (copy)";
+  /* Fresh ids all the way down. A duplicate sharing set ids with its original
+     would merge as the same rows across devices, and editing one would appear
+     to edit both. */
+  (c.ex||[]).forEach(function(e){
+    e.id=rid("ee_");
+    (e.sets||[]).forEach(function(x){ x.id=rid("st_"); });
+  });
+  S.wtpl.push(c);
+  exSave();
+}
+function exTplDel(id){
+  var t=exTpl(id); if(!t)return;
+  var used=(S.wsched||[]).filter(function(c){return c.tpl===id;}).length;
+  var msg="Delete “"+(t.n||"this workout")+"” from the library?";
+  if(used)msg+="\n\n"+used+" schedule"+(used===1?"":"s")+" use"+(used===1?"s":"")+
+    " it and will be removed too. Workouts you have already done are kept.";
+  if(!confirm(msg))return;
+  S.wtpl=S.wtpl.filter(function(x){return x.id!==id;});
+  S.wsched=(S.wsched||[]).filter(function(c){return c.tpl!==id;});
+  exSave();
+}
+function exTplAddEx(id){
+  var t=exTpl(id); if(!t)return;
+  var n=(prompt("Exercise name","")||"").trim();
+  if(!n)return;
+  if(!Array.isArray(t.ex))t.ex=[];
+  t.ex.push({id:rid("ee_"),n:n.slice(0,EX_NAME_MAX),sets:[]});
+  exSave();
+}
+function exTplAddSet(tid,eid){
+  var t=exTpl(tid); if(!t)return;
+  var ex=null; (t.ex||[]).forEach(function(e){ if(e.id===eid)ex=e; });
+  if(!ex)return;
+  if(!Array.isArray(ex.sets))ex.sets=[];
+  var last=ex.sets[ex.sets.length-1], s={id:rid("st_")};
+  if(last){
+    if(last.reps!==undefined)s.reps=last.reps;
+    if(last.w!==undefined){ s.w=last.w; s.u=last.u||"kg"; }
+    if(last.dur!==undefined)s.dur=last.dur;
+  }
+  ex.sets.push(s);
+  exSave();
+}
+function exTplEditSet(tid,eid,sid,field,raw){
+  var t=exTpl(tid); if(!t)return;
+  var ex=null; (t.ex||[]).forEach(function(e){ if(e.id===eid)ex=e; });
+  if(!ex)return;
+  var set=null; (ex.sets||[]).forEach(function(x){ if(x.id===sid)set=x; });
+  if(!set)return;
+  var v=String(raw==null?"":raw).trim();
+  if(v===""||!isFinite(+v)||+v<=0){ delete set[field]; if(field==="w")delete set.u; }
+  else if(field==="w"){ set.w=Math.round(+v*100)/100; if(!set.u)set.u="kg"; }
+  else if(field==="reps")set.reps=Math.min(9999,Math.round(+v));
+  else if(field==="dur")set.dur=Math.min(1440,Math.round(+v));
+  exSave();
+}
+
+/* Add a library workout straight to a day, with no schedule behind it. This is
+   the "I am training now" path, and it is deliberately one tap. */
+function exAddFromTpl(id,k){
+  var t=exTpl(id); if(!t)return;
+  S.workouts.push(exFromTemplate(t,k||exDate));
+  exSave();
+}
+
+/* Push a session's exercises back into the library workout it came from - the
+   explicit opt-in the brief asks for. Everything about this is one-way and
+   on demand: nothing a session does reaches the template by itself. */
+function exPushToTpl(wid){
+  var w=exFind(wid); if(!w||!w.tpl)return;
+  var t=exTpl(w.tpl);
+  if(!t){ alert("That library workout no longer exists."); return; }
+  if(!confirm("Update “"+(t.n||"the saved workout")+"” in your library to match this session?\n\nSets you did today become the new targets. Other days are not affected."))return;
+  t.ex=(w.ex||[]).map(function(e){
+    return {id:rid("ee_"),n:e.n,
+      sets:(e.sets||[]).map(function(x){
+        var s={id:rid("st_")};
+        if(x.reps!==undefined)s.reps=x.reps;
+        if(x.w!==undefined){ s.w=x.w; s.u=x.u||"kg"; }
+        if(x.dur!==undefined)s.dur=x.dur;
+        return s;
+      })};
+  });
+  if(!t.ex.length)delete t.ex;
+  exSave();
+  stamp("Library workout updated");
+}
+
 // ---- rendering -----------------------------------------------------------
 function renderExercise(){
   exEl("exStreakN").textContent=exStreak();
@@ -8734,6 +9274,7 @@ function renderExercise(){
   exSetNav(S.exNav);
   renderExDay();
   renderExCal();
+  renderExLib();
 }
 
 function exSetNav(v){
@@ -8741,6 +9282,7 @@ function exSetNav(v){
   S.exNav=v;
   exEl("ex-pane-today").hidden=(v!=="today");
   exEl("ex-pane-cal").hidden=(v!=="cal");
+  exEl("ex-pane-lib").hidden=(v!=="lib");
   document.querySelectorAll("[data-xt]").forEach(function(b){
     var on=(b.dataset.xt===v);
     b.classList.toggle("on",on);
@@ -8758,9 +9300,27 @@ function renderExDay(){
     parseKeyDate(exDate).toLocaleDateString(undefined,{weekday:"long",year:"numeric",month:"long",day:"numeric"}) +
     (list.length ? " — "+doneN+" of "+list.length+" done"+(sets?", "+setsDone+"/"+sets+" sets":"") : "");
 
-  exEl("exSessions").innerHTML = list.length
-    ? list.map(exSessHTML).join("")
+  /* Planned occurrences render after the sessions that already exist: what you
+     have started belongs above what you have not. */
+  var plan=exPlanOn(exDate);
+  exEl("exSessions").innerHTML = (list.length||plan.length)
+    ? list.map(exSessHTML).join("") + plan.map(function(p){ return exPlanHTML(p,exDate); }).join("")
     : '<div class="ex-empty">Nothing planned for this day.<br>Add a workout, or mark it as a rest day so it doesn’t count against your streak.</div>';
+
+  var pr=exDayProgress(exDate);
+  var prog=exEl("exProg");
+  prog.hidden=!pr.workouts;
+  if(pr.workouts){
+    exEl("exProgPct").textContent=pr.pct+"%";
+    exEl("exProgLbl").textContent=
+      pr.wdone+" of "+pr.workouts+" workout"+(pr.workouts===1?"":"s")+" done"+
+      (pr.sets>pr.workouts?" · "+pr.done+"/"+pr.sets+" sets":"")+
+      (pr.workouts-pr.wdone>0?" · "+(pr.workouts-pr.wdone)+" to go":"");
+    var fill=exEl("exProgFill");
+    fill.style.width=pr.pct+"%";
+    fill.setAttribute("aria-valuenow",pr.pct);
+    prog.classList.toggle("full",pr.pct>=100);
+  }
 
   exEl("exMeals").innerHTML = meals.length
     ? meals.map(function(m){
@@ -8825,6 +9385,12 @@ function exSessHTML(w){
       '<span class="ex-sess-n">'+esc(w.n||"Workout")+'</span>'+
       '<span class="ex-sess-meta">'+(sets?done+"/"+sets+" sets":"no sets yet")+'</span>'+
       '<button class="ex-mini" data-wdone="'+esc(w.id)+'">'+(w.done?"Undo":"Done")+'</button>'+
+      /* Only a session that came from the library can be pushed back to it,
+         and only on purpose. Nothing a session does reaches its template by
+         itself - a light day on the bike must not quietly redefine what "Leg
+         day" means from now on. */
+      (w.tpl?'<button class="ex-mini" data-wpush="'+esc(w.id)+'" '+
+        'title="Make these sets the new targets in your library">Save to library</button>':'')+
       '<button class="ex-mini" data-wren="'+esc(w.id)+'">Rename</button>'+
       '<button class="ex-mini warn" data-wdel="'+esc(w.id)+'">Delete</button>'+
     '</div>'+
@@ -8907,6 +9473,181 @@ function exRowHTML(key,x,i,hasDur){
   '</tr>';
 }
 
+/* Which library rows are expanded, and which one is having its schedule
+   edited. Ephemeral, like exUI - see the note there. */
+var exLibUI={open:{},sch:null};
+
+function exTplSets(t){
+  var n=0;
+  (t.ex||[]).forEach(function(e){ n+=(e.sets||[]).length; });
+  return n;
+}
+function exTplSummary(t){
+  var ex=(t.ex||[]).length, st=exTplSets(t);
+  if(!ex)return "No exercises yet";
+  return ex+" exercise"+(ex===1?"":"s")+(st?" · "+st+" set"+(st===1?"":"s"):"");
+}
+
+function renderExLib(){
+  var list=(S.wtpl||[]).slice().sort(function(a,b){return (b.at||0)-(a.at||0);});
+  exEl("exLibCount").textContent=list.length;
+  exEl("exLib").innerHTML = list.length
+    ? list.map(exTplHTML).join("")
+    : '<div class="ex-empty">Nothing saved yet.<br>Build a workout once here and it is two taps to use again.</div>';
+  renderExSched();
+  exFillLibPicker();
+}
+
+function exTplHTML(t){
+  var open=!!exLibUI.open[t.id], planning=(exLibUI.sch===t.id);
+  var plans=(S.wsched||[]).filter(function(c){return c.tpl===t.id;});
+  return '<div class="ex-card'+(open?" open":"")+'" data-tpl="'+esc(t.id)+'">'+
+    '<div class="ex-card-h" data-ttog="'+esc(t.id)+'">'+
+      '<span class="ex-ico">'+EX_ICON+'</span>'+
+      '<span class="ex-card-t">'+
+        '<span class="ex-card-n">'+esc(t.n||"Workout")+'</span>'+
+        '<span class="ex-card-s">'+esc(exTplSummary(t))+
+          (plans.length?' · '+plans.length+' schedule'+(plans.length===1?'':'s'):'')+'</span>'+
+      '</span>'+
+      '<span class="ex-chev" aria-hidden="true">'+
+        '<svg viewBox="0 0 16 16" width="14" height="14" focusable="false"><path d="M4 6l4 4 4-4"/></svg>'+
+      '</span>'+
+    '</div>'+
+    '<div class="ex-tbl-wrap"'+(open?'':' hidden')+'>'+
+      '<div class="ex-lib-acts">'+
+        '<button class="um-btn ex-primary" data-tadd="'+esc(t.id)+'">Add to today</button>'+
+        '<button class="um-btn" data-tsch="'+esc(t.id)+'">'+(planning?"Close":"Schedule…")+'</button>'+
+        '<button class="um-btn" data-tren="'+esc(t.id)+'">Rename</button>'+
+        '<button class="um-btn" data-tdup="'+esc(t.id)+'">Duplicate</button>'+
+        '<button class="um-btn danger" data-tdel="'+esc(t.id)+'">Delete</button>'+
+      '</div>'+
+      (planning?exSchFormHTML(t):"")+
+      (t.ex&&t.ex.length
+        ? t.ex.map(function(e){ return exTplExHTML(t,e); }).join("")
+        : '<div class="ex-none">No exercises yet.</div>')+
+      '<button class="ex-add-ex" data-teadd="'+esc(t.id)+'">+ Add an exercise</button>'+
+    '</div>'+
+  '</div>';
+}
+
+/* A template's exercise: the same table as a session's, minus the Done column.
+   These are targets - there is nothing to tick, because nothing has happened. */
+function exTplExHTML(t,e){
+  var key=esc(t.id)+"|"+esc(e.id);
+  var unit=exUnitOf(e), hasDur=exHasDur(e);
+  return '<div class="ex-sub">'+
+    '<div class="ex-sub-h">'+
+      '<span class="ex-sub-n">'+esc(e.n||"Exercise")+'</span>'+
+      '<button class="ex-mini warn" data-tedel="'+key+'">Remove</button>'+
+    '</div>'+
+    '<table class="ex-tbl">'+
+      '<thead><tr><th class="c-set">Set</th><th>Weight ('+esc(unit)+')</th>'+
+      '<th>Reps</th>'+(hasDur?'<th>Min</th>':'')+'</tr></thead>'+
+      '<tbody>'+(e.sets||[]).map(function(x,i){
+        return '<tr class="ex-row" data-trow="'+key+"|"+esc(x.id)+'">'+
+          '<td class="c-set">'+(i+1)+'</td>'+
+          '<td><input class="ex-in" type="number" min="0" step="0.5" inputmode="decimal" value="'+
+            (x.w!==undefined?x.w:"")+'" placeholder="–" data-f="w" aria-label="Target weight, set '+(i+1)+'"></td>'+
+          '<td><input class="ex-in" type="number" min="0" step="1" inputmode="numeric" value="'+
+            (x.reps!==undefined?x.reps:"")+'" placeholder="–" data-f="reps" aria-label="Target reps, set '+(i+1)+'"></td>'+
+          (hasDur?'<td><input class="ex-in" type="number" min="0" step="1" inputmode="numeric" value="'+
+            (x.dur!==undefined?x.dur:"")+'" placeholder="–" data-f="dur" aria-label="Target minutes, set '+(i+1)+'"></td>':'')+
+        '</tr>';
+      }).join("")+'</tbody>'+
+    '</table>'+
+    '<button class="ex-add-set" data-tsadd="'+key+'">+ Add set</button>'+
+  '</div>';
+}
+
+/* The recurrence form. Same vocabulary as the Personal Calendar's activity
+   editor, because it produces the same rr object and is read by the same
+   occursOn(). Somebody who has scheduled an appointment here already knows
+   how this works. */
+function exSchFormHTML(t){
+  var DW=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  return '<div class="ex-sch-form" data-schfor="'+esc(t.id)+'">'+
+    '<div class="ex-f"><label for="wsDate">Starting</label>'+
+      '<input id="wsDate" type="date" value="'+esc(exDate)+'"></div>'+
+    '<div class="ex-f"><label for="wsRepeat">Repeat</label>'+
+      '<select id="wsRepeat">'+
+        '<option value="">Just that one day</option>'+
+        '<option value="daily">Daily</option>'+
+        '<option value="weekly">Weekly</option>'+
+        '<option value="monthly">Monthly</option>'+
+        '<option value="yearly">Yearly</option>'+
+      '</select></div>'+
+    '<div class="ex-f" id="wsIntWrap" hidden><label for="wsInt">Every</label>'+
+      '<input id="wsInt" type="number" min="1" max="99" value="1">'+
+      '<span class="ag-hint" id="wsIntUnit">day(s)</span></div>'+
+    '<div class="ex-f" id="wsDaysWrap" hidden><label>On these days</label>'+
+      '<div class="ex-dow-pick">'+DW.map(function(d,i){
+        return '<button type="button" class="ex-dowb" data-wsday="'+i+'">'+d+'</button>';
+      }).join("")+'</div></div>'+
+    '<div class="ex-f" id="wsUntilWrap" hidden><label for="wsUntil">Until <span class="ag-optional">optional</span></label>'+
+      '<input id="wsUntil" type="date"></div>'+
+    '<div class="ex-acts"><button class="um-btn ex-primary" id="wsSave">Save schedule</button></div>'+
+  '</div>';
+}
+
+function renderExSched(){
+  var list=(S.wsched||[]).slice().sort(function(a,b){return (a.date<b.date)?-1:1;});
+  exEl("exSchCount").textContent=list.length;
+  exEl("exSchList").innerHTML = list.length
+    ? list.map(function(c){
+        var t=exTpl(c.tpl);
+        var nxt=nextOccurrence(c,today());
+        return '<div class="ex-sch" data-sch="'+esc(c.id)+'">'+
+          '<span class="ex-sch-n">'+esc(t?(t.n||"Workout"):"(deleted workout)")+'</span>'+
+          '<span class="ex-sch-r">'+esc(rruleText(c))+'</span>'+
+          '<span class="ex-sch-x">'+(nxt?"next "+esc(exPretty(nxt)):"no more dates")+'</span>'+
+          '<button class="ex-mini warn" data-schdel="'+esc(c.id)+'">Remove</button>'+
+        '</div>';
+      }).join("")
+    : '<div class="ex-empty">Nothing scheduled.<br>Open a saved workout above and choose Schedule.</div>';
+}
+
+/* The quick picker in Today. Rebuilt on every render because the library can
+   change from the Library tab while this one is on screen. */
+function exFillLibPicker(){
+  var sel=exEl("exFromLib");
+  if(!sel)return;
+  var list=(S.wtpl||[]).slice().sort(function(a,b){return (a.n||"").localeCompare(b.n||"");});
+  sel.innerHTML='<option value="">Add from library…</option>'+
+    list.map(function(t){ return '<option value="'+esc(t.id)+'">'+esc(t.n||"Workout")+'</option>'; }).join("");
+  sel.disabled=!list.length;
+}
+
+/* A planned occurrence that has not been started. Shown with its targets so
+   you know what you are in for, and one button to begin - at which point it
+   becomes an ordinary session and every control lights up. */
+function exPlanHTML(p,k){
+  var t=p.tpl, sets=exTplSets(t);
+  return '<div class="ex-sess planned" data-plan="'+esc(p.sch.id)+'|'+esc(k)+'">'+
+    '<div class="ex-sess-h">'+
+      '<span class="ex-sess-n">'+esc(t.n||"Workout")+'</span>'+
+      '<span class="ex-sess-meta">Planned · '+esc(rruleText(p.sch))+'</span>'+
+      '<button class="ex-mini" data-planskip="'+esc(p.sch.id)+'|'+esc(k)+'">Skip today</button>'+
+    '</div>'+
+    '<div class="ex-body">'+
+      '<div class="ex-plan-sum">'+esc(exTplSummary(t))+
+        (sets?'':' — add sets in the Library if you want targets')+'</div>'+
+      (t.ex||[]).map(function(e){
+        return '<div class="ex-plan-ex"><b>'+esc(e.n||"Exercise")+'</b>'+
+          ((e.sets||[]).length?' <span>'+(e.sets||[]).length+' × '+
+            esc(exTargetText(e.sets[0]))+'</span>':'')+'</div>';
+      }).join("")+
+      '<button class="um-btn ex-primary" data-planstart="'+esc(p.sch.id)+'|'+esc(k)+'">Start this workout</button>'+
+    '</div>'+
+  '</div>';
+}
+function exTargetText(x){
+  var bits=[];
+  if(x.reps!==undefined)bits.push(x.reps+" reps");
+  if(x.w!==undefined)bits.push(x.w+(x.u||"kg"));
+  if(x.dur!==undefined)bits.push(x.dur+" min");
+  return bits.length?bits.join(" · "):"set";
+}
+
 function renderExCal(){
   var p=dparts(exCalCursor);
   exEl("exCalTitle").textContent=parseKeyDate(exCalCursor)
@@ -8914,15 +9655,24 @@ function renderExCal(){
   var first=monthKey(p.y,p.m)+"-01", lead=dowOf(first), tk=today();
   var start=addDays(first,-lead), out='<div class="ex-grid">'+
     DOW.map(function(d){return '<div class="ex-dow">'+d+'</div>';}).join("");
+  /* exDayState's words are not the CSS suffixes. They were assumed to be, and
+     "planned" became class "st-planned" while the stylesheet defined
+     "st-plan" - so a planned day has never actually been painted. One map,
+     here, rather than two vocabularies that agree by coincidence. */
+  var CLS={done:"done",rest:"rest",missed:"miss",planned:"plan"};
   for(var i=0;i<42;i++){
     var k=addDays(start,i), kp=dparts(k);
-    var inMonth=(kp.m===p.m&&kp.y===p.y), st=exDayState(k), list=exOn(k);
-    var label=list.length?(list[0].n||(list[0].rest?"Rest":"Workout")):"";
+    var inMonth=(kp.m===p.m&&kp.y===p.y), st=exDayState(k);
+    var list=exOn(k), plan=exPlanOn(k), total=list.length+plan.length;
+    // A day may hold nothing real yet and still be spoken for by a schedule,
+    // so the label falls through to whatever is planned for it.
+    var label=list.length?(list[0].n||(list[0].rest?"Rest":"Workout"))
+             :plan.length?(plan[0].tpl.n||"Workout"):"";
     out+='<div class="ex-cell'+(inMonth?"":" out")+(k===tk?" today":"")+
-         (st!=="empty"?" st-"+(st==="missed"?"miss":st):"")+'" data-exday="'+k+'">'+
+         (CLS[st]?" st-"+CLS[st]:"")+'" data-exday="'+k+'">'+
       '<span class="ex-cell-d">'+kp.d+'</span>'+
-      (list.length>1?'<span class="ex-cell-n">'+list.length+' sessions</span>'
-                    :(label?'<span class="ex-cell-n">'+esc(label)+'</span>':''))+
+      (total>1?'<span class="ex-cell-n">'+total+' sessions</span>'
+              :(label?'<span class="ex-cell-n">'+esc(label)+'</span>':''))+
     '</div>';
   }
   exEl("exCalBody").innerHTML=out+'</div>';
