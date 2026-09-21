@@ -2,6 +2,62 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-22 — The section switcher becomes a segmented control (v4.18)
+
+The Board's pennant banners are replaced by one recessed track with the active
+section raised out of it as a pill, per the reference David supplied. The
+Expense Tracker's Subscriptions nav changes with it — same `.pnav` class, same
+question ("which part of this tab am I in"), and the app keeps one idiom for a
+nested section rather than inventing a second per tab.
+
+### The tokens were already there
+
+This needed no new colours. The main tab strip already defines a palette-aware
+set for exactly this problem:
+
+| | | |
+|---|---|---|
+| track | `--tab-face` | the recessed surface |
+| pill | `--paper` | one step **lighter** than the track in both themes |
+| resting label | `--tab-ink` | exists because `--muted` fails AA on these faces (4.41 and 3.82) |
+| active label | `--forest-ink` | |
+
+`--paper` being lighter than `--tab-face` in *both* themes is what makes
+"raised" read without a single hardcoded colour: white on grey in light,
+`#263238` on `#0F1416` in dark. Verified across four palettes in both themes —
+the track comes out cream on Sienna and Retro, near-black in the dark blocks,
+and the pill is always the lighter of the pair.
+
+### Why the pill is not filled green
+
+The reference's concept is a light pill on a dark track; filling it would throw
+that away. But hue still carries meaning here, so the active *label* is brand
+green — green means focus, "this is the view you are in" — and the resting ones
+are neutral. Terracotta and red are not spent on a view switcher: they mean
+endurance and adrenaline, and diluting them here would cost more elsewhere than
+it buys.
+
+### The phone
+
+Four sections with icons measure 390px against 345px of phone, so the track
+scrolled with the last section clipped and no hint that it moved — at which
+point it has stopped being a segmented control and become a row that hides
+things. The icons drop at ≤430px and all four fit whole (302px in a 302px
+track). Horizontal scroll survives as the fallback for anything narrower.
+
+### Simplifications the new shape allowed
+
+- `clip-path` gone, so `:focus-visible` is an ordinary outline again. The
+  pennants needed a drop-shadow glow because a ring was clipped away with the
+  rest of the box.
+- `filter: drop-shadow` gone, so the lift is a plain two-layer `box-shadow` —
+  a tight one for the edge, a soft one for the lift; one large blur reads as a
+  glow rather than as a raised object.
+- The bottom-padding hack that made room for the pennant's point is gone.
+
+Markup, labels, icons and behaviour are unchanged. This is only how it looks.
+
+
 ## 2026-09-22 — A workout library, and schedules that derive themselves (v4.17)
 
 Three ideas, deliberately kept apart:

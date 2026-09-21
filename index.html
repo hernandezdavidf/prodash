@@ -2319,66 +2319,88 @@ return {
   .hb-chip:hover{border-style:solid;border-color:var(--olive);color:var(--forest-ink)}
   .hb-chip span{opacity:.65;font-variant-numeric:tabular-nums}
 
-  /* ---- section navigation: pennant tabs -----------------------------------
-     Banner shape with a downward point, icon, uppercase label and a gradient,
-     per the reference. EVERY rule here is scoped under .pnav on purpose:
-     `.sub-tab` is shared by sixteen buttons across four unrelated groups (the
-     pennants, the Calendar view switcher, the Board History sub-views, the
-     Subscriptions filter), so an unscoped change would restyle all of them.
+  /* ---- section navigation: a segmented control ----------------------------
+     One recessed track holding the sections, with the active one raised out of
+     it as a pill. Replaced the pennant banners on 2026-09-22 per the reference
+     David supplied.
 
-     .pnav, not .bview: this was the Board's private layout switcher until the
-     Expense Tracker needed the same thing for its Subscriptions section. Both
-     answer the same question - "which part of this tab am I in" - so they are
-     one style with one class, and the app has ONE idiom for a nested section
-     rather than a second one invented per tab. .bview survives as the Board's
-     own hook (see body.reports-only) and carries no styling of its own.
+     EVERY rule here is still scoped under .pnav on purpose: `.sub-tab` is
+     shared by sixteen buttons across four unrelated groups (this control, the
+     Calendar view switcher, the Board History sub-views, the Subscriptions
+     filter), so an unscoped change would restyle all of them.
 
-     Colour follows the app's rule that hue carries meaning rather than
-     decoration, which is why this does NOT copy the reference's magenta and
-     yellow, and does not give each tab its own hue: orange means endurance and
-     red means adrenaline here, so spending either on a view switcher would
-     dilute the one thing they are for. The active tab is brand green because
-     green means focus - "this is the view you are in" - and the inactive one is
-     neutral. */
+     .pnav, not .bview: this is the Board's layout switcher AND the Expense
+     Tracker's Subscriptions nav. Both answer the same question - "which part
+     of this tab am I in" - so they are one style with one class, and the app
+     has ONE idiom for a nested section rather than a second invented per tab.
+     .bview survives as the Board's own hook (see body.reports-only) and
+     carries no styling of its own.
+
+     THE TOKENS ARE THE WHOLE TRICK, and they already existed for the main tab
+     strip. --tab-face is the recessed surface, --panel its lighter sibling,
+     and --tab-ink is text that clears AA on them (which --muted does not, at
+     4.41 and 3.82). So:
+
+       track  --tab-face   recessed against the page in every palette
+       pill   --paper      one step LIGHTER than the track in both themes -
+                           white on grey in light, #222C31 on #0F1416 in dark -
+                           which is what makes "raised" read without a single
+                           hardcoded colour
+       label  --tab-ink resting, --forest-ink active
+
+     Green on the active pill rather than a green fill: the reference's concept
+     is a light pill on a dark track, and filling it would throw that away. But
+     hue still carries meaning here, so the active label is brand green because
+     green means focus - "this is the view you are in" - and the resting ones
+     are neutral. Terracotta and red are not spent on a view switcher; they
+     mean endurance and adrenaline, and diluting them here would cost more
+     elsewhere than it buys. */
   .pnav{display:flex;justify-content:flex-start;margin-bottom:16px}
-  .pnav .sub-tabs{gap:10px;margin:0;align-items:flex-start}
+  .pnav .sub-tabs{
+    display:inline-flex;gap:3px;margin:0;padding:4px;
+    flex-wrap:nowrap;max-width:100%;
+    border:1px solid var(--line);border-radius:999px;
+    background:var(--tab-face);
+    /* A four-section control at uppercase-with-tracking will not fit a narrow
+       phone. It scrolls rather than wrapping, because a segmented control that
+       breaks onto two lines stops reading as one control. */
+    overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .pnav .sub-tabs::-webkit-scrollbar{display:none}
   .pnav .sub-tab{
-    position:relative;display:flex;align-items:center;gap:8px;
-    /* the extra bottom padding is the pennant's point, which the clip-path
-       below cuts out of it - without it the notch would eat the label */
-    padding:9px 20px 20px;
-    border:0;border-radius:8px 8px 0 0;
-    font-size:11.5px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;
-    background:linear-gradient(180deg,var(--ivory),var(--line));
-    color:var(--tab-ink);
-    clip-path:polygon(0 0,100% 0,100% calc(100% - 11px),50% 100%,0 calc(100% - 11px));
-    /* drop-shadow, not box-shadow: box-shadow is cast from the unclipped border
-       box, so it would draw a rectangle behind a pennant. filter follows the
-       clipped silhouette. */
-    filter:drop-shadow(0 2px 2px rgba(var(--shadow-rgb),.22));
-    transition:filter .15s,color .15s}
-  .pnav .sub-tab:hover{filter:drop-shadow(0 3px 4px rgba(var(--shadow-rgb),.3))}
-  .pnav .sub-tab:not(.on):hover{color:var(--ink)}
-  /* Gradient stays inside a range where white clears AA: the palette green
-     #43A047 is only 3.3:1 with white, and 11.5px bold is nowhere near WCAG's
-     large-text threshold, so the band runs --forest -> --forest-dk instead. */
+    display:flex;align-items:center;gap:7px;flex:none;
+    padding:8px 16px;border:0;border-radius:999px;background:transparent;
+    font-size:11.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;
+    color:var(--tab-ink);white-space:nowrap;cursor:pointer;
+    transition:background .15s,color .15s}
+  .pnav .sub-tab:not(.on):hover{color:var(--ink);background:rgba(var(--shadow-rgb),.07)}
   .pnav .sub-tab.on{
-    background:linear-gradient(180deg,var(--forest),var(--forest-dk));
-    color:var(--on-brand);
-    filter:drop-shadow(0 3px 4px rgba(var(--shadow-rgb),.34))}
-  .pnav .sub-tab.on:hover{filter:drop-shadow(0 4px 6px rgba(var(--shadow-rgb),.38))}
-  /* The ring would be clipped away with the rest of the box, so focus is shown
-     as a glow that survives the clip. */
-  .pnav .sub-tab:focus-visible{outline:none;
-    filter:drop-shadow(0 0 0 2px var(--olive)) drop-shadow(0 3px 4px rgba(var(--shadow-rgb),.34))}
+    background:var(--paper);color:var(--forest-ink);font-weight:800;
+    /* Two shadows: a tight one for the edge and a soft one for the lift. A
+       single large blur reads as a glow rather than as a raised object. */
+    box-shadow:0 1px 1px rgba(var(--shadow-rgb),.16),0 2px 6px rgba(var(--shadow-rgb),.12)}
+  /* An ordinary ring works again now the clip-path is gone - the pennants
+     needed a drop-shadow glow because an outline was clipped away with the
+     rest of the box. */
+  .pnav .sub-tab:focus-visible{outline:2px solid var(--forest);outline-offset:-2px}
   .pnav .bv-i{flex:none;fill:currentColor;margin-top:-1px}
   .pnav .bv-i-s{fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+  @media (prefers-reduced-motion:reduce){ .pnav .sub-tab{transition:none} }
   @media(max-width:620px){
-    /* "Consolidated view" and "Classic view" lose their qualifier - two
-       pennants at uppercase-with-tracking do not fit a phone otherwise. */
+    /* "Consolidated view" and "Classic view" lose their qualifier - four
+       sections at uppercase-with-tracking do not fit a phone otherwise. */
     .pnav .bv-lg{display:none}
-    .pnav .sub-tab{padding:8px 14px 18px;font-size:11px;letter-spacing:.5px}
-    .pnav .sub-tabs{gap:7px}
+    .pnav .sub-tab{padding:8px 12px;font-size:10.5px;letter-spacing:.4px;gap:6px}
+    .pnav .sub-tabs{gap:2px;padding:3px}
+  }
+  @media(max-width:430px){
+    /* The icons go before the control does. Four sections with icons measure
+       390px against 345px of phone, and the track then scrolls with the last
+       section clipped and no hint that it moves - at which point it has
+       stopped being a segmented control and become a row that hides things.
+       Labels alone fit whole, and the labels are what people read. The
+       overflow scroll above stays as the fallback for anything narrower. */
+    .pnav .bv-i{display:none}
+    .pnav .sub-tab{padding:8px 11px;gap:0}
   }
   #checklist[hidden],.cols[hidden]{display:none}
 
@@ -5191,7 +5213,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="4.17";
+var APP_VERSION="4.18";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -5202,6 +5224,7 @@ var APP_VERSION="4.17";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-22T12:00:00+08:00",text:"The section switcher inside Board is now one rounded bar holding all four sections, with the one you are on raised out of it as a pale pill in brand green -- instead of the four banner-shaped pennants. The Expense Tracker's Every expense / Recurring subscriptions switcher changed with it, because they are the same control and should not look like two different ideas. It picks up whichever palette you are on, so the bar is cream on Sienna and Retro and near-black in the dark themes, and the raised pill is always a step lighter than the bar it sits in, which is what makes it look lifted rather than just coloured. On a phone the icons drop away so all four still fit on one line -- a switcher that has to be scrolled to see the last section is not really a switcher. Nothing moved and nothing was renamed; this is only how it looks."},
   {ts:"2026-09-22T00:30:00+08:00",text:"Exercise has a Library now, so you stop rebuilding the same workout. Save a workout once with its exercises and target sets, then add it to today in a single tap, or put it on a schedule -- every day, certain weekdays, monthly, every other week, with an end date if you want one. It uses the same repeat rules your Personal Calendar already uses, so it knows about things like the 31st in February. Scheduled workouts show up on the Exercise calendar and at the top of Today before you have done anything, with what you are in for; press Start and it becomes a real workout you can tick through. If you are not doing it today, Skip today drops just that one date and leaves the rest of the schedule alone. Today now has a progress bar: it counts sets rather than whole workouts so it actually moves while you are training, it counts anything still planned so it cannot read 100% while something waits below, and it turns green when the day is done. The important rule: changing sets on a workout you are doing never changes the saved one. If you want today's numbers to become the new targets, there is a Save to library button that says so. Nothing is written to your history for a scheduled workout until you actually start it, so a plan you never got to leaves no false record."},
   {ts:"2026-09-21T23:30:00+08:00",text:"Today's workout has been rebuilt around the exercise. Each exercise is now its own card you can fold away, with a proper table underneath it -- set number, weight, reps and a tick box -- instead of a row of chips. The card header tells you where you are at a glance: \"3 sets, 1/3\". Tick a set and the whole row is crossed out. Tick the last one and the card turns green, crosses out its own name, says done and folds itself shut, so what is left to do is what stays in front of you; tap it to open it again if you need to correct something. The biggest change is that adding a set no longer asks you three questions in three pop-up boxes. It just adds the row, copied from the set above, and you type over whatever is different -- which is how it should have worked from the start, because the old way was unusable one-handed between reps and made fixing a typo mean deleting the set. Weight and reps are now edited straight in the table, and leaving a box empty means \"not tracked\" rather than zero. The three dots on each card hold rename and remove. Minutes only get a column when you actually use them, and the weight column is headed with the unit you are using rather than always saying KG."},
   {ts:"2026-09-21T20:00:00+08:00",text:"A new Exercise section on the Board, beside Classic view, Consolidated checklist and Reports. It has its own day view and its own calendar, and it does not touch your lanes or tasks at all. On any day you can add a workout, put exercises under it, and add sets carrying reps, weight and minutes -- each set is a button you tap as you finish it, and the whole workout ticks itself off when the last set goes in. A workout you did not plan can be added to today in two taps. You can also mark a day as a rest day, which matters for the streak. The streak counts days you completed something, and a day you marked as rest is skipped rather than counted against you -- so planning a rest no longer looks like giving up. Today is never counted as a break while it is still today. Beside the streak are your longest run, sessions this week and total sessions, because a streak that has just ended should not read as though nothing happened. The calendar fills a day you trained, outlines a rest day, and marks a day you planned something and did not do it; tapping any day opens it. Underneath the day there is a place to jot what you ate and drank, with a time -- deliberately just a note, not a calorie counter. Graphs and the written reports are still to come."},
