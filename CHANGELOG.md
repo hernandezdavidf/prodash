@@ -2,6 +2,27 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-22 — Reports becomes one section (v4.19)
+
+The Board's Reports sub-view had two cards: **Reports** (everything *added*
+between two dates) and **Current Day Report** (done today plus everything still
+open, with the Excel export). They are now one card with a **Today / Date
+range** segmented switch.
+
+- **One lane filter** (`#repLane`) serves both modes; `#cdrLane` is gone.
+- **The range fields only show in Date range mode.** They are toggled with
+  `hidden`, which needed `.rep-controls [hidden]{display:none}` because
+  `.rep-fld`'s `display:flex` otherwise wins over the UA rule.
+- **Export moved to the end of the filter row** and now exports whatever the
+  card is showing. Render and export both read `repCurrentList()`, so the
+  spreadsheet cannot disagree with the screen. A side effect worth having: a
+  date range is now exportable, which it never was. Range exports are named
+  `prodash-<lane>-<from>_to_<to>.xlsx`; Today keeps `prodash-<lane>-<date>.xlsx`.
+- **Today is the default** each time the app loads. The mode is session-only
+  on purpose — opening Reports cold should answer "what's on my plate now".
+- The switch reuses the theme picker's segmented idiom (`.th-modes`) at the
+  height of the inputs beside it, not a new style.
+
 ## 2026-09-22 — The section switcher becomes a segmented control (v4.18)
 
 The Board's pennant banners are replaced by one recessed track with the active

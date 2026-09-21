@@ -1156,6 +1156,20 @@ body.reports-only .board-only:not(.bview):not(#view-reports){display:none}
 .rep-quick{border:1px solid var(--line);border-radius:7px;padding:0 12px;font-size:12px;height:31px;
   color:var(--forest-ink);font-weight:600;background:var(--paper)}
 .rep-quick:hover{background:var(--ivory)}
+/* The range fields are toggled with `hidden`, which .rep-fld's display:flex
+   would otherwise override. */
+.rep-controls [hidden]{display:none}
+/* Same segmented idiom as the theme picker's mode switch (.th-modes), sized
+   to sit in a filter row at the height of the inputs beside it. */
+.rep-modes{display:flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;height:31px}
+.rep-modes button{padding:0 13px;font-size:12px;font-weight:700;background:var(--paper);color:var(--muted);
+  border:0;border-right:1px solid var(--line);cursor:pointer;white-space:nowrap}
+.rep-modes button:last-child{border-right:0}
+.rep-modes button:hover{background:var(--ivory);color:var(--ink)}
+.rep-modes button[aria-checked="true"]{background:var(--forest);color:var(--on-brand)}
+/* Export sits at the far end of the filter row: it acts on the result of every
+   control to its left, so it reads last. Height matches the inputs. */
+.rep-export{margin-left:auto;height:31px}
 .rep-totals{display:flex;gap:18px;font-size:12.5px;color:var(--muted);margin-bottom:12px;flex-wrap:wrap}
 .rep-totals b{font-family:var(--serif);font-size:17px;color:var(--ink);display:block;line-height:1.2}
 .rep-lane{margin-bottom:16px}
@@ -2597,27 +2611,30 @@ return {
        rest of the Board when you leave the tab, and its `hidden` attribute is
        driven by setBoardView() alongside #checklist and #boardCols. -->
   <div id="view-reports" class="board-only" role="tabpanel" aria-labelledby="bvReports" tabindex="-1" hidden>
+    <!-- One card, two questions. "Today" is what used to be the separate
+         Current Day Report (done today + everything still open); "Date range"
+         is the old top card (everything ADDED between two dates). They share
+         one lane filter and one export, and the export always writes exactly
+         the list on screen - so there is never a question of which report the
+         button belongs to. -->
     <div class="card">
       <h2>Reports <span class="cnt" id="repCount">0 tasks</span></h2>
-      <div class="sub">Completed and pending tasks recorded in the lanes, filtered by the date they were added.</div>
+      <div class="sub" id="repSub"></div>
       <div class="rep-controls">
-        <div class="rep-fld"><label for="repFrom">From</label><input type="date" id="repFrom"></div>
-        <div class="rep-fld"><label for="repTo">To</label><input type="date" id="repTo"></div>
+        <div class="rep-fld"><label id="repModeLbl">Show</label>
+          <div class="rep-modes" role="radiogroup" aria-labelledby="repModeLbl">
+            <button type="button" role="radio" data-rmode="today" aria-checked="true">Today</button>
+            <button type="button" role="radio" data-rmode="range" aria-checked="false">Date range</button>
+          </div>
+        </div>
         <div class="rep-fld"><label for="repLane">Lane</label><select id="repLane"></select></div>
-        <button class="rep-quick" id="repThisWeek">Last 7 days</button>
+        <div class="rep-fld rep-range" hidden><label for="repFrom">From</label><input type="date" id="repFrom"></div>
+        <div class="rep-fld rep-range" hidden><label for="repTo">To</label><input type="date" id="repTo"></div>
+        <button class="rep-quick rep-range" id="repThisWeek" hidden>Last 7 days</button>
+        <button class="laf-save rep-export" id="repExport">Export to Excel</button>
       </div>
       <div id="repSummary"></div>
       <div id="repBody"></div>
-    </div>
-
-    <div class="card">
-      <h2>Current Day Report <span class="cnt" id="cdrDate"></span></h2>
-      <div class="sub">What's done today, plus everything still sitting open — for one lane, or all of them.</div>
-      <div class="rep-controls">
-        <div class="rep-fld"><label for="cdrLane">Lane</label><select id="cdrLane"></select></div>
-        <button class="laf-save" id="cdrExport">Export to Excel</button>
-      </div>
-      <div id="cdrPreview"></div>
     </div>
   </div>
 
@@ -5213,7 +5230,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="4.18";
+var APP_VERSION="4.19";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -5224,6 +5241,7 @@ var APP_VERSION="4.18";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-22T15:00:00+08:00",text:"Reports is now one section instead of two. A Today / Date range switch at the top picks what you are looking at: Today is the old Current Day Report (everything done today plus everything still open), Date range is the old Reports list (everything added between two dates). There is one Lane filter for both, and Export to Excel now sits at the end of the filter row and exports exactly the list on screen -- so you can finally export a date range too, not only today."},
   {ts:"2026-09-22T12:00:00+08:00",text:"The section switcher inside Board is now one rounded bar holding all four sections, with the one you are on raised out of it as a pale pill in brand green -- instead of the four banner-shaped pennants. The Expense Tracker's Every expense / Recurring subscriptions switcher changed with it, because they are the same control and should not look like two different ideas. It picks up whichever palette you are on, so the bar is cream on Sienna and Retro and near-black in the dark themes, and the raised pill is always a step lighter than the bar it sits in, which is what makes it look lifted rather than just coloured. On a phone the icons drop away so all four still fit on one line -- a switcher that has to be scrolled to see the last section is not really a switcher. Nothing moved and nothing was renamed; this is only how it looks."},
   {ts:"2026-09-22T00:30:00+08:00",text:"Exercise has a Library now, so you stop rebuilding the same workout. Save a workout once with its exercises and target sets, then add it to today in a single tap, or put it on a schedule -- every day, certain weekdays, monthly, every other week, with an end date if you want one. It uses the same repeat rules your Personal Calendar already uses, so it knows about things like the 31st in February. Scheduled workouts show up on the Exercise calendar and at the top of Today before you have done anything, with what you are in for; press Start and it becomes a real workout you can tick through. If you are not doing it today, Skip today drops just that one date and leaves the rest of the schedule alone. Today now has a progress bar: it counts sets rather than whole workouts so it actually moves while you are training, it counts anything still planned so it cannot read 100% while something waits below, and it turns green when the day is done. The important rule: changing sets on a workout you are doing never changes the saved one. If you want today's numbers to become the new targets, there is a Save to library button that says so. Nothing is written to your history for a scheduled workout until you actually start it, so a plan you never got to leaves no false record."},
   {ts:"2026-09-21T23:30:00+08:00",text:"Today's workout has been rebuilt around the exercise. Each exercise is now its own card you can fold away, with a proper table underneath it -- set number, weight, reps and a tick box -- instead of a row of chips. The card header tells you where you are at a glance: \"3 sets, 1/3\". Tick a set and the whole row is crossed out. Tick the last one and the card turns green, crosses out its own name, says done and folds itself shut, so what is left to do is what stays in front of you; tap it to open it again if you need to correct something. The biggest change is that adding a set no longer asks you three questions in three pop-up boxes. It just adds the row, copied from the set above, and you type over whatever is different -- which is how it should have worked from the start, because the old way was unusable one-handed between reps and made fixing a typo mean deleting the set. Weight and reps are now edited straight in the table, and leaving a box empty means \"not tracked\" rather than zero. The three dots on each card hold rename and remove. Minutes only get a column when you actually use them, and the weight column is headed with the unit you are using rather than always saying KG."},
@@ -8603,12 +8621,12 @@ applyAccess();
 window.addEventListener("pdauth:userchanged",applyAccess);
 
 /* ============================================================
-   Reports — a read-only view over S.tasks, grouped by lane.
-   "Reports" (top): everything ADDED within a date range, split
+   Reports — a read-only view over S.tasks, grouped by lane. One card,
+   two modes sharing a lane filter and a real .xlsx export:
+   "Today": what got done TODAY plus every currently open task (this
+     was the separate Current Day Report card until v4.19).
+   "Date range": everything ADDED within a date range, split
      completed / pending.
-   "Current Day Report" (below): what got done TODAY plus every
-     currently open task, for one lane or all of them - exportable
-     as a real .xlsx.
    ============================================================ */
 function laneNameOf(id){
   var L=S.lanes.filter(function(x){return x.id===id;})[0];
@@ -8668,32 +8686,41 @@ function repRowsHtml(list){
   });
   return body||'<div class="empty">Nothing recorded here yet.</div>';
 }
-function renderReportsView(){
-  renderRepLaneOptions("repLane","All lanes");
-  renderRepLaneOptions("cdrLane","All lanes");
-
+/* "today" | "range". Session-only on purpose: opening Reports cold should
+   answer the everyday question (what's on my plate now), not whatever
+   historical range you last looked at. */
+var repMode="today";
+/** The list the card is showing right now - the one place both the render
+    and the export read from, so the spreadsheet can never disagree with the
+    screen. */
+function repCurrentList(){
+  var laneId=document.getElementById("repLane").value||null;
+  if(repMode==="today")return currentDayList(laneId);
   var fromEl=document.getElementById("repFrom"),toEl=document.getElementById("repTo");
   if(!fromEl.value)fromEl.value=shift(today(),-6);
   if(!toEl.value)toEl.value=today();
-  var from=fromEl.value,to=toEl.value,laneId=document.getElementById("repLane").value;
-  var list=tasksAddedInRange(from,to,laneId||null);
-  var done=list.filter(function(t){return t.done;}).length,pending=list.length-done;
-  document.getElementById("repCount").textContent=list.length+" task"+(list.length===1?"":"s");
-  document.getElementById("repSummary").innerHTML=
-    '<div class="rep-totals"><span><b>'+done+'</b>completed</span>'+
-    '<span><b>'+pending+'</b>pending</span>'+
-    '<span><b>'+list.length+'</b>total, this range</span></div>';
-  document.getElementById("repBody").innerHTML=repRowsHtml(list);
+  return tasksAddedInRange(fromEl.value,toEl.value,laneId);
+}
+function renderReportsView(){
+  renderRepLaneOptions("repLane","All lanes");
+  var isToday=(repMode==="today");
+  document.querySelectorAll("[data-rmode]").forEach(function(b){
+    b.setAttribute("aria-checked",b.getAttribute("data-rmode")===repMode?"true":"false");});
+  document.querySelectorAll(".rep-range").forEach(function(el){el.hidden=isToday;});
 
-  document.getElementById("cdrDate").textContent=
-    parseKeyDate(today()).toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"});
-  var cdrLaneId=document.getElementById("cdrLane").value;
-  var cdrList=currentDayList(cdrLaneId||null);
-  var cdrDone=cdrList.filter(function(t){return t.done;}).length;
-  document.getElementById("cdrPreview").innerHTML=
-    '<div class="rep-totals"><span><b>'+cdrDone+'</b>completed today</span>'+
-    '<span><b>'+(cdrList.length-cdrDone)+'</b>still open</span>'+
-    '<span><b>'+cdrList.length+'</b>total</span></div>'+repRowsHtml(cdrList);
+  var list=repCurrentList();
+  var done=list.filter(function(t){return t.done;}).length,open=list.length-done;
+  document.getElementById("repCount").textContent=isToday
+    ? parseKeyDate(today()).toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"})
+    : list.length+" task"+(list.length===1?"":"s");
+  document.getElementById("repSub").textContent=isToday
+    ? "What's done today, plus everything still sitting open — for one lane, or all of them."
+    : "Completed and pending tasks recorded in the lanes, filtered by the date they were added.";
+  document.getElementById("repSummary").innerHTML=
+    '<div class="rep-totals"><span><b>'+done+'</b>'+(isToday?"completed today":"completed")+'</span>'+
+    '<span><b>'+open+'</b>'+(isToday?"still open":"pending")+'</span>'+
+    '<span><b>'+list.length+'</b>'+(isToday?"total":"total, this range")+'</span></div>';
+  document.getElementById("repBody").innerHTML=repRowsHtml(list);
 }
 function parseKeyDate(k){var p=k.split("-");return new Date(+p[0],+p[1]-1,+p[2]);}
 
@@ -11137,7 +11164,8 @@ document.getElementById("repThisWeek").addEventListener("click",function(){
   document.getElementById("repTo").value=today();
   renderReportsView();
 });
-document.getElementById("cdrLane").addEventListener("change",renderReportsView);
+document.querySelectorAll("[data-rmode]").forEach(function(b){
+  b.addEventListener("click",function(){repMode=b.getAttribute("data-rmode");renderReportsView();});});
 
 /* ---- tiny, dependency-free .xlsx writer -----------------------------------
    One worksheet, inline strings, ZIP "stored" (no compression) - valid per
@@ -11233,15 +11261,18 @@ function downloadXlsx(rows,filename){
   a.href=URL.createObjectURL(xlsxBlob(rows));a.download=filename;a.click();
   setTimeout(function(){URL.revokeObjectURL(a.href);},1000);
 }
-document.getElementById("cdrExport").addEventListener("click",function(){
-  var laneId=document.getElementById("cdrLane").value;
-  var list=currentDayList(laneId||null);
+// Exports exactly what the Reports card is showing - Today or the date range.
+document.getElementById("repExport").addEventListener("click",function(){
+  var laneId=document.getElementById("repLane").value;
+  var list=repCurrentList();
   var rows=[["Lane","Task","Status","Added","Completed"]];
   list.slice().sort(function(a,b){return laneNameOf(a.lane)<laneNameOf(b.lane)?-1:1;}).forEach(function(t){
     rows.push([laneNameOf(t.lane),t.text,t.done?"Done":"Pending",t.added||"",t.done?(t.completedAt||""):""]);
   });
   var label=(laneId?laneNameOf(laneId):"All_lanes").replace(/[^\w-]+/g,"_");
-  downloadXlsx(rows,"prodash-"+label+"-"+today()+".xlsx");
+  var span=repMode==="today"?today()
+    :document.getElementById("repFrom").value+"_to_"+document.getElementById("repTo").value;
+  downloadXlsx(rows,"prodash-"+label+"-"+span+".xlsx");
 });
 
 /* ================= APP WIDGETS =============================================
