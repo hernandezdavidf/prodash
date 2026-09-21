@@ -2510,6 +2510,15 @@ return {
         <svg class="bv-i bv-i-s" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="M1.7 13.7h12.6"/><path d="M3.7 13.7V8.3M7.2 13.7V3.2M10.7 13.7V6.1M14 13.7v-2.6"/></svg>
         <span>Reports</span>
       </button>
+      <!-- A fourth way of looking at the board's week, and the only one with
+           its own data. It sits here rather than as a main tab because it is
+           still "what am I doing with my days" - but unlike the other three it
+           does not read S.tasks at all, which is why it carries its own
+           accent and its own internal sections. -->
+      <button class="sub-tab" id="bvExercise" data-bview="exercise" role="tab" aria-selected="false" aria-controls="view-exercise">
+        <svg class="bv-i bv-i-s" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="M2.2 6.2v3.6M4.4 4.6v6.8M11.6 4.6v6.8M13.8 6.2v3.6M4.4 8h7.2"/></svg>
+        <span>Exercise</span>
+      </button>
     </div>
   </div>
 
@@ -2587,6 +2596,105 @@ return {
         <button class="laf-save" id="cdrExport">Export to Excel</button>
       </div>
       <div id="cdrPreview"></div>
+    </div>
+  </div>
+
+  <!-- ===================== Exercise & Workouts =========================
+       Visually separate from the rest of the Board, as the brief asked, but
+       built from the same vocabulary: the same card, the same sub-tab
+       pennants, the same month grid as the Personal Calendar. "Separate" here
+       means it reads as its own place, not as a second design language.
+
+       Terracotta is the accent throughout. It is this palette's attention
+       colour and is otherwise reserved for things that need you - which is
+       exactly what a streak about to lapse is. -->
+  <div id="view-exercise" class="board-only" role="tabpanel" aria-labelledby="bvExercise" tabindex="-1" hidden>
+
+    <!-- The streak banner leads, because it is the one number that answers
+         "am I actually doing this" at a glance. It is deliberately NOT the
+         only measure on the screen: the two figures beside it exist so a
+         broken streak does not read as nothing accomplished. -->
+    <div class="ex-hero">
+      <div class="ex-streak">
+        <div class="ex-streak-n" id="exStreakN">0</div>
+        <div class="ex-streak-l">day streak</div>
+      </div>
+      <div class="ex-hero-facts">
+        <div><b id="exBest">0</b><span>longest streak</span></div>
+        <div><b id="exWk">0</b><span>sessions this week</span></div>
+        <div><b id="exTotal">0</b><span>sessions logged</span></div>
+      </div>
+      <div class="ex-hero-note" id="exStreakNote"></div>
+    </div>
+
+    <div class="bview ex-nav">
+      <div class="sub-tabs" role="tablist" aria-label="Exercise sections">
+        <button class="sub-tab on" id="exNavToday" data-xt="today" role="tab" aria-selected="true" aria-controls="ex-pane-today">
+          <svg class="bv-i bv-i-s" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="M8 2.6v5.4l3.4 2"/><circle cx="8" cy="8" r="6.2"/></svg>
+          <span>Today</span>
+        </button>
+        <button class="sub-tab" id="exNavCal" data-xt="cal" role="tab" aria-selected="false" aria-controls="ex-pane-cal">
+          <svg class="bv-i bv-i-s" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><rect x="1.8" y="3" width="12.4" height="11.2" rx="1.6"/><path d="M1.8 6.6h12.4M5.2 1.8v2.4M10.8 1.8v2.4"/></svg>
+          <span>Calendar</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ---------------- Today (and any other single day) ---------------- -->
+    <div id="ex-pane-today" role="tabpanel" aria-labelledby="exNavToday" tabindex="-1">
+      <div class="card">
+        <h2>
+          <button class="ex-step" id="exPrev" title="Previous day" aria-label="Previous day">&lsaquo;</button>
+          <span id="exDayTitle">Today</span>
+          <button class="ex-step" id="exNext" title="Next day" aria-label="Next day">&rsaquo;</button>
+          <button class="h2-add" id="exToday" title="Jump back to today">Today</button>
+        </h2>
+        <div class="sub" id="exDaySub"></div>
+
+        <div class="ex-acts">
+          <button class="um-btn ex-primary" id="exAddWorkout">+ Add a workout</button>
+          <button class="um-btn" id="exAddRest">Mark as a rest day</button>
+        </div>
+
+        <div id="exSessions"></div>
+      </div>
+
+      <!-- Food and drink sits with the day's training, not in a tab of its
+           own, because the brief's reason for having it at all is being able
+           to look at the two together. -->
+      <div class="card">
+        <h2>What I ate and drank</h2>
+        <div class="sub">Jot it down, nothing more. No calories, no portions &mdash; this is a note, not a nutrition tracker.</div>
+        <form id="exMealForm" class="ex-meal-form" autocomplete="off">
+          <input id="exMealTime" type="time" aria-label="Time">
+          <select id="exMealKind" aria-label="Food or drink">
+            <option value="food">Food</option>
+            <option value="drink">Drink</option>
+          </select>
+          <input id="exMealName" placeholder="What was it?" maxlength="80" aria-label="What was it">
+          <button class="um-btn" type="submit">Add</button>
+        </form>
+        <div id="exMeals"></div>
+      </div>
+    </div>
+
+    <!-- ---------------- Calendar ---------------- -->
+    <div id="ex-pane-cal" role="tabpanel" aria-labelledby="exNavCal" tabindex="-1" hidden>
+      <div class="card">
+        <h2>
+          <button class="ex-step" id="exCalPrev" title="Previous month" aria-label="Previous month">&lsaquo;</button>
+          <span id="exCalTitle"></span>
+          <button class="ex-step" id="exCalNext" title="Next month" aria-label="Next month">&rsaquo;</button>
+        </h2>
+        <div class="sub">A trained day is filled, a rest day is outlined, a planned-but-missed day is marked. Tap any day to open it.</div>
+        <div id="exCalBody"></div>
+        <div class="ex-legend">
+          <span><i class="ex-k done"></i>Completed</span>
+          <span><i class="ex-k plan"></i>Planned</span>
+          <span><i class="ex-k rest"></i>Rest day</span>
+          <span><i class="ex-k miss"></i>Missed</span>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -3328,6 +3436,138 @@ return {
      job, not an emergency: the app still works, one field on one screen does
      not. Red here would compete with the actual failures .pf-msg.err reports
      directly above it. */
+  /* ===================== Exercise & Workouts =========================
+     Terracotta-accented so the section reads as its own place at a glance,
+     while every shape - card, pennant, month grid - is borrowed from the rest
+     of the board. Separate, not foreign. */
+  #view-exercise[hidden]{display:none}
+
+  .ex-hero{display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+    background:var(--terra-lt);border:1px solid var(--terra);border-radius:14px;
+    padding:16px 18px;margin-bottom:14px}
+  .ex-streak{display:flex;align-items:baseline;gap:8px;flex:none}
+  /* The one genuinely large number on the screen. Weight and size extremes
+     rather than a timid step up - and the serif, because this is a headline
+     figure, not a data cell. */
+  .ex-streak-n{font-family:var(--serif);font-size:54px;font-weight:800;line-height:.9;
+    color:var(--terra-ink);font-variant-numeric:tabular-nums}
+  .ex-streak-l{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--terra-ink)}
+  .ex-hero-facts{display:flex;gap:20px;flex-wrap:wrap;margin-left:auto}
+  .ex-hero-facts div{display:flex;flex-direction:column;gap:1px}
+  .ex-hero-facts b{font-size:19px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums}
+  .ex-hero-facts span{font-size:11px;color:var(--muted);letter-spacing:.02em}
+  .ex-hero-note{flex-basis:100%;font-size:12.5px;color:var(--terra-ink);line-height:1.5}
+  .ex-hero-note:empty{display:none}
+
+  .ex-nav{margin-bottom:12px}
+
+  /* Day stepper in the card heading. Kept quiet: the heading is the subject,
+     these only move it. */
+  .ex-step{background:none;border:1px solid var(--line);border-radius:8px;
+    width:28px;height:28px;font-size:17px;line-height:1;cursor:pointer;
+    color:var(--ink);flex:none}
+  .ex-step:hover{border-color:var(--terra);color:var(--terra-ink)}
+
+  .ex-acts{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 14px}
+  .um-btn.ex-primary{border-color:var(--terra);color:var(--terra-ink);font-weight:700}
+  .um-btn.ex-primary:hover:not(:disabled){background:var(--terra);color:var(--on-warm);border-color:var(--terra)}
+
+  /* ---- a session ---- */
+  .ex-sess{border:1px solid var(--line);border-radius:12px;margin-bottom:11px;
+    background:var(--paper);overflow:hidden}
+  .ex-sess.done{border-color:var(--olive)}
+  .ex-sess.rest{background:var(--ivory);border-style:dashed}
+  .ex-sess-h{display:flex;align-items:center;gap:9px;padding:11px 13px;
+    border-bottom:1px solid var(--line)}
+  .ex-sess.rest .ex-sess-h{border-bottom:0}
+  .ex-sess-n{font-weight:800;font-size:15px;color:var(--ink);flex:1;min-width:0;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ex-sess.done .ex-sess-n{color:var(--forest-ink)}
+  .ex-sess-meta{font-size:11.5px;color:var(--muted);white-space:nowrap}
+  .ex-mini{background:none;border:0;padding:3px 6px;border-radius:6px;cursor:pointer;
+    font-size:11.5px;color:var(--muted);font-weight:600}
+  .ex-mini:hover{background:var(--ivory);color:var(--ink)}
+  .ex-mini.warn:hover{background:var(--alert-lt);color:var(--alert-ink)}
+
+  .ex-ex{padding:9px 13px;border-bottom:1px solid var(--line)}
+  .ex-ex:last-child{border-bottom:0}
+  .ex-ex-h{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+  .ex-ex-n{font-weight:700;font-size:13.5px;color:var(--ink);flex:1;min-width:0}
+  .ex-sets{display:flex;flex-wrap:wrap;gap:6px}
+  /* A set is a tap target first and a data cell second - this is used mid-rep
+     with one hand. 34px minimum, and the whole chip toggles, not a checkbox
+     inside it. */
+  .ex-set{display:flex;align-items:center;gap:6px;min-height:34px;
+    padding:5px 10px;border:1px solid var(--line);border-radius:9px;
+    background:var(--paper);cursor:pointer;font-size:12.5px;color:var(--ink);
+    font-variant-numeric:tabular-nums}
+  .ex-set:hover{border-color:var(--terra)}
+  .ex-set.on{background:var(--olive-lt);border-color:var(--olive);color:var(--forest-ink);font-weight:700}
+  .ex-set-i{width:15px;height:15px;border:1.5px solid var(--sage);border-radius:4px;
+    flex:none;position:relative;background:var(--paper)}
+  .ex-set.on .ex-set-i{background:var(--forest);border-color:var(--forest)}
+  .ex-set.on .ex-set-i::after{content:"";position:absolute;left:4px;top:1px;
+    width:4px;height:8px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(42deg)}
+  .ex-set-add{border-style:dashed;color:var(--muted);font-weight:600}
+
+  .ex-empty{padding:22px 14px;text-align:center;color:var(--muted);font-size:13px;
+    border:1px dashed var(--line);border-radius:12px}
+
+  /* ---- food and drink ---- */
+  .ex-meal-form{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}
+  .ex-meal-form input,.ex-meal-form select{padding:8px 10px;font:inherit;font-size:13px;
+    border:1px solid var(--line);border-radius:9px;background:var(--paper);color:var(--ink)}
+  .ex-meal-form #exMealName{flex:1;min-width:150px}
+  .ex-meal-form input:focus,.ex-meal-form select:focus{outline:2px solid var(--terra);
+    outline-offset:-1px;border-color:var(--terra)}
+  .ex-meal{display:flex;align-items:center;gap:10px;padding:9px 2px;
+    border-bottom:1px solid var(--line);font-size:13.5px}
+  .ex-meal:last-child{border-bottom:0}
+  .ex-meal-t{font-size:11.5px;color:var(--muted);width:52px;flex:none;
+    font-variant-numeric:tabular-nums}
+  .ex-meal-k{font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;
+    padding:2px 6px;border-radius:5px;flex:none;
+    background:var(--ivory);color:var(--muted);border:1px solid var(--line)}
+  .ex-meal-k.drink{background:var(--olive-lt);color:var(--forest-ink);border-color:var(--olive)}
+  .ex-meal-n{flex:1;min-width:0;color:var(--ink)}
+
+  /* ---- calendar ---- */
+  .ex-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+  .ex-dow{font-size:10.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;
+    color:var(--sage);text-align:center;padding-bottom:4px}
+  .ex-cell{aspect-ratio:1;border:1px solid var(--line);border-radius:9px;
+    background:var(--paper);cursor:pointer;padding:5px;
+    display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:3px}
+  .ex-cell:hover{border-color:var(--terra)}
+  .ex-cell.out{opacity:.38}
+  .ex-cell.today{box-shadow:inset 0 0 0 2px var(--terra)}
+  .ex-cell-d{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .ex-dot{width:9px;height:9px;border-radius:50%;flex:none}
+  .ex-cell.st-done{background:var(--olive-lt);border-color:var(--olive)}
+  .ex-cell.st-done .ex-cell-d{color:var(--forest-ink);font-weight:800}
+  .ex-cell.st-rest{border-style:dashed}
+  .ex-cell.st-miss{background:var(--alert-lt);border-color:var(--alert)}
+  .ex-cell.st-plan{border-color:var(--terra);border-style:dashed}
+  .ex-cell-n{font-size:9.5px;color:var(--muted);line-height:1.15;text-align:center;
+    overflow:hidden;max-height:22px}
+
+  .ex-legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;
+    font-size:11.5px;color:var(--muted)}
+  .ex-legend span{display:flex;align-items:center;gap:6px}
+  .ex-k{width:13px;height:13px;border-radius:4px;border:1px solid var(--line);flex:none}
+  .ex-k.done{background:var(--olive-lt);border-color:var(--olive)}
+  .ex-k.plan{border-color:var(--terra);border-style:dashed}
+  .ex-k.rest{border-style:dashed}
+  .ex-k.miss{background:var(--alert-lt);border-color:var(--alert)}
+
+  @media (max-width:560px){
+    .ex-hero{gap:12px}
+    .ex-streak-n{font-size:44px}
+    .ex-hero-facts{margin-left:0;gap:14px}
+    .ex-cell-n{display:none}
+  }
+
   .um-stale{margin:10px 0;padding:10px 12px;border-radius:8px;font-size:12.5px;line-height:1.55;
     background:var(--terra-lt);color:var(--ink);border:1px solid var(--terra);border-left-width:4px}
   .um-stale[hidden]{display:none}
@@ -4212,7 +4452,23 @@ var NOTE_MAX=2000;
    An unknown value falling back to "classic" is also what makes this safe to
    sync: a device on an older build hands this a boardView it has never heard
    of, and vice versa. */
-var BOARD_VIEWS={classic:1,checklist:1,reports:1};
+var BOARD_VIEWS={classic:1,checklist:1,reports:1,exercise:1};
+
+/* Exercise & Workouts. Declared up here with the other norm()-time constants,
+   for the reason spelled out above: norm() runs during initial execution, so a
+   `var` further down the file hoists as undefined and every clamp it feeds
+   silently never fires.
+
+   EX_NAVS is the section inside the Exercise sub-tab, kept in S so the tab
+   reopens where you left it - the same courtesy S.boardView does for the Board.
+   The DATE you were looking at deliberately is NOT kept: coming back to the app
+   tomorrow and landing on yesterday would be wrong every time. */
+var EX_NAVS={today:1,cal:1};
+var EX_UNITS={kg:1,lb:1};
+// Longest a workout, exercise or food entry name may be. Same reasoning as
+// NOTE_MAX: these reach the sheet-free local store, but they also travel
+// through sync and history, and an unbounded string is an unbounded document.
+var EX_NAME_MAX=80;
 
 function norm(s){
   if(!s||typeof s!=="object")s={};
@@ -4327,6 +4583,89 @@ function norm(s){
     if(typeof x.at!=="number")x.at=0;
   });
   if(["clocks","bible","prompter"].indexOf(s.wgLast)<0)s.wgLast="clocks";
+
+  /* ---- Exercise & Workouts ----
+     workouts: one row per SESSION, not per day - "multiple workouts per day"
+     is the spec, and a day-keyed map could not hold two. KEYED, so a session
+     logged on the phone at the gym and another logged on the laptop at home
+     both survive a merge; for a record of what you actually did, losing the
+     losing side is the one outcome that makes the whole feature pointless.
+
+       {id, d:"YYYY-MM-DD", n, rest, done, at, ex:[...], note}
+
+     A REST DAY is an ordinary row with rest:true and no exercises. Modelling
+     it as a row rather than a flag on a date means it merges, moves and
+     deletes like everything else, and it is what lets the streak treat a
+     planned rest as neutral instead of a gap.
+
+     Every row is repaired rather than dropped where it can be: a session with
+     a broken exercise list is still a record that you trained that day.
+     Rows with no id or no date cannot be merged or placed, so those do go. */
+  if(!Array.isArray(s.workouts))s.workouts=[];
+  s.workouts=s.workouts.filter(function(w){
+    return w&&typeof w==="object"&&typeof w.id==="string"&&w.id&&
+           typeof w.d==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(w.d);
+  });
+  s.workouts.forEach(function(w){
+    w.n=(typeof w.n==="string"?w.n:"").slice(0,EX_NAME_MAX);
+    w.rest=!!w.rest;
+    w.done=!!w.done;
+    if(typeof w.at!=="number")w.at=0;
+    if(typeof w.note!=="string"||!w.note.trim())delete w.note;
+    else w.note=w.note.slice(0,NOTE_MAX);
+    /* A rest day never carries exercises. Absent and empty must not read as
+       different objects to diffOps(), which compares by JSON.stringify - the
+       same rule the task sub-notes follow. */
+    if(w.rest){ delete w.ex; return; }
+    if(!Array.isArray(w.ex)){ delete w.ex; return; }
+    w.ex=w.ex.filter(function(e){
+      return e&&typeof e==="object"&&typeof e.id==="string"&&e.id;
+    }).map(function(e){
+      var o={id:e.id,n:(typeof e.n==="string"?e.n:"").slice(0,EX_NAME_MAX),sets:[]};
+      if(Array.isArray(e.sets)){
+        o.sets=e.sets.filter(function(x){
+          return x&&typeof x==="object"&&typeof x.id==="string"&&x.id;
+        }).map(function(x){
+          var t={id:x.id,done:!!x.done};
+          /* reps, weight and duration are all OPTIONAL and independent: a set
+             may be 12 reps, or 40kg x 8, or a 20-minute hold with neither.
+             Absent stays absent rather than becoming 0, because "0 reps" and
+             "reps not tracked for this movement" are different claims and the
+             progress report has to tell them apart. */
+          if(typeof x.reps==="number"&&isFinite(x.reps)&&x.reps>0)t.reps=Math.min(9999,Math.round(x.reps));
+          if(typeof x.w==="number"&&isFinite(x.w)&&x.w>0)t.w=Math.round(x.w*100)/100;
+          if(t.w!==undefined)t.u=EX_UNITS[x.u]?x.u:"kg";
+          if(typeof x.dur==="number"&&isFinite(x.dur)&&x.dur>0)t.dur=Math.min(1440,Math.round(x.dur));
+          return t;
+        });
+      }
+      if(!o.sets.length)delete o.sets;
+      return o;
+    });
+    if(!w.ex.length)delete w.ex;
+  });
+
+  /* meals: food and drink notes, deliberately NOT a nutrition tracker. No
+     calories, no macros, no portion maths - the spec asked for lightweight and
+     flexible, and the moment this grows a calorie field it becomes a thing
+     that has to be right rather than a thing you jot. KEYED for the same
+     reason as workouts. */
+  if(!Array.isArray(s.meals))s.meals=[];
+  s.meals=s.meals.filter(function(m){
+    return m&&typeof m==="object"&&typeof m.id==="string"&&m.id&&
+           typeof m.d==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(m.d)&&
+           typeof m.n==="string"&&m.n.trim()!=="";
+  });
+  s.meals.forEach(function(m){
+    m.n=m.n.slice(0,EX_NAME_MAX);
+    m.kind=(m.kind==="drink")?"drink":"food";
+    if(typeof m.t!=="string"||!/^\d{2}:\d{2}$/.test(m.t))m.t="";
+    if(typeof m.note!=="string"||!m.note.trim())delete m.note;
+    else m.note=m.note.slice(0,NOTE_MAX);
+    if(typeof m.at!=="number")m.at=0;
+  });
+
+  if(!EX_NAVS[s.exNav])s.exNav="today";
   return s;
 }
 function load(){
@@ -4586,7 +4925,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="4.14";
+var APP_VERSION="4.15";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -4597,6 +4936,7 @@ var APP_VERSION="4.14";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-21T20:00:00+08:00",text:"A new Exercise section on the Board, beside Classic view, Consolidated checklist and Reports. It has its own day view and its own calendar, and it does not touch your lanes or tasks at all. On any day you can add a workout, put exercises under it, and add sets carrying reps, weight and minutes -- each set is a button you tap as you finish it, and the whole workout ticks itself off when the last set goes in. A workout you did not plan can be added to today in two taps. You can also mark a day as a rest day, which matters for the streak. The streak counts days you completed something, and a day you marked as rest is skipped rather than counted against you -- so planning a rest no longer looks like giving up. Today is never counted as a break while it is still today. Beside the streak are your longest run, sessions this week and total sessions, because a streak that has just ended should not read as though nothing happened. The calendar fills a day you trained, outlines a rest day, and marks a day you planned something and did not do it; tapping any day opens it. Underneath the day there is a place to jot what you ate and drank, with a time -- deliberately just a note, not a calorie counter. Graphs and the written reports are still to come."},
   {ts:"2026-09-16T12:00:00+08:00",text:"Sign in with Google, and a profile you can actually edit. The sign-in card now offers Google as well as a password, and a new person can start an account that way -- Google fills in the name and email, and you finish with a username, a password and a secret question. The password is still asked for on purpose: an account that only Google can open is one you cannot get into when Google is unavailable, and one you would be locked out of the moment you disconnected it. If you try Google with an address that already has a ProDash account, it will not merge them -- it asks you to sign in with your password first and connect Google from your profile, because anyone could have typed your address into the sign-up form and nobody ever checked. The login box now takes your email as well as your username. Your profile page has grown up: you can change your own nickname at last, change your own password, disconnect Google, sign out every other device you have left yourself logged in on, and delete your account outright if you want to -- that one is permanent and asks for your password and your username typed back. Google's button only appears on the hosted app with a connection; opening the file directly still works exactly as it always did, with your password. Needs the Worker redeployed -- until it is, the profile page says so and leaves those controls switched off."},
   {ts:"2026-09-16T00:00:00+08:00",text:"Opening ProDash on a new device no longer starts with a question. The first screen used to ask for the address of your server before it would even show a login form -- on a new phone, after reinstalling the app, or any time a browser cleared its storage. It was the same answer every time, and it is the one thing you cannot look up from the phone you are holding at 3am. The app now knows its own address, so a fresh device goes straight to Log in. Nothing changed for a device you are already signed in on. The old screen is still there behind 'Change server' on the sign-in card, for pointing one device somewhere else, and it now has a 'Use the built-in address' link to undo a mistyped one."},
   {ts:"2026-09-14T15:00:00+08:00",text:"A new widget: Teleprompter. Open Widgets and it sits beside World Clocks and the Bible. Type or paste a script, give it a title if you like (it borrows the first line if you don't), and press Start prompter -- or tap the play button beside any saved script to go straight in. The script fills the screen in large type on your theme's deepest colour, with a line a third of the way down marking where your eye should be, and scrolls smoothly at a pace you set. Speed is measured in lines, so making the text bigger never changes how fast you have to read. Play from the top gives you a three-second countdown to get settled; resuming after a pause does not. Restart goes back to the top with a countdown, Stop goes back to the top and waits. Size and Spacing change as you drag them without losing your place. While it plays the controls fade away after a couple of seconds, and a stray tap only brings them back -- it will not pause you or press a button by accident. Drag the text to catch up or skip ahead without stopping it, and your phone's screen stays awake while it runs. On a keyboard: Space plays and pauses, R restarts, the up and down arrows change speed, and Escape exits. Full screen is there where your browser allows it, and on an Android phone there is a Landscape button too; if a browser refuses either, it tells you rather than doing nothing. Your scripts sync to your other devices and appear in Board History like everything else. Your speed, size and spacing do not -- they stay with each device, because the text size that is right on a laptop is far too big for a phone. Anything you were typing and had not saved is still there if the page reloads."},
@@ -4660,8 +5000,8 @@ var APP_VERSION_HISTORY=[
    pushed" is per-account, though - it tracks a specific board's revisions. */
 var DEV_KEY="prodash.deviceId", DEV_NAME_KEY="prodash.deviceName", PUSHED_KEY=PDAuth.ns("prodash.pushedUpTo");
 var HIST_CAP=400, CKPT_EVERY=25, BATCH_MS=2500;
-var BOARD_KEYS=["tasks","log","days","events","lanes","rituals","theme","palette","hiddenBlocks","plans","roll","boardView","expenses","cur","subs","subSkip","zones","scripts","bibleVer","bibleAt","bibleSize","wgLast"];
-var KEYED=["tasks","events","lanes","rituals","expenses","subs","zones","scripts"], MAPS=["log","days","plans"], SCALARS=["theme","palette","roll","boardView","cur","bibleVer","bibleAt","bibleSize","wgLast"];
+var BOARD_KEYS=["tasks","log","days","events","lanes","rituals","theme","palette","hiddenBlocks","plans","roll","boardView","expenses","cur","subs","subSkip","zones","scripts","bibleVer","bibleAt","bibleSize","wgLast","workouts","meals","exNav"];
+var KEYED=["tasks","events","lanes","rituals","expenses","subs","zones","scripts","workouts","meals"], MAPS=["log","days","plans"], SCALARS=["theme","palette","roll","boardView","cur","bibleVer","bibleAt","bibleSize","wgLast","exNav"];
 // Plain arrays of primitive ids (not objects with their own .id, so KEYED's
 // per-item union doesn't apply) compared by CONTENT, not reference - a
 // cloned snapshot never shares object identity with the live array even
@@ -6016,6 +6356,7 @@ function setBoardView(v){
   document.getElementById("boardCols").hidden=(v!=="classic");
   document.getElementById("checklist").hidden=(v!=="checklist");
   document.getElementById("view-reports").hidden=(v!=="reports");
+  document.getElementById("view-exercise").hidden=(v!=="exercise");
   document.querySelectorAll("[data-bview]").forEach(function(b){
     var on=(b.dataset.bview===v);
     b.classList.toggle("on",on);
@@ -6026,6 +6367,9 @@ function setBoardView(v){
   // renderAll() while you are standing on it - a task ticked in another window
   // must not leave a stale count here.
   if(v==="reports")renderReportsView();
+  // Same reasoning: a set ticked on the phone must not leave a stale streak
+  // on the laptop that is sitting on this view when the sync lands.
+  if(v==="exercise")renderExercise();
 }
 
 function toggleTask(id){
@@ -6730,6 +7074,95 @@ function renderAll(){
 document.querySelectorAll("[data-bview]").forEach(function(b){
   b.addEventListener("click",function(){ setBoardView(b.dataset.bview); save(); });
 });
+/* ---- Exercise wiring ----
+   The session list and the calendar are rebuilt with innerHTML on every
+   render, so nothing inside them can hold its own listener - it would be
+   discarded on the next paint. One delegated handler on each container
+   instead, matching with closest() so a click landing on the tick square
+   inside a set button still resolves to the button. That closest() is the
+   same lesson the board's own handlers carry: a button containing an <svg>
+   or a <span> would otherwise never dispatch. */
+document.querySelectorAll("[data-xt]").forEach(function(b){
+  b.addEventListener("click",function(){ exSetNav(b.dataset.xt); save(); });
+});
+
+exEl("exPrev").addEventListener("click",function(){ exDate=shift(exDate,-1); renderExDay(); });
+exEl("exNext").addEventListener("click",function(){ exDate=shift(exDate,1);  renderExDay(); });
+exEl("exToday").addEventListener("click",function(){ exDate=today(); renderExDay(); });
+exEl("exCalPrev").addEventListener("click",function(){
+  var p=dparts(exCalCursor); exCalCursor=monthKey(p.y,p.m-1)+"-01"; renderExCal();
+});
+exEl("exCalNext").addEventListener("click",function(){
+  var p=dparts(exCalCursor); exCalCursor=monthKey(p.y,p.m+1)+"-01"; renderExCal();
+});
+
+exEl("exAddWorkout").addEventListener("click",function(){ exAddSession(false); });
+exEl("exAddRest").addEventListener("click",function(){ exAddSession(true); });
+exEl("exMealForm").addEventListener("submit",exAddMeal);
+
+exEl("exSessions").addEventListener("click",function(ev){
+  var t;
+  if((t=ev.target.closest("[data-set]"))){
+    var p=t.dataset.set.split("|"); exToggleSet(p[0],p[1],p[2]); return;
+  }
+  if((t=ev.target.closest("[data-sadd]"))){
+    var q=t.dataset.sadd.split("|"); exAddSet(q[0],q[1]); return;
+  }
+  if((t=ev.target.closest("[data-eadd]"))){ exAddExercise(t.dataset.eadd); return; }
+  if((t=ev.target.closest("[data-edel]"))){
+    var r=t.dataset.edel.split("|"), w=exFind(r[0]);
+    if(w&&w.ex){ w.ex=w.ex.filter(function(e){return e.id!==r[1];}); if(!w.ex.length)delete w.ex; exSave(); }
+    return;
+  }
+  if((t=ev.target.closest("[data-wdone]"))){
+    var wd=exFind(t.dataset.wdone);
+    if(wd){
+      wd.done=!wd.done;
+      /* Marking a session done ticks its outstanding sets, and un-marking it
+         leaves them alone. Finishing a workout means you did the sets; undoing
+         the label does not mean you undid them. */
+      if(wd.done)(wd.ex||[]).forEach(function(e){ (e.sets||[]).forEach(function(x){ x.done=true; }); });
+      exSave();
+    }
+    return;
+  }
+  if((t=ev.target.closest("[data-wren]"))){
+    var wr=exFind(t.dataset.wren);
+    if(wr){
+      var n=(prompt("Rename this workout",wr.n||"")||"").trim();
+      if(n){ wr.n=n.slice(0,EX_NAME_MAX); exSave(); }
+    }
+    return;
+  }
+  if((t=ev.target.closest("[data-wdel]"))){
+    var wx=exFind(t.dataset.wdel);
+    if(wx && confirm("Delete “"+(wx.n||"this workout")+"”? This cannot be undone.")){
+      S.workouts=S.workouts.filter(function(w){return w.id!==t.dataset.wdel;});
+      exSave();
+    }
+    return;
+  }
+});
+
+exEl("exMeals").addEventListener("click",function(ev){
+  var t=ev.target.closest("[data-mdel]");
+  if(!t)return;
+  S.meals=S.meals.filter(function(m){return m.id!==t.dataset.mdel;});
+  exSave();
+});
+
+/* Tapping a day on the calendar opens it in Today rather than editing in
+   place: the day view already knows how to show sessions, sets and food, and
+   a second editor would be a second thing to keep in step. */
+exEl("exCalBody").addEventListener("click",function(ev){
+  var t=ev.target.closest("[data-exday]");
+  if(!t)return;
+  exDate=t.dataset.exday;
+  exSetNav("today");
+  renderExDay();
+  exSave();
+});
+
 document.getElementById("ritAddBtn").addEventListener("click",addRitual);
 ["ritName","ritTag","ritTarget"].forEach(function(id){
   document.getElementById(id).addEventListener("keydown",function(e){if(e.key==="Enter")addRitual();});});
@@ -8037,6 +8470,338 @@ document.querySelector(".tabbar").addEventListener("keydown",function(e){
 var calView="month", calCursor=today();
 var MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
 var DOW=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+/* ===================== Exercise & Workouts ==========================
+
+   Reads S.workouts and S.meals and nothing else on the board. It does not
+   touch S.tasks, S.events or the lanes, which is why it can sit inside the
+   Board's switcher without entangling itself with the other three views.
+
+   The day it is showing is deliberately NOT persisted. Which SECTION you were
+   on is (S.exNav), because that is a preference; which DAY is not, because
+   coming back tomorrow and landing on yesterday would be wrong every time. */
+var exDate = today();
+var exCalCursor = today();
+
+function exEl(id){ return document.getElementById(id); }
+
+/* Sessions on a day, oldest first. at is the creation stamp, not a start
+   time - the brief never asked when a workout began, and inventing a field
+   nobody fills means sorting on a blank. */
+function exOn(k){
+  return (S.workouts||[]).filter(function(w){return w.d===k;})
+                         .sort(function(a,b){return (a.at||0)-(b.at||0);});
+}
+function exMealsOn(k){
+  return (S.meals||[]).filter(function(m){return m.d===k;})
+    .sort(function(a,b){
+      // Untimed entries sink below timed ones rather than sorting as midnight,
+      // which would put "forgot to note the time" at the top of the morning.
+      if(!a.t&&!b.t)return (a.at||0)-(b.at||0);
+      if(!a.t)return 1;
+      if(!b.t)return -1;
+      return a.t<b.t?-1:a.t>b.t?1:0;
+    });
+}
+function exSets(w){
+  var n=0;
+  (w.ex||[]).forEach(function(e){ n+=(e.sets||[]).length; });
+  return n;
+}
+function exSetsDone(w){
+  var n=0;
+  (w.ex||[]).forEach(function(e){ (e.sets||[]).forEach(function(x){ if(x.done)n++; }); });
+  return n;
+}
+/* A session counts as completed when it says so. w.done is set explicitly -
+   by the Done button, or automatically when the last set is ticked - rather
+   than being recomputed from the sets every time, because a session with no
+   sets at all (a run, a swim) still has to be completable. */
+function exDoneSess(w){ return !w.rest && w.done; }
+
+/* The state of a DAY, which is what the calendar paints and the streak walks.
+     done    - at least one completed session
+     planned - sessions exist, none completed, and the day has not passed
+     missed  - sessions exist, none completed, and the day is over
+     rest    - a rest day was planned and nothing was completed
+     empty   - nothing at all
+   A completed session outranks a rest day: if you trained on a day you had
+   marked as rest, you trained. */
+function exDayState(k){
+  var list=exOn(k);
+  if(!list.length)return "empty";
+  if(list.some(exDoneSess))return "done";
+  if(list.some(function(w){return w.rest;}))return "rest";
+  return (k<today())?"missed":"planned";
+}
+
+/* THE STREAK RULE, stated once, here, because a streak nobody can explain is
+   a number nobody trusts:
+
+     - a day with a completed session EXTENDS the streak
+     - a day you marked as a rest day is SKIPPED - it neither extends nor
+       breaks it, which is the whole point of planning rest
+     - today is skipped while it is still today, so an unfinished day never
+       shows the streak as already broken
+     - anything else BREAKS it
+
+   Walking backwards from today rather than forwards from the first record
+   means the answer is "how long have I kept this up", which is the question
+   the number is for. */
+function exStreak(){
+  var k=today(), n=0, guard=0;
+  while(guard++ < 3650){
+    var st=exDayState(k);
+    if(st==="done"){ n++; }
+    else if(st==="rest"){ /* neutral */ }
+    else if(k===today()){ /* today is not over; it cannot break anything yet */ }
+    else break;
+    k=shift(k,-1);
+  }
+  return n;
+}
+
+/* Longest run the same rule has ever produced. Walks forward from the first
+   recorded day so it costs one pass, not one pass per day. */
+function exBestStreak(){
+  var days=(S.workouts||[]).map(function(w){return w.d;}).sort();
+  if(!days.length)return 0;
+  var k=days[0], end=today(), best=0, run=0, guard=0;
+  while(k<=end && guard++ < 3650){
+    var st=exDayState(k);
+    if(st==="done"){ run++; if(run>best)best=run; }
+    else if(st==="rest"){ /* neutral */ }
+    else { run=0; }
+    k=shift(k,1);
+  }
+  return best;
+}
+
+function exWeekCount(){
+  var n=0, k=shift(today(),-6);
+  for(var i=0;i<7;i++){ if(exDayState(k)==="done")n++; k=shift(k,1); }
+  return n;
+}
+
+function exPretty(k){
+  var d=parseKeyDate(k), t=today();
+  if(k===t)return "Today";
+  if(k===shift(t,-1))return "Yesterday";
+  if(k===shift(t,1))return "Tomorrow";
+  return d.toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"});
+}
+
+// ---- rendering -----------------------------------------------------------
+function renderExercise(){
+  exEl("exStreakN").textContent=exStreak();
+  exEl("exBest").textContent=exBestStreak();
+  exEl("exWk").textContent=exWeekCount();
+  exEl("exTotal").textContent=(S.workouts||[]).filter(function(w){return !w.rest;}).length;
+
+  /* One line of plain language under the numbers. A streak is only motivating
+     while it is legible; "3" on its own tells you nothing about whether today
+     is still open. */
+  var st=exDayState(today()), note=exEl("exStreakNote");
+  note.textContent =
+      st==="done"    ? "Today is in. Keep it going."
+    : st==="rest"    ? "Rest day today — your streak is safe."
+    : st==="planned" ? "Today's workout is still waiting."
+    : exStreak()>0   ? "Nothing logged today yet. Rest days don't break a streak — mark one if that's the plan."
+    :                  "No streak yet. One completed session starts it.";
+
+  exSetNav(S.exNav);
+  renderExDay();
+  renderExCal();
+}
+
+function exSetNav(v){
+  if(!EX_NAVS[v])v="today";
+  S.exNav=v;
+  exEl("ex-pane-today").hidden=(v!=="today");
+  exEl("ex-pane-cal").hidden=(v!=="cal");
+  document.querySelectorAll("[data-xt]").forEach(function(b){
+    var on=(b.dataset.xt===v);
+    b.classList.toggle("on",on);
+    b.setAttribute("aria-selected",on?"true":"false");
+  });
+}
+
+function renderExDay(){
+  exEl("exDayTitle").textContent=exPretty(exDate);
+  var list=exOn(exDate), meals=exMealsOn(exDate);
+  var doneN=list.filter(exDoneSess).length;
+  var sets=0,setsDone=0;
+  list.forEach(function(w){ sets+=exSets(w); setsDone+=exSetsDone(w); });
+  exEl("exDaySub").textContent =
+    parseKeyDate(exDate).toLocaleDateString(undefined,{weekday:"long",year:"numeric",month:"long",day:"numeric"}) +
+    (list.length ? " — "+doneN+" of "+list.length+" done"+(sets?", "+setsDone+"/"+sets+" sets":"") : "");
+
+  exEl("exSessions").innerHTML = list.length
+    ? list.map(exSessHTML).join("")
+    : '<div class="ex-empty">Nothing planned for this day.<br>Add a workout, or mark it as a rest day so it doesn’t count against your streak.</div>';
+
+  exEl("exMeals").innerHTML = meals.length
+    ? meals.map(function(m){
+        return '<div class="ex-meal" data-meal="'+esc(m.id)+'">'+
+          '<span class="ex-meal-t">'+esc(m.t||"—")+'</span>'+
+          '<span class="ex-meal-k'+(m.kind==="drink"?" drink":"")+'">'+(m.kind==="drink"?"Drink":"Food")+'</span>'+
+          '<span class="ex-meal-n">'+esc(m.n)+(m.note?' <span class="sub">'+esc(m.note)+'</span>':'')+'</span>'+
+          '<button class="ex-mini warn" data-mdel="'+esc(m.id)+'" title="Delete">Delete</button>'+
+        '</div>';
+      }).join("")
+    : '<div class="ex-empty">Nothing noted for this day.</div>';
+}
+
+function exSessHTML(w){
+  if(w.rest){
+    return '<div class="ex-sess rest" data-w="'+esc(w.id)+'">'+
+      '<div class="ex-sess-h">'+
+        '<span class="ex-sess-n">'+esc(w.n||"Rest day")+'</span>'+
+        '<span class="ex-sess-meta">Planned rest — does not break your streak</span>'+
+        '<button class="ex-mini warn" data-wdel="'+esc(w.id)+'">Remove</button>'+
+      '</div></div>';
+  }
+  var sets=exSets(w), done=exSetsDone(w);
+  return '<div class="ex-sess'+(w.done?" done":"")+'" data-w="'+esc(w.id)+'">'+
+    '<div class="ex-sess-h">'+
+      '<span class="ex-sess-n">'+esc(w.n||"Workout")+'</span>'+
+      '<span class="ex-sess-meta">'+(sets?done+"/"+sets+" sets":"no sets yet")+'</span>'+
+      '<button class="ex-mini" data-wdone="'+esc(w.id)+'">'+(w.done?"Undo":"Done")+'</button>'+
+      '<button class="ex-mini" data-wren="'+esc(w.id)+'">Rename</button>'+
+      '<button class="ex-mini warn" data-wdel="'+esc(w.id)+'">Delete</button>'+
+    '</div>'+
+    (w.ex||[]).map(function(e){
+      return '<div class="ex-ex">'+
+        '<div class="ex-ex-h">'+
+          '<span class="ex-ex-n">'+esc(e.n||"Exercise")+'</span>'+
+          '<button class="ex-mini warn" data-edel="'+esc(w.id)+'|'+esc(e.id)+'">Remove</button>'+
+        '</div>'+
+        '<div class="ex-sets">'+
+          (e.sets||[]).map(function(x,i){
+            return '<button class="ex-set'+(x.done?" on":"")+'" data-set="'+esc(w.id)+'|'+esc(e.id)+'|'+esc(x.id)+'">'+
+              '<span class="ex-set-i"></span>'+(i+1)+'. '+esc(exSetLabel(x))+'</button>';
+          }).join("")+
+          '<button class="ex-set ex-set-add" data-sadd="'+esc(w.id)+'|'+esc(e.id)+'">+ set</button>'+
+        '</div>'+
+      '</div>';
+    }).join("")+
+    '<div class="ex-ex"><button class="um-btn" data-eadd="'+esc(w.id)+'">+ Add an exercise</button></div>'+
+  '</div>';
+}
+
+/* What a set says on its chip. Only the parts that were actually recorded -
+   an empty set reads "set", not "0 reps x 0kg", because those are claims
+   about your training that nobody made. */
+function exSetLabel(x){
+  var bits=[];
+  if(x.reps!==undefined)bits.push(x.reps+" reps");
+  if(x.w!==undefined)bits.push(x.w+(x.u||"kg"));
+  if(x.dur!==undefined)bits.push(x.dur+" min");
+  return bits.length?bits.join(" · "):"set";
+}
+
+function renderExCal(){
+  var p=dparts(exCalCursor);
+  exEl("exCalTitle").textContent=parseKeyDate(exCalCursor)
+    .toLocaleDateString(undefined,{month:"long",year:"numeric"});
+  var first=monthKey(p.y,p.m)+"-01", lead=dowOf(first), tk=today();
+  var start=addDays(first,-lead), out='<div class="ex-grid">'+
+    DOW.map(function(d){return '<div class="ex-dow">'+d+'</div>';}).join("");
+  for(var i=0;i<42;i++){
+    var k=addDays(start,i), kp=dparts(k);
+    var inMonth=(kp.m===p.m&&kp.y===p.y), st=exDayState(k), list=exOn(k);
+    var label=list.length?(list[0].n||(list[0].rest?"Rest":"Workout")):"";
+    out+='<div class="ex-cell'+(inMonth?"":" out")+(k===tk?" today":"")+
+         (st!=="empty"?" st-"+(st==="missed"?"miss":st):"")+'" data-exday="'+k+'">'+
+      '<span class="ex-cell-d">'+kp.d+'</span>'+
+      (list.length>1?'<span class="ex-cell-n">'+list.length+' sessions</span>'
+                    :(label?'<span class="ex-cell-n">'+esc(label)+'</span>':''))+
+    '</div>';
+  }
+  exEl("exCalBody").innerHTML=out+'</div>';
+}
+
+// ---- mutations -----------------------------------------------------------
+/* save() persists and schedules the sync; it does NOT repaint. Every mutating
+   handler in this file follows the same "save();renderAll();" pattern the rest
+   of the board uses - this just names it, because the first version of the
+   Exercise tab called save() alone and the data was written correctly while
+   the screen sat there showing "Nothing planned for this day."
+
+   renderAll() rather than renderExercise(): the header's own counters and the
+   day view read the same board, and leaving them a repaint behind is the class
+   of bug this project keeps rediscovering. renderAll() routes back here
+   through setBoardView() anyway. */
+function exSave(){ save(); renderAll(); }
+
+function exFind(id){
+  var out=null;
+  (S.workouts||[]).forEach(function(w){ if(w.id===id)out=w; });
+  return out;
+}
+function exAddSession(rest){
+  var n = rest ? "Rest day" : (prompt("What is this workout called?","Workout")||"").trim();
+  if(!rest && !n) return;
+  var w={id:rid("wk_"),d:exDate,n:n.slice(0,EX_NAME_MAX),rest:!!rest,done:false,at:Date.now()};
+  S.workouts.push(w);
+  exSave();
+}
+function exAddExercise(wid){
+  var w=exFind(wid); if(!w||w.rest)return;
+  var n=(prompt("Exercise name","")||"").trim();
+  if(!n)return;
+  if(!Array.isArray(w.ex))w.ex=[];
+  w.ex.push({id:rid("ee_"),n:n.slice(0,EX_NAME_MAX),sets:[]});
+  exSave();
+}
+/* Adding a set copies the previous one. Sets in a workout are near-identical
+   by nature, and retyping "10 reps, 40kg" five times is the difference
+   between a tool you use at the gym and one you use once. */
+function exAddSet(wid,eid){
+  var w=exFind(wid); if(!w)return;
+  var ex=null; (w.ex||[]).forEach(function(e){ if(e.id===eid)ex=e; });
+  if(!ex)return;
+  if(!Array.isArray(ex.sets))ex.sets=[];
+  var last=ex.sets[ex.sets.length-1];
+  var reps=prompt("Reps (leave blank to skip)", last&&last.reps!==undefined?String(last.reps):"");
+  if(reps===null)return;
+  var wt=prompt("Weight (leave blank to skip)", last&&last.w!==undefined?String(last.w):"");
+  if(wt===null)return;
+  var dur=prompt("Minutes (leave blank to skip)", last&&last.dur!==undefined?String(last.dur):"");
+  if(dur===null)return;
+  var t={id:rid("st_"),done:false};
+  if(String(reps).trim()!==""&&isFinite(+reps)&&+reps>0)t.reps=Math.round(+reps);
+  if(String(wt).trim()!==""&&isFinite(+wt)&&+wt>0){ t.w=Math.round(+wt*100)/100; t.u=(last&&last.u)||"kg"; }
+  if(String(dur).trim()!==""&&isFinite(+dur)&&+dur>0)t.dur=Math.round(+dur);
+  ex.sets.push(t);
+  exSave();
+}
+function exToggleSet(wid,eid,sid){
+  var w=exFind(wid); if(!w)return;
+  (w.ex||[]).forEach(function(e){
+    if(e.id!==eid)return;
+    (e.sets||[]).forEach(function(x){ if(x.id===sid)x.done=!x.done; });
+  });
+  /* Ticking the last outstanding set finishes the session, and unticking one
+     reopens it. Doing this here rather than in exDoneSess() keeps w.done a
+     recorded fact that the user can also set by hand - a run has no sets to
+     tick and still has to be completable. */
+  var total=exSets(w);
+  if(total)w.done=(exSetsDone(w)===total);
+  exSave();
+}
+function exAddMeal(e){
+  e.preventDefault();
+  var n=exEl("exMealName").value.trim();
+  if(!n)return;
+  S.meals.push({
+    id:rid("ml_"), d:exDate, t:exEl("exMealTime").value||"",
+    kind:exEl("exMealKind").value==="drink"?"drink":"food",
+    n:n.slice(0,EX_NAME_MAX), at:Date.now()
+  });
+  exEl("exMealName").value="";
+  exSave();
+}
 
 function weekStartOf(k){return addDays(k,-dowOf(k));}
 function nextOccurrence(e,from){

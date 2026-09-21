@@ -2,6 +2,81 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-21 — Exercise & Workouts, part one (v4.15)
+
+A fourth Board sub-view beside Classic, Consolidated Checklist and Reports.
+Unlike the other three it reads none of `S.tasks`, `S.events` or the lanes —
+which is exactly why it can sit in the same switcher without entangling itself
+with them. Visually separate, same vocabulary: same card, same pennants, same
+month grid as the Personal Calendar, terracotta throughout because this
+palette reserves that colour for things that want your attention.
+
+This is the core. Graphs and the six written reports are the second pass; the
+data model was settled first so they are not built on a shape that turns out
+wrong.
+
+### Data
+
+Two new KEYED arrays, `workouts` and `meals`, plus the `exNav` scalar.
+
+A workout is one **session**, not one day — "multiple workouts per day" was in
+the brief, and a day-keyed map cannot hold two. KEYED so a session logged on
+the phone at the gym and another logged on the laptop at home both survive the
+merge; for a record of what you actually did, losing a side makes the whole
+feature pointless.
+
+A **rest day is an ordinary row** with `rest:true` and no exercises, rather
+than a flag on a date. It merges, moves and deletes like everything else, and
+it is what lets the streak treat planned rest as neutral.
+
+Sets carry reps, weight and duration, each **independent and optional**: a set
+may be 12 reps, or 40kg × 8, or a 20-minute hold with neither. Absent stays
+absent rather than becoming 0, because "0 reps" and "not tracked for this
+movement" are different claims and the progress report will have to tell them
+apart.
+
+`meals` is deliberately not a nutrition tracker. No calories, no macros, no
+portions. The moment it grows a calorie field it becomes a thing that has to be
+*right* rather than a thing you jot.
+
+### The streak rule, stated once
+
+- a day with a completed session **extends** it
+- a day marked as a rest day is **skipped** — neither extends nor breaks
+- **today is skipped while it is still today**, so an unfinished day never
+  shows the streak as already broken
+- anything else **breaks** it
+
+It is walked backwards from today, so the number answers "how long have I kept
+this up". The hero shows it large, with longest run, sessions this week and
+total sessions beside it — a streak that has just ended must not read as though
+nothing was ever accomplished.
+
+### Two bugs worth recording
+
+**The wiring block landed inside a `forEach`.** Inserted by line number, it
+came to rest between `b.addEventListener(...)` and the `});` that closed the
+`[data-bview]` loop — so it ran once per pennant. Four pennants, four delegated
+listeners on the same container, and one tap on "+ set" added four sets. Found
+by instrumenting the block with a counter rather than by reading it again;
+three rounds of staring at `exAddSet` had already failed to see it, because
+nothing was wrong with `exAddSet`.
+
+**Every mutation saved and nothing repainted.** `save()` persists and schedules
+the sync; it does not render — the rest of the board pairs it as
+`save();renderAll();`. The data was written correctly while the screen sat
+there reading "Nothing planned for this day." Now named `exSave()` so the pair
+cannot drift apart again.
+
+### Verified
+
+Driven in a browser against the working tree: adding a workout, an exercise and
+sets; one tap adding exactly one set; the last set auto-completing its session;
+a rest day rendering and the streak jumping it (today done + rest + a session
+two days back = 2); food notes; and the calendar filling, outlining and ringing
+the right days, with a tap opening that day.
+
+
 ## 2026-09-21 — A review gate that cannot be talked round
 
 Two additions, no change to the app itself: an independent code-reviewer
