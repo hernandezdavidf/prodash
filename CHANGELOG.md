@@ -2,6 +2,67 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-21 — Today's workout, rebuilt around the exercise (v4.16)
+
+The exercise becomes the unit of the screen: a collapsible card with a set
+table under it, replacing the row of chips. Modelled on a reference layout the
+user supplied, translated into this palette rather than copied — the reference
+is orange-on-white throughout; here terracotta means *wants you* and forest
+green means *done*, which are the two roles this app already assigns them.
+
+### The card
+
+Header carries icon tile, name, `3 sets · 1/3`, a three-dot menu and a chevron.
+Tapping anywhere on the header that is not a button folds the card.
+
+Completion is the state change: green tile, name struck through, `· done`
+appended, and the card **folds itself shut** — so what is left to do is what
+stays in front of you. An explicit chevron tap reopens it, because a finished
+card still has to be correctable.
+
+Rows strike through individually as each set is ticked, across every cell
+including the numbers inside their inputs. The line has to cross the whole row
+or it reads as a note about the label rather than about the set.
+
+### Adding a set no longer asks three questions
+
+The previous version ran three `prompt()` dialogs per set — reps, weight,
+minutes. That is unusable one-handed between reps, and it made correcting a
+typo mean deleting the set and starting again. Now the row appears immediately,
+**copied from the set above**, and weight and reps are edited in place. Blank
+clears the field rather than writing 0, preserving the distinction the model
+makes between "0 reps" and "not tracked for this movement" — the reports being
+built next depend on it.
+
+### Two details the reference could not know
+
+- The **minutes** column appears only when something in that exercise actually
+  uses it. A permanently empty column is a claim that you forgot to fill it in.
+- The **weight** column is headed with the unit in use, not a hardcoded KG. A
+  set records its own unit, and a header saying KG over pounds is simply wrong.
+
+### The bug this shook out
+
+Finished cards would not fold. `exAddSet()` pins a card open so the row it just
+created is visible, and that pin then outranked the collapse-when-done default
+forever. Fixed by clearing the remembered open/closed state on every tick, so
+the default applies again — the narrowest fix available; an explicit chevron
+toggle still wins right up until the next set is ticked.
+
+Open/closed and menu state live in a module-level `exUI`, deliberately not in
+`S`. It is not data, it is where you happen to be looking, and syncing it would
+mean a card folding itself shut on the phone because the laptop collapsed it.
+
+### Verified
+
+Driven in a browser: three sets added with no dialogs; inline weight and reps
+edits persisting; a new set copying the one above; individual rows striking
+through; the card turning green, struck through and folding on the final tick;
+the chevron reopening a finished card; the three-dot menu opening without
+folding the card it sits in. Checked at 375px — no horizontal scroll, tick
+targets intact.
+
+
 ## 2026-09-21 — Exercise & Workouts, part one (v4.15)
 
 A fourth Board sub-view beside Classic, Consolidated Checklist and Reports.

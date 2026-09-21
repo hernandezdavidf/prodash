@@ -3490,26 +3490,106 @@ return {
   .ex-mini:hover{background:var(--ivory);color:var(--ink)}
   .ex-mini.warn:hover{background:var(--alert-lt);color:var(--alert-ink)}
 
-  .ex-ex{padding:9px 13px;border-bottom:1px solid var(--line)}
-  .ex-ex:last-child{border-bottom:0}
-  .ex-ex-h{display:flex;align-items:center;gap:8px;margin-bottom:7px}
-  .ex-ex-n{font-weight:700;font-size:13.5px;color:var(--ink);flex:1;min-width:0}
-  .ex-sets{display:flex;flex-wrap:wrap;gap:6px}
-  /* A set is a tap target first and a data cell second - this is used mid-rep
-     with one hand. 34px minimum, and the whole chip toggles, not a checkbox
-     inside it. */
-  .ex-set{display:flex;align-items:center;gap:6px;min-height:34px;
-    padding:5px 10px;border:1px solid var(--line);border-radius:9px;
-    background:var(--paper);cursor:pointer;font-size:12.5px;color:var(--ink);
-    font-variant-numeric:tabular-nums}
-  .ex-set:hover{border-color:var(--terra)}
-  .ex-set.on{background:var(--olive-lt);border-color:var(--olive);color:var(--forest-ink);font-weight:700}
-  .ex-set-i{width:15px;height:15px;border:1.5px solid var(--sage);border-radius:4px;
-    flex:none;position:relative;background:var(--paper)}
-  .ex-set.on .ex-set-i{background:var(--forest);border-color:var(--forest)}
-  .ex-set.on .ex-set-i::after{content:"";position:absolute;left:4px;top:1px;
-    width:4px;height:8px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(42deg)}
-  .ex-set-add{border-style:dashed;color:var(--muted);font-weight:600}
+
+  /* ---- an exercise, as a collapsible card with a set table ----
+     The session is the outer card; each EXERCISE is one of these. Terracotta
+     while there is work left, forest green once every set is ticked - the two
+     colours this palette already uses for "wants you" and "done", rather than
+     a third vocabulary invented for this screen. */
+  .ex-body{padding:10px 11px 11px;display:flex;flex-direction:column;gap:9px}
+  .ex-none{font-size:12.5px;color:var(--muted);padding:4px 2px}
+
+  .ex-card{border:1px solid var(--line);border-radius:11px;background:var(--paper);
+    overflow:hidden}
+  .ex-card-h{display:flex;align-items:center;gap:10px;padding:10px 11px;cursor:pointer;
+    user-select:none}
+  .ex-card-h:hover{background:var(--ivory)}
+  .ex-ico{width:30px;height:30px;border-radius:9px;flex:none;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--terra-lt);color:var(--terra-ink)}
+  .ex-ico svg{fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round}
+  .ex-card-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+  .ex-card-n{font-weight:800;font-size:14.5px;color:var(--ink);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ex-card-s{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+  /* Finished: green tile, struck-through name, and the whole card settles back
+     so the work still to do is what stands out. */
+  .ex-card.fin{border-color:var(--olive);background:var(--olive-lt)}
+  .ex-card.fin .ex-ico{background:var(--forest);color:var(--on-brand)}
+  .ex-card.fin .ex-card-n{text-decoration:line-through;
+    text-decoration-color:var(--olive);text-decoration-thickness:1.5px;
+    color:var(--forest-ink)}
+  .ex-card.fin .ex-card-s{color:var(--forest-ink)}
+  .ex-card.fin .ex-card-h:hover{background:transparent}
+
+  .ex-dots{background:none;border:0;padding:4px;border-radius:7px;cursor:pointer;
+    color:var(--sage);flex:none;line-height:0}
+  .ex-dots svg{fill:currentColor}
+  .ex-dots:hover{background:var(--ivory);color:var(--ink)}
+  .ex-chev{color:var(--sage);flex:none;line-height:0;transition:transform .16s ease}
+  .ex-chev svg{fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+  .ex-card.open .ex-chev{transform:rotate(180deg)}
+  @media (prefers-reduced-motion:reduce){ .ex-chev{transition:none} }
+
+  .ex-menu{display:flex;gap:6px;padding:0 11px 9px;flex-wrap:wrap}
+
+  .ex-tbl-wrap{border-top:1px solid var(--line);padding:0 11px 10px}
+  .ex-card.fin .ex-tbl-wrap{border-top-color:var(--olive)}
+  .ex-tbl-wrap[hidden]{display:none}
+  .ex-tbl{width:100%;border-collapse:collapse;font-size:13px}
+  .ex-tbl th{font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;
+    color:var(--sage);text-align:left;padding:9px 6px 7px;border-bottom:1px solid var(--line)}
+  .ex-tbl td{padding:4px 6px;border-bottom:1px solid var(--line);vertical-align:middle}
+  .ex-tbl tr:last-child td{border-bottom:0}
+  .ex-tbl .c-set{width:34px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .ex-tbl .c-done{width:52px;text-align:right}
+  .ex-tbl th.c-done{text-align:right}
+
+  /* A ticked row is struck through across every cell, including the numbers in
+     their inputs - the line has to cross the whole row or it reads as a note
+     about the label rather than about the set. */
+  .ex-row.done td{color:var(--muted);text-decoration:line-through;
+    text-decoration-color:var(--olive);text-decoration-thickness:1.5px}
+  .ex-row.done .ex-in{color:var(--muted);text-decoration:line-through;
+    text-decoration-color:var(--olive);text-decoration-thickness:1.5px}
+  .ex-row.done .c-done{text-decoration:none}
+
+  .ex-in{width:100%;min-width:0;box-sizing:border-box;padding:7px 8px;
+    font:inherit;font-size:13px;font-variant-numeric:tabular-nums;
+    color:var(--ink);background:var(--ivory);
+    border:1px solid transparent;border-radius:8px;-moz-appearance:textfield}
+  .ex-in::-webkit-outer-spin-button,.ex-in::-webkit-inner-spin-button{
+    -webkit-appearance:none;margin:0}
+  .ex-in:hover{border-color:var(--line)}
+  .ex-in:focus{outline:2px solid var(--terra);outline-offset:-1px;
+    background:var(--paper);border-color:var(--terra)}
+  .ex-card.fin .ex-in{background:transparent}
+
+  /* 34px square, because this is tapped mid-set with one hand. */
+  .ex-tick{width:34px;height:34px;border-radius:9px;cursor:pointer;
+    border:1.5px solid var(--line);background:var(--paper);position:relative;
+    display:inline-block;vertical-align:middle}
+  .ex-tick:hover{border-color:var(--terra)}
+  .ex-tick.on{background:var(--forest);border-color:var(--forest)}
+  .ex-tick.on::after{content:"";position:absolute;left:12px;top:7px;
+    width:6px;height:13px;border:solid var(--on-brand);border-width:0 2.5px 2.5px 0;
+    transform:rotate(42deg)}
+  .ex-tick:focus-visible{outline:2px solid var(--terra);outline-offset:2px}
+
+  .ex-add-set,.ex-add-ex{margin-top:9px;width:100%;padding:9px;cursor:pointer;
+    font:inherit;font-size:12.5px;font-weight:700;color:var(--terra-ink);
+    background:transparent;border:1px dashed var(--terra);border-radius:9px}
+  .ex-add-set:hover,.ex-add-ex:hover{background:var(--terra-lt)}
+  .ex-add-ex{margin-top:0}
+
+  @media (max-width:480px){
+    .ex-tbl{font-size:12.5px}
+    .ex-tbl th,.ex-tbl td{padding-left:4px;padding-right:4px}
+    .ex-tbl .c-done{width:44px}
+    .ex-tick{width:30px;height:30px}
+    .ex-tick.on::after{left:10px;top:6px;width:5px;height:11px}
+  }
 
   .ex-empty{padding:22px 14px;text-align:center;color:var(--muted);font-size:13px;
     border:1px dashed var(--line);border-radius:12px}
@@ -4925,7 +5005,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="4.15";
+var APP_VERSION="4.16";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -4936,6 +5016,7 @@ var APP_VERSION="4.15";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-21T23:30:00+08:00",text:"Today's workout has been rebuilt around the exercise. Each exercise is now its own card you can fold away, with a proper table underneath it -- set number, weight, reps and a tick box -- instead of a row of chips. The card header tells you where you are at a glance: \"3 sets, 1/3\". Tick a set and the whole row is crossed out. Tick the last one and the card turns green, crosses out its own name, says done and folds itself shut, so what is left to do is what stays in front of you; tap it to open it again if you need to correct something. The biggest change is that adding a set no longer asks you three questions in three pop-up boxes. It just adds the row, copied from the set above, and you type over whatever is different -- which is how it should have worked from the start, because the old way was unusable one-handed between reps and made fixing a typo mean deleting the set. Weight and reps are now edited straight in the table, and leaving a box empty means \"not tracked\" rather than zero. The three dots on each card hold rename and remove. Minutes only get a column when you actually use them, and the weight column is headed with the unit you are using rather than always saying KG."},
   {ts:"2026-09-21T20:00:00+08:00",text:"A new Exercise section on the Board, beside Classic view, Consolidated checklist and Reports. It has its own day view and its own calendar, and it does not touch your lanes or tasks at all. On any day you can add a workout, put exercises under it, and add sets carrying reps, weight and minutes -- each set is a button you tap as you finish it, and the whole workout ticks itself off when the last set goes in. A workout you did not plan can be added to today in two taps. You can also mark a day as a rest day, which matters for the streak. The streak counts days you completed something, and a day you marked as rest is skipped rather than counted against you -- so planning a rest no longer looks like giving up. Today is never counted as a break while it is still today. Beside the streak are your longest run, sessions this week and total sessions, because a streak that has just ended should not read as though nothing happened. The calendar fills a day you trained, outlines a rest day, and marks a day you planned something and did not do it; tapping any day opens it. Underneath the day there is a place to jot what you ate and drank, with a time -- deliberately just a note, not a calorie counter. Graphs and the written reports are still to come."},
   {ts:"2026-09-16T12:00:00+08:00",text:"Sign in with Google, and a profile you can actually edit. The sign-in card now offers Google as well as a password, and a new person can start an account that way -- Google fills in the name and email, and you finish with a username, a password and a secret question. The password is still asked for on purpose: an account that only Google can open is one you cannot get into when Google is unavailable, and one you would be locked out of the moment you disconnected it. If you try Google with an address that already has a ProDash account, it will not merge them -- it asks you to sign in with your password first and connect Google from your profile, because anyone could have typed your address into the sign-up form and nobody ever checked. The login box now takes your email as well as your username. Your profile page has grown up: you can change your own nickname at last, change your own password, disconnect Google, sign out every other device you have left yourself logged in on, and delete your account outright if you want to -- that one is permanent and asks for your password and your username typed back. Google's button only appears on the hosted app with a connection; opening the file directly still works exactly as it always did, with your password. Needs the Worker redeployed -- until it is, the profile page says so and leaves those controls switched off."},
   {ts:"2026-09-16T00:00:00+08:00",text:"Opening ProDash on a new device no longer starts with a question. The first screen used to ask for the address of your server before it would even show a login form -- on a new phone, after reinstalling the app, or any time a browser cleared its storage. It was the same answer every time, and it is the one thing you cannot look up from the phone you are holding at 3am. The app now knows its own address, so a fresh device goes straight to Log in. Nothing changed for a device you are already signed in on. The old screen is still there behind 'Change server' on the sign-in card, for pointing one device somewhere else, and it now has a 'Use the built-in address' link to undo a mistyped one."},
@@ -7108,10 +7189,38 @@ exEl("exSessions").addEventListener("click",function(ev){
   if((t=ev.target.closest("[data-sadd]"))){
     var q=t.dataset.sadd.split("|"); exAddSet(q[0],q[1]); return;
   }
+  /* The three-dot menu, before the header toggle: it sits INSIDE the header,
+     so without this a tap on it would also fold the card it is attached to. */
+  if((t=ev.target.closest("[data-emenu]"))){
+    var mk=t.dataset.emenu.split("|")[1];
+    exUI.menu[mk]=!exUI.menu[mk];
+    renderExDay();
+    return;
+  }
+  // Tapping anywhere else on the header folds or unfolds the exercise.
+  if((t=ev.target.closest("[data-etog]"))){
+    var tk=t.dataset.etog.split("|"), ee=exFindEx(tk[0],tk[1]);
+    if(ee)exUI.open[tk[1]]=!exIsOpen(ee);
+    renderExDay();
+    return;
+  }
+  if((t=ev.target.closest("[data-eren]"))){
+    var rn=t.dataset.eren.split("|"), re=exFindEx(rn[0],rn[1]);
+    if(re){
+      var nn=(prompt("Rename this exercise",re.n||"")||"").trim();
+      if(nn){ re.n=nn.slice(0,EX_NAME_MAX); exUI.menu[rn[1]]=false; exSave(); }
+    }
+    return;
+  }
   if((t=ev.target.closest("[data-eadd]"))){ exAddExercise(t.dataset.eadd); return; }
   if((t=ev.target.closest("[data-edel]"))){
     var r=t.dataset.edel.split("|"), w=exFind(r[0]);
-    if(w&&w.ex){ w.ex=w.ex.filter(function(e){return e.id!==r[1];}); if(!w.ex.length)delete w.ex; exSave(); }
+    if(w&&w.ex&&confirm("Remove this exercise and its sets?")){
+      w.ex=w.ex.filter(function(e){return e.id!==r[1];});
+      if(!w.ex.length)delete w.ex;
+      delete exUI.menu[r[1]]; delete exUI.open[r[1]];
+      exSave();
+    }
     return;
   }
   if((t=ev.target.closest("[data-wdone]"))){
@@ -7142,6 +7251,19 @@ exEl("exSessions").addEventListener("click",function(ev){
     }
     return;
   }
+});
+
+/* Inline cell edits. `change`, not `input`: input fires on every keystroke and
+   each one would save, write a history revision and repaint the table out from
+   under the cursor. change fires on blur or Enter, which is when the value is
+   actually meant. */
+exEl("exSessions").addEventListener("change",function(ev){
+  var el=ev.target.closest(".ex-in");
+  if(!el)return;
+  var row=el.closest("[data-row]");
+  if(!row)return;
+  var p=row.dataset.row.split("|");
+  exEditSet(p[0],p[1],p[2],el.dataset.f,el.value);
 });
 
 exEl("exMeals").addEventListener("click",function(ev){
@@ -8652,6 +8774,42 @@ function renderExDay(){
     : '<div class="ex-empty">Nothing noted for this day.</div>';
 }
 
+/* Per-exercise view state: which cards are open, which have their action row
+   showing. Deliberately NOT in S - it is not data, it is where you happen to
+   be looking, and syncing it would mean a card folding itself shut on the
+   phone because the laptop collapsed it. Same reasoning as exDate. */
+var exUI={open:{},menu:{}};
+
+/* Open unless you closed it - EXCEPT a finished exercise, which folds itself
+   away. That is the point of the card changing state: the work that is left
+   stays in front of you. An explicit toggle always wins, so a completed card
+   can still be opened to correct a mistake. */
+function exIsOpen(e){
+  if(exUI.open[e.id]!==undefined)return exUI.open[e.id];
+  return !exExDone(e);
+}
+function exExSets(e){ return (e.sets||[]).length; }
+function exExDone(e){
+  var s=e.sets||[];
+  return s.length>0 && s.every(function(x){return x.done;});
+}
+/* The weight column is headed with the unit actually in use rather than a
+   hardcoded KG, because a set records its own unit and a board that says KG
+   over pounds is simply wrong. */
+function exUnitOf(e){
+  var u="kg";
+  (e.sets||[]).forEach(function(x){ if(x.u)u=x.u; });
+  return u;
+}
+// Minutes only get a column when something in this exercise actually uses
+// them. A permanently empty column is a claim that you forgot to fill it in.
+function exHasDur(e){
+  return (e.sets||[]).some(function(x){return x.dur!==undefined;});
+}
+
+var EX_ICON='<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false">'+
+  '<path d="M3 7.5v5M5.6 5.4v9.2M14.4 5.4v9.2M17 7.5v5M5.6 10h8.8"/></svg>';
+
 function exSessHTML(w){
   if(w.rest){
     return '<div class="ex-sess rest" data-w="'+esc(w.id)+'">'+
@@ -8661,7 +8819,7 @@ function exSessHTML(w){
         '<button class="ex-mini warn" data-wdel="'+esc(w.id)+'">Remove</button>'+
       '</div></div>';
   }
-  var sets=exSets(w), done=exSetsDone(w);
+  var sets=exSets(w), done=exSetsDone(w), list=w.ex||[];
   return '<div class="ex-sess'+(w.done?" done":"")+'" data-w="'+esc(w.id)+'">'+
     '<div class="ex-sess-h">'+
       '<span class="ex-sess-n">'+esc(w.n||"Workout")+'</span>'+
@@ -8670,34 +8828,83 @@ function exSessHTML(w){
       '<button class="ex-mini" data-wren="'+esc(w.id)+'">Rename</button>'+
       '<button class="ex-mini warn" data-wdel="'+esc(w.id)+'">Delete</button>'+
     '</div>'+
-    (w.ex||[]).map(function(e){
-      return '<div class="ex-ex">'+
-        '<div class="ex-ex-h">'+
-          '<span class="ex-ex-n">'+esc(e.n||"Exercise")+'</span>'+
-          '<button class="ex-mini warn" data-edel="'+esc(w.id)+'|'+esc(e.id)+'">Remove</button>'+
-        '</div>'+
-        '<div class="ex-sets">'+
-          (e.sets||[]).map(function(x,i){
-            return '<button class="ex-set'+(x.done?" on":"")+'" data-set="'+esc(w.id)+'|'+esc(e.id)+'|'+esc(x.id)+'">'+
-              '<span class="ex-set-i"></span>'+(i+1)+'. '+esc(exSetLabel(x))+'</button>';
-          }).join("")+
-          '<button class="ex-set ex-set-add" data-sadd="'+esc(w.id)+'|'+esc(e.id)+'">+ set</button>'+
-        '</div>'+
-      '</div>';
-    }).join("")+
-    '<div class="ex-ex"><button class="um-btn" data-eadd="'+esc(w.id)+'">+ Add an exercise</button></div>'+
+    '<div class="ex-body">'+
+      (list.length ? list.map(function(e){ return exCardHTML(w,e); }).join("")
+                   : '<div class="ex-none">No exercises yet.</div>')+
+      '<button class="ex-add-ex" data-eadd="'+esc(w.id)+'">+ Add an exercise</button>'+
+    '</div>'+
   '</div>';
 }
 
-/* What a set says on its chip. Only the parts that were actually recorded -
-   an empty set reads "set", not "0 reps x 0kg", because those are claims
-   about your training that nobody made. */
-function exSetLabel(x){
-  var bits=[];
-  if(x.reps!==undefined)bits.push(x.reps+" reps");
-  if(x.w!==undefined)bits.push(x.w+(x.u||"kg"));
-  if(x.dur!==undefined)bits.push(x.dur+" min");
-  return bits.length?bits.join(" · "):"set";
+/* One exercise: a header that carries its own completion, and a table of sets
+   underneath it. The header is the control - tapping anywhere on it that is
+   not a button folds the card. */
+function exCardHTML(w,e){
+  var key=esc(w.id)+"|"+esc(e.id);
+  var total=exExSets(e), ticked=(e.sets||[]).filter(function(x){return x.done;}).length;
+  var fin=exExDone(e), open=exIsOpen(e), unit=exUnitOf(e), hasDur=exHasDur(e);
+
+  return '<div class="ex-card'+(fin?" fin":"")+(open?" open":"")+'" data-ex="'+key+'">'+
+    '<div class="ex-card-h" data-etog="'+key+'">'+
+      '<span class="ex-ico">'+EX_ICON+'</span>'+
+      '<span class="ex-card-t">'+
+        '<span class="ex-card-n">'+esc(e.n||"Exercise")+'</span>'+
+        '<span class="ex-card-s">'+
+          (total? total+" set"+(total===1?"":"s")+" · "+ticked+"/"+total
+                : "no sets yet")+
+          (fin?" · done":"")+
+        '</span>'+
+      '</span>'+
+      '<button class="ex-dots" data-emenu="'+key+'" title="More" aria-label="More actions">'+
+        '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">'+
+        '<circle cx="8" cy="3" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="8" cy="13" r="1.3"/></svg>'+
+      '</button>'+
+      '<span class="ex-chev" aria-hidden="true">'+
+        '<svg viewBox="0 0 16 16" width="14" height="14" focusable="false"><path d="M4 6l4 4 4-4"/></svg>'+
+      '</span>'+
+    '</div>'+
+    (exUI.menu[e.id]
+      ? '<div class="ex-menu">'+
+          '<button class="ex-mini" data-eren="'+key+'">Rename exercise</button>'+
+          '<button class="ex-mini warn" data-edel="'+key+'">Remove exercise</button>'+
+        '</div>'
+      : '')+
+    '<div class="ex-tbl-wrap"'+(open?'':' hidden')+'>'+
+      '<table class="ex-tbl">'+
+        '<thead><tr>'+
+          '<th class="c-set">Set</th>'+
+          '<th>Weight ('+esc(unit)+')</th>'+
+          '<th>Reps</th>'+
+          (hasDur?'<th>Min</th>':'')+
+          '<th class="c-done">Done</th>'+
+        '</tr></thead>'+
+        '<tbody>'+
+          (e.sets||[]).map(function(x,i){ return exRowHTML(key,x,i,hasDur); }).join("")+
+        '</tbody>'+
+      '</table>'+
+      '<button class="ex-add-set" data-sadd="'+key+'">+ Add set</button>'+
+    '</div>'+
+  '</div>';
+}
+
+/* A set row. Weight and reps are edited in place - the first version asked for
+   them through three prompt() dialogs per set, which is unusable with one hand
+   between reps, and made correcting a typo mean deleting the set. */
+function exRowHTML(key,x,i,hasDur){
+  var id=key+"|"+esc(x.id);
+  return '<tr class="ex-row'+(x.done?" done":"")+'" data-row="'+id+'">'+
+    '<td class="c-set">'+(i+1)+'</td>'+
+    '<td><input class="ex-in" type="number" inputmode="decimal" min="0" step="0.5" '+
+      'value="'+(x.w!==undefined?x.w:"")+'" placeholder="–" data-f="w" aria-label="Weight, set '+(i+1)+'"></td>'+
+    '<td><input class="ex-in" type="number" inputmode="numeric" min="0" step="1" '+
+      'value="'+(x.reps!==undefined?x.reps:"")+'" placeholder="–" data-f="reps" aria-label="Reps, set '+(i+1)+'"></td>'+
+    (hasDur?'<td><input class="ex-in" type="number" inputmode="numeric" min="0" step="1" '+
+      'value="'+(x.dur!==undefined?x.dur:"")+'" placeholder="–" data-f="dur" aria-label="Minutes, set '+(i+1)+'"></td>':'')+
+    '<td class="c-done">'+
+      '<button class="ex-tick'+(x.done?" on":"")+'" data-set="'+id+'" '+
+        'role="checkbox" aria-checked="'+(x.done?"true":"false")+'" aria-label="Set '+(i+1)+' done"></button>'+
+    '</td>'+
+  '</tr>';
 }
 
 function renderExCal(){
@@ -8757,23 +8964,56 @@ function exAddExercise(wid){
 /* Adding a set copies the previous one. Sets in a workout are near-identical
    by nature, and retyping "10 reps, 40kg" five times is the difference
    between a tool you use at the gym and one you use once. */
+function exFindEx(wid,eid){
+  var w=exFind(wid); if(!w)return null;
+  var out=null; (w.ex||[]).forEach(function(e){ if(e.id===eid)out=e; });
+  return out;
+}
+
+/* Add a set by COPYING the previous one, with no dialogs at all.
+
+   The first version asked three prompt() questions per set. Sets in a workout
+   are near-identical by nature, so that was three dialogs to record something
+   the app could already infer - unusable one-handed between reps, and it made
+   correcting a typo mean deleting the set and starting again. Now the row
+   appears immediately, pre-filled from the set above, and every cell is
+   editable in place. */
 function exAddSet(wid,eid){
-  var w=exFind(wid); if(!w)return;
-  var ex=null; (w.ex||[]).forEach(function(e){ if(e.id===eid)ex=e; });
-  if(!ex)return;
+  var ex=exFindEx(wid,eid); if(!ex)return;
   if(!Array.isArray(ex.sets))ex.sets=[];
   var last=ex.sets[ex.sets.length-1];
-  var reps=prompt("Reps (leave blank to skip)", last&&last.reps!==undefined?String(last.reps):"");
-  if(reps===null)return;
-  var wt=prompt("Weight (leave blank to skip)", last&&last.w!==undefined?String(last.w):"");
-  if(wt===null)return;
-  var dur=prompt("Minutes (leave blank to skip)", last&&last.dur!==undefined?String(last.dur):"");
-  if(dur===null)return;
   var t={id:rid("st_"),done:false};
-  if(String(reps).trim()!==""&&isFinite(+reps)&&+reps>0)t.reps=Math.round(+reps);
-  if(String(wt).trim()!==""&&isFinite(+wt)&&+wt>0){ t.w=Math.round(+wt*100)/100; t.u=(last&&last.u)||"kg"; }
-  if(String(dur).trim()!==""&&isFinite(+dur)&&+dur>0)t.dur=Math.round(+dur);
+  if(last){
+    if(last.reps!==undefined)t.reps=last.reps;
+    if(last.w!==undefined){ t.w=last.w; t.u=last.u||"kg"; }
+    if(last.dur!==undefined)t.dur=last.dur;
+  }
   ex.sets.push(t);
+  /* Adding a set to a finished exercise reopens it - otherwise the card would
+     stay folded and collapsed over the very row you just asked for. */
+  exUI.open[eid]=true;
+  exSave();
+}
+
+/* One cell edited in place. Blank CLEARS the field rather than writing 0: the
+   model draws a distinction between "0 reps" and "not tracked for this
+   movement", and the reports downstream depend on it. */
+function exEditSet(wid,eid,sid,field,raw){
+  var ex=exFindEx(wid,eid); if(!ex)return;
+  var set=null; (ex.sets||[]).forEach(function(x){ if(x.id===sid)set=x; });
+  if(!set)return;
+  var s=String(raw==null?"":raw).trim();
+  if(s===""||!isFinite(+s)||+s<=0){
+    delete set[field];
+    if(field==="w")delete set.u;
+  }else if(field==="w"){
+    set.w=Math.round(+s*100)/100;
+    if(!set.u)set.u="kg";
+  }else if(field==="reps"){
+    set.reps=Math.min(9999,Math.round(+s));
+  }else if(field==="dur"){
+    set.dur=Math.min(1440,Math.round(+s));
+  }
   exSave();
 }
 function exToggleSet(wid,eid,sid){
@@ -8788,6 +9028,15 @@ function exToggleSet(wid,eid,sid){
      tick and still has to be completable. */
   var total=exSets(w);
   if(total)w.done=(exSetsDone(w)===total);
+  /* Drop this exercise's remembered open/closed state so the default applies
+     again - which means the card folds itself the moment its last set goes in,
+     and unfolds if you untick one.
+
+     Without this it never folded at all: exAddSet() pins the card open so the
+     row it just created is visible, and that pin then outranked the default
+     forever. Clearing it on a tick is the narrowest fix - an explicit chevron
+     toggle still wins right up until the next set is ticked. */
+  delete exUI.open[eid];
   exSave();
 }
 function exAddMeal(e){
