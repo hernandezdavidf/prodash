@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PROJECT_DIR:-.}/tools/stop-gate.ps1\"",
+            "timeout": 120,
+            "statusMessage": "Running ProDash validation..."
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(powershell -NoProfile -ExecutionPolicy Bypass -File tools/validate.ps1)",
+      "Bash(powershell -NoProfile -ExecutionPolicy Bypass -File tools/mark-verified.ps1)"
+    ]
+  }
+}

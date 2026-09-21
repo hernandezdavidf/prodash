@@ -2,6 +2,82 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-21 — A review gate that cannot be talked round
+
+Two additions, no change to the app itself: an independent code-reviewer
+subagent, and a Stop hook that refuses to let a turn be reported as finished
+while validation is failing.
+
+### The constraint that shaped it
+
+There is no Node and no Python on this machine, so there is no test runner to
+call and no linter to install. What there is, is a codebase with a documented
+history of specific repeatable failures — every one of them in this file, and
+every one statically detectable. `tools/validate.ps1` checks those, in under a
+second, with nothing but PowerShell and git:
+
+- sheet schema width (`COL_COUNT` = `F` map = `SHEET_HEADERS`)
+- app/Worker version lockstep (`WORKER_MIN` ≤ `WORKER_VERSION`)
+- `APP_VERSION` and `CACHE_VERSION` bumped whenever the app is touched
+- every `getElementById` target actually exists in the markup
+- every `BOARD_KEYS` entry classified into exactly one merge class
+- no secret tracked by git or sitting in the folder
+- the changelog mirrored into `APP_VERSION_HISTORY` for real deploys
+
+Each check exists because the thing it checks for actually broke once. The
+comment above each one says which.
+
+### Three things the gate got wrong about itself first
+
+Worth recording, because they are the failure modes of validation tooling in
+general and this one caught them in its own first hour:
+
+1. **It silently skipped three checks and reported PASS.** `$ErrorActionPreference
+   = "Stop"` plus git's ordinary stderr (the CRLF notice fires on nearly every
+   call here) made the enclosing `try` abort, and `catch { }` swallowed it. A
+   validator that quietly skips is worse than none. Every git call now goes
+   through one helper that cannot throw, and a check that cannot run says so as
+   a finding instead of vanishing.
+2. **A brace-balance check could not detect a stray `{` handed to it.** The
+   comments in this project are full of prose apostrophes — "don't", "Google's"
+   — each of which opens a string as far as a regex is concerned, so the
+   stripper swallowed whole regions including the injected fault. Deleted
+   rather than patched: a check that cannot detect a fault you give it is false
+   assurance.
+3. **`$findings.Count` on a single finding reported the advisory total as −1.**
+   A scalar is not a one-element array in PowerShell.
+
+### The browser is the parser, and the gate now knows it
+
+Nothing here can parse this JavaScript. Windows' JScript host is ES5 and the
+app uses `const` and template literals; headless Chrome and Edge are installed
+but produce no output when spawned from this environment. So the gate does not
+pretend. `tools/mark-verified.ps1` records a SHA-256 of `index.html` and
+`worker.js` after a real in-browser load, and validation fails while the files
+have moved on — which turns "I should check it in a browser" into a step that
+cannot be skipped quietly. Running the marker without loading the page is
+forging a test result, and the reviewer agent is told to treat evidence of that
+as Critical.
+
+### The gate blocks, but it is not a deadlock
+
+`tools/stop-gate.ps1` exits 2 on failure, which refuses turn completion and
+hands the findings back with instructions to diagnose, fix and re-run. It does
+that up to three times per session; after that it stands down with a loud
+message, because a gate that can never be escaped would leave a session unable
+to report the very failure it is blocking on.
+
+### The reviewer
+
+`.claude/agents/code-reviewer.md` reviews independently, classifies findings
+Critical / High / Medium / Low, and is told what makes this project unusual:
+one file, no build step, `file://` and offline are load-bearing, two deploy
+pipelines that cannot land together, and a changelog full of decisions that
+look like mistakes until you read why. It is explicitly instructed not to
+rewrite correct code, not to propose a build step, and to say plainly what it
+could not verify rather than let silence read as a pass.
+
+
 ## 2026-09-16 — Sign in with Google, and a profile with controls in it (v4.14 / Worker 4.10)
 
 Google becomes a second front door to an ordinary ProDash account — not a
