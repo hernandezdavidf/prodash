@@ -2,6 +2,28 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-24 — Phase 2, and phases that queue (v4.21)
+
+**Phase 2 — Early Intermediate** joins the catalogue: sixteen movements over
+the same three circuits, on harder variations (Bulgarian split squat, RDL
+hinge with a 3-sec eccentric, lateral lunge, single-leg glute bridge, side
+plank, shoulder taps). Same 2×/week × 4 weeks suggestion as Phase 1. As
+promised when `EX_PROGRAMS` was introduced, it is one array entry and nothing
+else — no new rendering, no new schema.
+
+### Phases chain instead of colliding
+
+`exProgStart()` now anchors a new program to the day after the last **bounded**
+schedule ends, rather than to the next matching weekday from today. Installing
+Phase 2 while Phase 1 is still running puts it in weeks 5–8, which is what the
+program says it is.
+
+Only a schedule with an `until` defers a new one: an open-ended repeat never
+ends, and waiting for it would mean waiting forever. `exProgChainEnd()` is the
+one place that decision is made, and the confirm names the resulting date and
+says it comes after the current program — a suggestion that reads wrong is
+visible before anything is written.
+
 ## 2026-09-24 — Ready-made programs in the Exercise Library (v4.20)
 
 A fifteen-exercise program is now one tap instead of an evening of typing.

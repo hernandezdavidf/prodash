@@ -5252,7 +5252,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="4.20";
+var APP_VERSION="4.21";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -5263,6 +5263,7 @@ var APP_VERSION="4.20";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-24T18:00:00+08:00",text:"Phase 2, Early Intermediate, joins Phase 1 in the ready-made programs: sixteen movements across the same three circuits, built on harder variations -- Bulgarian split squats, Romanian deadlift hinges, lateral lunges, single-leg glute bridges, side planks and shoulder taps. Phases now queue instead of colliding. If a program is already scheduled with an end date, a new one starts the day after that finishes rather than on top of it, so adding Phase 2 while Phase 1 is still running puts it in weeks 5 to 8 where it belongs. The date is in the question it asks, so you can see where it landed before agreeing to it."},
   {ts:"2026-09-24T12:00:00+08:00",text:"The Exercise Library can now install a whole program in one tap. Open Exercise, then Library, and use \"Add a ready-made program\" -- the first one is Phase 1, Beginner Foundation: the warm-up, the five-exercise leg circuit and the four-exercise core circuit, all fifteen movements with their rounds and target reps already filled in. It then offers to put it on your calendar every Monday and Thursday for four weeks. Say yes and those days fill themselves in on the Exercise calendar and in Today, with a Start this workout button waiting; nothing is recorded until you actually start one. Exercises can now carry a circuit heading, so Warm-up, Leg circuit and Abs/core stay visibly separate while you work through them. It is an ordinary saved workout once installed -- rename it, change the reps, reschedule it or delete it like any other."},
   {ts:"2026-09-22T15:00:00+08:00",text:"Reports is now one section instead of two. A Today / Date range switch at the top picks what you are looking at: Today is the old Current Day Report (everything done today plus everything still open), Date range is the old Reports list (everything added between two dates). There is one Lane filter for both, and Export to Excel now sits at the end of the filter row and exports exactly the list on screen -- so you can finally export a date range too, not only today."},
   {ts:"2026-09-22T12:00:00+08:00",text:"The section switcher inside Board is now one rounded bar holding all four sections, with the one you are on raised out of it as a pale pill in brand green -- instead of the four banner-shaped pennants. The Expense Tracker's Every expense / Recurring subscriptions switcher changed with it, because they are the same control and should not look like two different ideas. It picks up whichever palette you are on, so the bar is cream on Sienna and Retro and near-black in the dark themes, and the raised pill is always a step lighter than the bar it sits in, which is what makes it look lifted rather than just coloured. On a phone the icons drop away so all four still fit on one line -- a switcher that has to be scrolled to see the last section is not really a switcher. Nothing moved and nothing was renamed; this is only how it looks."},
@@ -9296,6 +9297,46 @@ var EX_PROGRAMS=[{
     {g:"Abs/core · 2 rounds",   n:"Forearm plank, 20–40 sec hold",         sets:2},
     {g:"Abs/core · 2 rounds",   n:"Heel taps (lying) — 10–12 per side",    sets:2, reps:12}
   ]
+},{
+  key:"p2",
+  n:"Phase 2 — Early Intermediate",
+  blurb:"Weeks 5–8+ · harder variations · legs and core",
+  note:"Phase 2, from week 5 onwards. Goal: more strength, stability and core challenge. Still mostly bodyweight, but harder variations and more load on the core. Same weekly frequency as Phase 1 (2–3×).\n\n"+
+       "Each SET below is one ROUND of that circuit.\n"+
+       "Warm-up: 1–2 rounds, and more dynamic than Phase 1.\n"+
+       "Leg circuit: 2–3 rounds. Rest 45–90 sec between exercises, 60–90 sec between rounds.\n"+
+       "Abs/core: 2–3 rounds. Rest 30–45 sec between exercises.\n\n"+
+       "Form cues: split squat — back foot on a chair or sofa, front foot forward, lower until both knees are about 90°. This is your main squat pattern now. "+
+       "Romanian deadlift — hold a backpack or dumbbell if you have one, otherwise bodyweight with a slow tempo, 3 sec down and 1 sec up; feel the hamstrings stretch. "+
+       "Lateral lunge — step out to the side, sit back into that hip, keep the other leg straight, push back to the centre. "+
+       "Single-leg glute bridge — keep the hips level. "+
+       "Calf raises — hold something for balance if you need it. "+
+       "Dead bug — straighten the legs more to make it harder, but only as far as the lower back stays down. "+
+       "Bicycle crunch — slow, elbow to opposite knee, don't yank your neck. "+
+       "Side plank — stack or stagger the feet, straight line from head to feet. "+
+       "Reverse crunch — curl the pelvis up, lower abs rather than momentum. "+
+       "Shoulder taps — keep the hips as still as you can.",
+  sch:{days:[1,4],weeks:4},
+  ex:[
+    {g:"Warm-up · 1–2 rounds", n:"Leg swings, front/back and side/side — per leg", sets:1, reps:10},
+    {g:"Warm-up · 1–2 rounds", n:"Bodyweight squat",                       sets:1, reps:10},
+    {g:"Warm-up · 1–2 rounds", n:"Reverse lunge — per leg",                sets:1, reps:6},
+    {g:"Warm-up · 1–2 rounds", n:"Glute bridge",                           sets:1, reps:10},
+    {g:"Warm-up · 1–2 rounds", n:"Plank shoulder taps — 6–8 per side",     sets:1, reps:8},
+
+    {g:"Leg circuit · 2–3 rounds", n:"Split squat / Bulgarian — 8–10 per leg",      sets:3, reps:10},
+    {g:"Leg circuit · 2–3 rounds", n:"Romanian deadlift hinge, 3 sec down — 10–12", sets:3, reps:12},
+    {g:"Leg circuit · 2–3 rounds", n:"Lateral lunge — 8–10 per side",               sets:3, reps:10},
+    {g:"Leg circuit · 2–3 rounds", n:"Single-leg glute bridge — 8–10 per leg",      sets:3, reps:10},
+    {g:"Leg circuit · 2–3 rounds", n:"Calf raises, single-leg if possible — per leg",sets:3, reps:15},
+    {g:"Leg circuit · 2–3 rounds", n:"Step-downs from a low step — 6–8 per leg (optional)", sets:2, reps:8},
+
+    {g:"Abs/core · 2–3 rounds", n:"Dead bug, longer lever — 8–10 per side",  sets:3, reps:10},
+    {g:"Abs/core · 2–3 rounds", n:"Bicycle crunch, controlled — 10–12 per side", sets:3, reps:12},
+    {g:"Abs/core · 2–3 rounds", n:"Side plank, 20–30 sec per side",          sets:3},
+    {g:"Abs/core · 2–3 rounds", n:"Reverse crunch or bent-knee leg raise — 10–12", sets:3, reps:12},
+    {g:"Abs/core · 2–3 rounds", n:"Plank shoulder taps — 8–12 per side",     sets:3, reps:12}
+  ]
 }];
 function exProgram(key){
   var p=null;
@@ -9304,13 +9345,28 @@ function exProgram(key){
 }
 /** The program's suggested first date: the next of its earliest weekday, today
     included. A 4-week block that starts on a Monday is what people mean by
-    "weeks 1–4", and defaulting to today would put week 1 half in the past. */
+    "weeks 1–4", and defaulting to today would put week 1 half in the past.
+
+    PHASES CHAIN. If a program is already scheduled and has an end date still
+    ahead, this starts the day after that instead of today - Phase 2 is "weeks
+    5–8", not "weeks 1–4 again, on top". Only a bounded schedule defers a new
+    one: an open-ended repeat never ends, and waiting for it would mean waiting
+    forever. The date is shown in the confirm either way, so a suggestion that
+    reads wrong is visible before anything is written. */
+/** The last day already spoken for by a bounded schedule, or "" if none is. */
+function exProgChainEnd(){
+  var k=today(), end="";
+  (S.wsched||[]).forEach(function(c){
+    if(c.rr&&c.rr.until&&c.rr.until>=k&&c.rr.until>end)end=c.rr.until;
+  });
+  return end;
+}
 function exProgStart(p){
-  var k=today();
-  if(!p.sch||!p.sch.days||!p.sch.days.length)return k;
+  var end=exProgChainEnd(), from=end?addDays(end,1):today();
+  if(!p.sch||!p.sch.days||!p.sch.days.length)return from;
   var want=p.sch.days.slice().sort(function(a,b){return a-b;})[0];
-  for(var i=0;i<7;i++){ if(dowOf(addDays(k,i))===want)return addDays(k,i); }
-  return k;
+  for(var i=0;i<7;i++){ if(dowOf(addDays(from,i))===want)return addDays(from,i); }
+  return from;
 }
 function exProgSchedText(p){
   if(!p.sch)return "";
@@ -9343,8 +9399,11 @@ function exProgInstall(key){
 
   if(p.sch){
     var start=exProgStart(p);
+    var after=!!exProgChainEnd();
     if(confirm("Added “"+p.n+"” to your library.\n\nSchedule it on "+exProgSchedText(p)+
-               "?\n\nStarting "+exPretty(start)+". Nothing is recorded until you actually start a session, "+
+               "?\n\nStarting "+exPretty(start)+
+               (after?", after your current program finishes":"")+
+               ". Nothing is recorded until you actually start a session, "+
                "and you can change or remove the schedule any time.")){
       S.wsched.push({id:rid("sc_"),tpl:t.id,date:start,at:Date.now(),
         rr:{f:"weekly",int:1,days:p.sch.days.slice(),
