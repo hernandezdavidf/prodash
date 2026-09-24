@@ -2745,6 +2745,9 @@ return {
         <div class="sub">Build a workout once and reuse it. Add one to today in a tap, or put it on a repeating schedule &mdash; changing it here never rewrites a session you have already done.</div>
         <div class="ex-acts">
           <button class="um-btn ex-primary" id="exTplNew">+ New saved workout</button>
+          <!-- Ready-made programs. Options are filled from EX_PROGRAMS at boot
+               rather than written here, so the catalogue lives in one place. -->
+          <select class="ex-pick" id="exProgPick" aria-label="Add a ready-made program"></select>
         </div>
         <div id="exLib"></div>
       </div>
@@ -3714,6 +3717,15 @@ return {
   .ex-sub{border-top:1px solid var(--line);padding:9px 0 4px}
   .ex-sub-h{display:flex;align-items:center;gap:8px;margin-bottom:4px}
   .ex-sub-n{font-weight:700;font-size:13px;color:var(--ink);flex:1;min-width:0}
+
+  /* A circuit heading. Terracotta because it is structure rather than content -
+     the same job the lane dividers do in Reports, and it keeps the exercise
+     names themselves as the only black text in the list. Uppercase and small:
+     read as a label at a glance, never mistaken for an exercise. */
+  .ex-grp{font-size:10.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;
+    color:var(--terra-ink);margin:12px 0 2px;padding-bottom:4px;
+    border-bottom:1px solid var(--terra)}
+  .ex-grp:first-child{margin-top:4px}
 
   .ex-sch-form{border:1px solid var(--terra);background:var(--terra-lt);
     border-radius:10px;padding:11px;margin:8px 0}
@@ -4701,6 +4713,14 @@ var EX_NAVS={today:1,cal:1,lib:1};
    movement" are different claims and the reports have to tell them apart. */
 function exCleanExercise(e,withDone){
   var o={id:e.id,n:(typeof e.n==="string"?e.n:"").slice(0,EX_NAME_MAX),sets:[]};
+  /* grp: an optional circuit label - "Warm-up", "Leg circuit", "Abs/core".
+     Consecutive exercises sharing one get a heading above them, and that is
+     ALL it does: it is a label on the exercise, not a container holding it.
+     A grouping object would have meant every loop over t.ex in this file
+     learning to walk two levels, and a program with no circuits paying for a
+     nesting it never uses. Absent stays absent so diffOps(), which compares
+     by JSON.stringify, does not read "" and undefined as a change. */
+  if(typeof e.grp==="string"&&e.grp.trim())o.grp=e.grp.trim().slice(0,EX_GRP_MAX);
   if(Array.isArray(e.sets)){
     o.sets=e.sets.filter(function(x){
       return x&&typeof x==="object"&&typeof x.id==="string"&&x.id;
@@ -4722,6 +4742,8 @@ var EX_UNITS={kg:1,lb:1};
 // NOTE_MAX: these reach the sheet-free local store, but they also travel
 // through sync and history, and an unbounded string is an unbounded document.
 var EX_NAME_MAX=80;
+// A circuit heading is a label, not a sentence.
+var EX_GRP_MAX=40;
 
 function norm(s){
   if(!s||typeof s!=="object")s={};
@@ -5230,7 +5252,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="4.19";
+var APP_VERSION="4.20";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -5241,6 +5263,7 @@ var APP_VERSION="4.19";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-24T12:00:00+08:00",text:"The Exercise Library can now install a whole program in one tap. Open Exercise, then Library, and use \"Add a ready-made program\" -- the first one is Phase 1, Beginner Foundation: the warm-up, the five-exercise leg circuit and the four-exercise core circuit, all fifteen movements with their rounds and target reps already filled in. It then offers to put it on your calendar every Monday and Thursday for four weeks. Say yes and those days fill themselves in on the Exercise calendar and in Today, with a Start this workout button waiting; nothing is recorded until you actually start one. Exercises can now carry a circuit heading, so Warm-up, Leg circuit and Abs/core stay visibly separate while you work through them. It is an ordinary saved workout once installed -- rename it, change the reps, reschedule it or delete it like any other."},
   {ts:"2026-09-22T15:00:00+08:00",text:"Reports is now one section instead of two. A Today / Date range switch at the top picks what you are looking at: Today is the old Current Day Report (everything done today plus everything still open), Date range is the old Reports list (everything added between two dates). There is one Lane filter for both, and Export to Excel now sits at the end of the filter row and exports exactly the list on screen -- so you can finally export a date range too, not only today."},
   {ts:"2026-09-22T12:00:00+08:00",text:"The section switcher inside Board is now one rounded bar holding all four sections, with the one you are on raised out of it as a pale pill in brand green -- instead of the four banner-shaped pennants. The Expense Tracker's Every expense / Recurring subscriptions switcher changed with it, because they are the same control and should not look like two different ideas. It picks up whichever palette you are on, so the bar is cream on Sienna and Retro and near-black in the dark themes, and the raised pill is always a step lighter than the bar it sits in, which is what makes it look lifted rather than just coloured. On a phone the icons drop away so all four still fit on one line -- a switcher that has to be scrolled to see the last section is not really a switcher. Nothing moved and nothing was renamed; this is only how it looks."},
   {ts:"2026-09-22T00:30:00+08:00",text:"Exercise has a Library now, so you stop rebuilding the same workout. Save a workout once with its exercises and target sets, then add it to today in a single tap, or put it on a schedule -- every day, certain weekdays, monthly, every other week, with an end date if you want one. It uses the same repeat rules your Personal Calendar already uses, so it knows about things like the 31st in February. Scheduled workouts show up on the Exercise calendar and at the top of Today before you have done anything, with what you are in for; press Start and it becomes a real workout you can tick through. If you are not doing it today, Skip today drops just that one date and leaves the rest of the schedule alone. Today now has a progress bar: it counts sets rather than whole workouts so it actually moves while you are training, it counts anything still planned so it cannot read 100% while something waits below, and it turns green when the day is done. The important rule: changing sets on a workout you are doing never changes the saved one. If you want today's numbers to become the new targets, there is a Save to library button that says so. Nothing is written to your history for a scheduled workout until you actually start it, so a plan you never got to leaves no false record."},
@@ -7534,6 +7557,18 @@ exEl("exFromLib").addEventListener("change",function(){
   if(id)exAddFromTpl(id,exDate);
 });
 
+/* The ready-made programs. The OPTIONS are filled by exFillProgPicker() from
+   renderExLib, not here: EX_PROGRAMS is a `var` further down the file, so at
+   this point in initial execution it has hoisted as undefined and reading it
+   would throw. Same trap the norm()-time constants carry a warning about. The
+   listener is safe to bind now because it only reads the catalogue when
+   something is actually chosen. */
+exEl("exProgPick").addEventListener("change",function(){
+  var k=this.value;
+  this.value="";
+  if(k)exProgInstall(k);
+});
+
 exEl("exLib").addEventListener("click",function(ev){
   var t;
   if((t=ev.target.closest("[data-tadd]"))){
@@ -9163,6 +9198,7 @@ function exFromTemplate(t,k){
   if(t.ex&&t.ex.length){
     w.ex=t.ex.map(function(e){
       var o={id:rid("ee_"),n:e.n||"Exercise"};
+      if(e.grp)o.grp=e.grp;
       if(e.sets&&e.sets.length){
         o.sets=e.sets.map(function(x){
           var s={id:rid("st_"),done:false};
@@ -9201,6 +9237,125 @@ function exDayProgress(k){
   });
   return {sets:sets,done:done,workouts:wk,wdone:wdone,
           pct:sets?Math.round(done/sets*100):0};
+}
+
+/* ---- starter programs ------------------------------------------------------
+   Ready-made workouts you can drop into the library whole, so a fourteen-
+   exercise program is one tap rather than an evening of typing.
+
+   A program is DATA, not a special kind of template. Installing one builds an
+   ordinary S.wtpl row with fresh ids and then forgets where it came from: it
+   renames, edits, duplicates, schedules and deletes like anything you built by
+   hand, and a later version of the app changing this catalogue can never reach
+   back into a workout you have been using for a month.
+
+   `sets` is rounds. The leg circuit is three rounds of five movements, so each
+   of those five carries three sets - ticking set 2 of the squat means you are
+   on round two. That mapping is why no "rounds" field had to be invented.
+
+   Where the source prescribes SECONDS, the hold goes in the name and the set
+   carries no numbers. Set durations are stored in whole minutes (see
+   exCleanExercise), so a 30-second plank would round to a minute and quietly
+   claim you held it twice as long as you did.
+
+   sch is only a SUGGESTION, offered at install time and editable afterwards
+   like any other schedule: days are 0=Sun..6=Sat, weeks sets the until date. */
+var EX_PROGRAMS=[{
+  key:"p1",
+  n:"Phase 1 — Beginner Foundation",
+  blurb:"Weeks 1–4 · no equipment · legs and core",
+  note:"Phase 1 of 4 weeks. Goal: learn the movement patterns, build basic strength and core stability. No equipment.\n\n"+
+       "Each SET below is one ROUND of that circuit.\n"+
+       "Warm-up: 1–2 rounds, 5–7 minutes.\n"+
+       "Leg circuit: 2–3 rounds. Rest 45–90 sec between exercises, 60–90 sec between rounds.\n"+
+       "Abs/core: 2 rounds. Rest 30–45 sec between exercises.\n\n"+
+       "Form cues: squat — feet shoulder-width, chest up, sit back and down, knees tracking over toes. "+
+       "Reverse lunge — step back, drop the knee toward the floor, front knee about 90°, push through the front heel. "+
+       "Glute bridge — squeeze the glutes, don't over-arch the lower back. "+
+       "Step-ups — step up fully and control the way down; start low if balance is tricky. "+
+       "Dead bug — lower back stays pressed to the floor. "+
+       "Bird dog — keep the hips level. "+
+       "Plank — elbows under shoulders, body in a straight line, glutes and abs squeezed.",
+  sch:{days:[1,4],weeks:4},
+  ex:[
+    {g:"Warm-up · 1–2 rounds",  n:"March in place or light jog",           sets:1, dur:2},
+    {g:"Warm-up · 1–2 rounds",  n:"Bodyweight squat",                      sets:1, reps:10},
+    {g:"Warm-up · 1–2 rounds",  n:"Hip hinge (good morning, hands on hips)",sets:1, reps:10},
+    {g:"Warm-up · 1–2 rounds",  n:"Glute bridge",                          sets:1, reps:10},
+    {g:"Warm-up · 1–2 rounds",  n:"Cat-cow + torso twists",                sets:1, reps:6},
+
+    {g:"Leg circuit · 2–3 rounds", n:"Squat (bodyweight) — 10–15 reps",    sets:3, reps:12},
+    {g:"Leg circuit · 2–3 rounds", n:"Reverse lunge — 8–12 per leg",       sets:3, reps:10},
+    {g:"Leg circuit · 2–3 rounds", n:"Glute bridge — 12–15 reps",          sets:3, reps:15},
+    {g:"Leg circuit · 2–3 rounds", n:"Step-ups (chair or step) — per leg", sets:3, reps:10},
+    {g:"Leg circuit · 2–3 rounds", n:"Calf raises — 15–20 reps",           sets:3, reps:20},
+    {g:"Leg circuit · 2–3 rounds", n:"Wall sit, 20–40 sec (optional finisher)", sets:2},
+
+    {g:"Abs/core · 2 rounds",   n:"Dead bug — 8–10 per side",              sets:2, reps:10},
+    {g:"Abs/core · 2 rounds",   n:"Bird dog — 8–10 per side",              sets:2, reps:10},
+    {g:"Abs/core · 2 rounds",   n:"Forearm plank, 20–40 sec hold",         sets:2},
+    {g:"Abs/core · 2 rounds",   n:"Heel taps (lying) — 10–12 per side",    sets:2, reps:12}
+  ]
+}];
+function exProgram(key){
+  var p=null;
+  EX_PROGRAMS.forEach(function(x){ if(x.key===key)p=x; });
+  return p;
+}
+/** The program's suggested first date: the next of its earliest weekday, today
+    included. A 4-week block that starts on a Monday is what people mean by
+    "weeks 1–4", and defaulting to today would put week 1 half in the past. */
+function exProgStart(p){
+  var k=today();
+  if(!p.sch||!p.sch.days||!p.sch.days.length)return k;
+  var want=p.sch.days.slice().sort(function(a,b){return a-b;})[0];
+  for(var i=0;i<7;i++){ if(dowOf(addDays(k,i))===want)return addDays(k,i); }
+  return k;
+}
+function exProgSchedText(p){
+  if(!p.sch)return "";
+  var DW=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  return p.sch.days.map(function(d){return DW[d];}).join(" and ")+
+         ", for "+p.sch.weeks+" weeks";
+}
+/* Install: build the template, then OFFER the schedule. Two steps, because
+   putting four weeks of recurring workouts on someone's calendar without
+   asking is not a convenience. Declining leaves the workout in the library,
+   which is still the part that took the typing. */
+function exProgInstall(key){
+  var p=exProgram(key); if(!p)return;
+  var dupe=(S.wtpl||[]).some(function(t){return (t.n||"")===p.n;});
+  if(dupe&&!confirm("“"+p.n+"” is already in your library.\n\nAdd a second copy?"))return;
+
+  var t={id:rid("tp_"),n:p.n.slice(0,EX_NAME_MAX),at:Date.now(),note:p.note.slice(0,NOTE_MAX),ex:[]};
+  p.ex.forEach(function(d){
+    var e={id:rid("ee_"),n:d.n.slice(0,EX_NAME_MAX),grp:d.g.slice(0,EX_GRP_MAX),sets:[]};
+    for(var i=0;i<d.sets;i++){
+      var s={id:rid("st_")};
+      if(d.reps!==undefined)s.reps=d.reps;
+      if(d.dur!==undefined)s.dur=d.dur;
+      e.sets.push(s);
+    }
+    t.ex.push(e);
+  });
+  S.wtpl.push(t);
+  exLibUI.open[t.id]=true;          // land on it open, so it is visibly there
+
+  if(p.sch){
+    var start=exProgStart(p);
+    if(confirm("Added “"+p.n+"” to your library.\n\nSchedule it on "+exProgSchedText(p)+
+               "?\n\nStarting "+exPretty(start)+". Nothing is recorded until you actually start a session, "+
+               "and you can change or remove the schedule any time.")){
+      S.wsched.push({id:rid("sc_"),tpl:t.id,date:start,at:Date.now(),
+        rr:{f:"weekly",int:1,days:p.sch.days.slice(),
+            until:addDays(start,p.sch.weeks*7-1)}});
+      exSave();
+      stamp("Added and scheduled");
+      return;
+    }
+  }
+  exSave();
+  stamp("Added to your library");
 }
 
 // ---- library actions -----------------------------------------------------
@@ -9289,14 +9444,16 @@ function exPushToTpl(wid){
   if(!t){ alert("That library workout no longer exists."); return; }
   if(!confirm("Update “"+(t.n||"the saved workout")+"” in your library to match this session?\n\nSets you did today become the new targets. Other days are not affected."))return;
   t.ex=(w.ex||[]).map(function(e){
-    return {id:rid("ee_"),n:e.n,
-      sets:(e.sets||[]).map(function(x){
-        var s={id:rid("st_")};
-        if(x.reps!==undefined)s.reps=x.reps;
-        if(x.w!==undefined){ s.w=x.w; s.u=x.u||"kg"; }
-        if(x.dur!==undefined)s.dur=x.dur;
-        return s;
-      })};
+    var o={id:rid("ee_"),n:e.n};
+    if(e.grp)o.grp=e.grp;
+    o.sets=(e.sets||[]).map(function(x){
+      var s={id:rid("st_")};
+      if(x.reps!==undefined)s.reps=x.reps;
+      if(x.w!==undefined){ s.w=x.w; s.u=x.u||"kg"; }
+      if(x.dur!==undefined)s.dur=x.dur;
+      return s;
+    });
+    return o;
   });
   if(!t.ex.length)delete t.ex;
   exSave();
@@ -9445,7 +9602,7 @@ function exSessHTML(w){
       '<button class="ex-mini warn" data-wdel="'+esc(w.id)+'">Delete</button>'+
     '</div>'+
     '<div class="ex-body">'+
-      (list.length ? list.map(function(e){ return exCardHTML(w,e); }).join("")
+      (list.length ? exGroupedHTML(list,function(e){ return exCardHTML(w,e); })
                    : '<div class="ex-none">No exercises yet.</div>')+
       '<button class="ex-add-ex" data-eadd="'+esc(w.id)+'">+ Add an exercise</button>'+
     '</div>'+
@@ -9527,6 +9684,24 @@ function exRowHTML(key,x,i,hasDur){
    edited. Ephemeral, like exUI - see the note there. */
 var exLibUI={open:{},sch:null};
 
+/* Draw a list of exercises, emitting a heading each time the circuit label
+   changes. Used by the library card, a live session and a planned occurrence,
+   because a program that reads as three circuits in one of those places and as
+   fourteen undifferentiated exercises in the other two is worse than no
+   grouping at all. A change BACK to an earlier label starts a new heading on
+   purpose: order is the author's, and two "Leg circuit" blocks separated by a
+   core block means they meant two. */
+function exGroupedHTML(list,fn){
+  var last=null;
+  return (list||[]).map(function(e){
+    var head="";
+    if((e.grp||"")!==last){
+      last=e.grp||"";
+      if(last)head='<div class="ex-grp">'+esc(last)+'</div>';
+    }
+    return head+fn(e);
+  }).join("");
+}
 function exTplSets(t){
   var n=0;
   (t.ex||[]).forEach(function(e){ n+=(e.sets||[]).length; });
@@ -9546,6 +9721,19 @@ function renderExLib(){
     : '<div class="ex-empty">Nothing saved yet.<br>Build a workout once here and it is two taps to use again.</div>';
   renderExSched();
   exFillLibPicker();
+  exFillProgPicker();
+}
+
+/* Built from EX_PROGRAMS rather than written into the markup, so adding a
+   Phase 2 is one entry in the catalogue and nothing else. */
+function exFillProgPicker(){
+  var sel=exEl("exProgPick");
+  if(!sel||sel.dataset.filled)return;     // a constant list; fill it once
+  sel.innerHTML='<option value="">Add a ready-made program…</option>'+
+    EX_PROGRAMS.map(function(p){
+      return '<option value="'+esc(p.key)+'">'+esc(p.n)+' — '+esc(p.blurb)+'</option>';
+    }).join("");
+  sel.dataset.filled="1";
 }
 
 function exTplHTML(t){
@@ -9573,7 +9761,7 @@ function exTplHTML(t){
       '</div>'+
       (planning?exSchFormHTML(t):"")+
       (t.ex&&t.ex.length
-        ? t.ex.map(function(e){ return exTplExHTML(t,e); }).join("")
+        ? exGroupedHTML(t.ex,function(e){ return exTplExHTML(t,e); })
         : '<div class="ex-none">No exercises yet.</div>')+
       '<button class="ex-add-ex" data-teadd="'+esc(t.id)+'">+ Add an exercise</button>'+
     '</div>'+
@@ -9681,11 +9869,11 @@ function exPlanHTML(p,k){
     '<div class="ex-body">'+
       '<div class="ex-plan-sum">'+esc(exTplSummary(t))+
         (sets?'':' — add sets in the Library if you want targets')+'</div>'+
-      (t.ex||[]).map(function(e){
+      exGroupedHTML(t.ex,function(e){
         return '<div class="ex-plan-ex"><b>'+esc(e.n||"Exercise")+'</b>'+
           ((e.sets||[]).length?' <span>'+(e.sets||[]).length+' × '+
             esc(exTargetText(e.sets[0]))+'</span>':'')+'</div>';
-      }).join("")+
+      })+
       '<button class="um-btn ex-primary" data-planstart="'+esc(p.sch.id)+'|'+esc(k)+'">Start this workout</button>'+
     '</div>'+
   '</div>';

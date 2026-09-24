@@ -2,6 +2,43 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-24 — Ready-made programs in the Exercise Library (v4.20)
+
+A fifteen-exercise program is now one tap instead of an evening of typing.
+**Library → "Add a ready-made program"** installs Phase 1 — Beginner
+Foundation (warm-up, leg circuit, abs/core), then offers its own recurring
+schedule: **Mondays and Thursdays for 4 weeks**, anchored to the next Monday.
+
+### A program is data, not a new kind of template
+
+`EX_PROGRAMS` is a plain catalogue. Installing one builds an ordinary `S.wtpl`
+row with fresh ids and then forgets where it came from — it renames, edits,
+duplicates, reschedules and deletes like anything hand-built, and editing the
+catalogue in a later release can never reach into a workout already in use.
+Adding Phase 2 is one entry in that array and nothing else.
+
+Two mappings avoided inventing fields:
+
+- **Rounds are sets.** The leg circuit is 3 rounds of 5 movements, so each
+  movement carries 3 sets; ticking set 2 means you are on round two.
+- **Second-based holds live in the name** ("Forearm plank, 20–40 sec hold"),
+  with no numbers on the set. `dur` is stored in whole minutes, so a
+  30-second plank would round to 1 and claim double what you did.
+
+### Exercises can carry a circuit heading
+
+New optional `grp` on an exercise (≤40 chars), rendered by `exGroupedHTML()`
+as a heading whenever the label changes. One helper, used by all three places
+exercises are listed — library card, live session, planned occurrence —
+because grouping that appears in one of them and not the others is worse than
+none. It is a *label on the exercise*, not a container: a nested shape would
+have made every loop over `t.ex` in the file walk two levels to serve the
+programs that have circuits, and cost the ones that don't.
+
+Installing and scheduling are two steps. Four weeks of recurring workouts
+should not land on someone's calendar unasked; declining still leaves the
+workout in the library, which is the part that took the typing.
+
 ## 2026-09-22 — Reports becomes one section (v4.19)
 
 The Board's Reports sub-view had two cards: **Reports** (everything *added*
