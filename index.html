@@ -2745,11 +2745,20 @@ return {
         <div class="sub">Build a workout once and reuse it. Add one to today in a tap, or put it on a repeating schedule &mdash; changing it here never rewrites a session you have already done.</div>
         <div class="ex-acts">
           <button class="um-btn ex-primary" id="exTplNew">+ New saved workout</button>
-          <!-- Ready-made programs. Options are filled from EX_PROGRAMS at boot
-               rather than written here, so the catalogue lives in one place. -->
-          <select class="ex-pick" id="exProgPick" aria-label="Add a ready-made program"></select>
         </div>
         <div id="exLib"></div>
+      </div>
+
+      <!-- Ready-made programs.
+           These were a <select> in 4.20 and nobody found them: a dropdown
+           reads as a filter for what is already on screen, not as a shelf
+           holding things you don't have yet. Whatever is on offer has to be
+           visible without opening anything - so the programs are listed, with
+           what is in each one, and a button that says what it does. -->
+      <div class="card">
+        <h2>Ready-made programs <span class="cnt" id="exProgCount">0</span></h2>
+        <div class="sub">Complete programs, already written out. Adding one drops the whole thing into your saved workouts and offers to put it on a repeating schedule &mdash; after that it is an ordinary workout you can rename, edit or reschedule.</div>
+        <div id="exProgList"></div>
       </div>
 
       <div class="card">
@@ -3717,6 +3726,21 @@ return {
   .ex-sub{border-top:1px solid var(--line);padding:9px 0 4px}
   .ex-sub-h{display:flex;align-items:center;gap:8px;margin-bottom:4px}
   .ex-sub-n{font-weight:700;font-size:13px;color:var(--ink);flex:1;min-width:0}
+
+  /* A ready-made program on the shelf. Deliberately not the .ex-card idiom the
+     saved workouts use: these are not yours yet, so they must not look like
+     something already in your library that happens to be collapsed. */
+  .ex-pgm{display:flex;gap:12px;align-items:center;flex-wrap:wrap;
+    border:1px dashed var(--terra);border-radius:11px;padding:11px 13px;margin-bottom:9px}
+  .ex-pgm:last-child{margin-bottom:0}
+  .ex-pgm.have{border-style:solid;border-color:var(--line);background:var(--ivory)}
+  .ex-pgm-t{flex:1;min-width:190px;display:flex;flex-direction:column;gap:2px}
+  .ex-pgm-n{font-family:var(--serif);font-size:15px;font-weight:800;color:var(--ink)}
+  .ex-pgm-have{align-self:flex-start;white-space:nowrap;font-size:9.5px;font-weight:800;
+    letter-spacing:.5px;text-transform:uppercase;color:var(--forest-ink);
+    border:1px solid var(--sage);border-radius:5px;padding:1px 5px;margin:1px 0}
+  .ex-pgm-b{font-size:12.5px;color:var(--terra-ink);font-weight:600}
+  .ex-pgm-f{font-size:11.5px;color:var(--muted)}
 
   /* A circuit heading. Terracotta because it is structure rather than content -
      the same job the lane dividers do in Reports, and it keeps the exercise
@@ -5252,7 +5276,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="4.21";
+var APP_VERSION="4.22";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -5263,6 +5287,7 @@ var APP_VERSION="4.21";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-09-24T21:30:00+08:00",text:"The ready-made programs are now visible. Phase 1 and Phase 2 sit in their own \"Ready-made programs\" section in the Library, each showing what is in it -- how many exercises, how many sets, and the schedule it suggests -- with an Add to library button. They were hidden inside a dropdown before, which nobody opened, because a dropdown looks like a way to filter what is already on screen rather than a shelf holding things you do not have yet. One already in your library says so and offers to add another copy."},
   {ts:"2026-09-24T18:00:00+08:00",text:"Phase 2, Early Intermediate, joins Phase 1 in the ready-made programs: sixteen movements across the same three circuits, built on harder variations -- Bulgarian split squats, Romanian deadlift hinges, lateral lunges, single-leg glute bridges, side planks and shoulder taps. Phases now queue instead of colliding. If a program is already scheduled with an end date, a new one starts the day after that finishes rather than on top of it, so adding Phase 2 while Phase 1 is still running puts it in weeks 5 to 8 where it belongs. The date is in the question it asks, so you can see where it landed before agreeing to it."},
   {ts:"2026-09-24T12:00:00+08:00",text:"The Exercise Library can now install a whole program in one tap. Open Exercise, then Library, and use \"Add a ready-made program\" -- the first one is Phase 1, Beginner Foundation: the warm-up, the five-exercise leg circuit and the four-exercise core circuit, all fifteen movements with their rounds and target reps already filled in. It then offers to put it on your calendar every Monday and Thursday for four weeks. Say yes and those days fill themselves in on the Exercise calendar and in Today, with a Start this workout button waiting; nothing is recorded until you actually start one. Exercises can now carry a circuit heading, so Warm-up, Leg circuit and Abs/core stay visibly separate while you work through them. It is an ordinary saved workout once installed -- rename it, change the reps, reschedule it or delete it like any other."},
   {ts:"2026-09-22T15:00:00+08:00",text:"Reports is now one section instead of two. A Today / Date range switch at the top picks what you are looking at: Today is the old Current Day Report (everything done today plus everything still open), Date range is the old Reports list (everything added between two dates). There is one Lane filter for both, and Export to Excel now sits at the end of the filter row and exports exactly the list on screen -- so you can finally export a date range too, not only today."},
@@ -7558,16 +7583,11 @@ exEl("exFromLib").addEventListener("change",function(){
   if(id)exAddFromTpl(id,exDate);
 });
 
-/* The ready-made programs. The OPTIONS are filled by exFillProgPicker() from
-   renderExLib, not here: EX_PROGRAMS is a `var` further down the file, so at
-   this point in initial execution it has hoisted as undefined and reading it
-   would throw. Same trap the norm()-time constants carry a warning about. The
-   listener is safe to bind now because it only reads the catalogue when
-   something is actually chosen. */
-exEl("exProgPick").addEventListener("change",function(){
-  var k=this.value;
-  this.value="";
-  if(k)exProgInstall(k);
+/* The ready-made programs. Delegated, because renderExPrograms() rebuilds the
+   rows whenever the library changes underneath them. */
+exEl("exProgList").addEventListener("click",function(ev){
+  var t=ev.target.closest("[data-prog]");
+  if(t)exProgInstall(t.dataset.prog);
 });
 
 exEl("exLib").addEventListener("click",function(ev){
@@ -9780,19 +9800,40 @@ function renderExLib(){
     : '<div class="ex-empty">Nothing saved yet.<br>Build a workout once here and it is two taps to use again.</div>';
   renderExSched();
   exFillLibPicker();
-  exFillProgPicker();
+  renderExPrograms();
 }
 
 /* Built from EX_PROGRAMS rather than written into the markup, so adding a
-   Phase 2 is one entry in the catalogue and nothing else. */
-function exFillProgPicker(){
-  var sel=exEl("exProgPick");
-  if(!sel||sel.dataset.filled)return;     // a constant list; fill it once
-  sel.innerHTML='<option value="">Add a ready-made program…</option>'+
-    EX_PROGRAMS.map(function(p){
-      return '<option value="'+esc(p.key)+'">'+esc(p.n)+' — '+esc(p.blurb)+'</option>';
-    }).join("");
-  sel.dataset.filled="1";
+   Phase 3 is one entry in the catalogue and nothing else.
+
+   Re-rendered with the rest of the library rather than filled once, because
+   "already in your library" is the one thing here that changes while you are
+   looking at it. */
+function renderExPrograms(){
+  var host=exEl("exProgList");
+  if(!host)return;
+  exEl("exProgCount").textContent=EX_PROGRAMS.length;
+  host.innerHTML=EX_PROGRAMS.map(function(p){
+    var have=(S.wtpl||[]).some(function(t){return (t.n||"")===p.n;});
+    var sets=0;
+    p.ex.forEach(function(d){ sets+=d.sets; });
+    /* ex-pgm, not ex-prog: .ex-prog is the day's progress bar, and a second
+       meaning for one class is a stylesheet that breaks at a distance. */
+    return '<div class="ex-pgm'+(have?" have":"")+'">'+
+      '<div class="ex-pgm-t">'+
+        '<span class="ex-pgm-n">'+esc(p.n)+'</span>'+
+        /* Its own row, not a chip trailing the name: these names are long
+           enough to wrap on a phone, and a chip caught in that wrap split
+           across two lines mid-word. */
+        (have?'<span class="ex-pgm-have">in your library</span>':'')+
+        '<span class="ex-pgm-b">'+esc(p.blurb)+'</span>'+
+        '<span class="ex-pgm-f">'+p.ex.length+' exercises · '+sets+' sets'+
+          (p.sch?' · suggested '+esc(exProgSchedText(p)):'')+'</span>'+
+      '</div>'+
+      '<button class="um-btn'+(have?'':' ex-primary')+'" data-prog="'+esc(p.key)+'">'+
+        (have?"Add again":"Add to library")+'</button>'+
+    '</div>';
+  }).join("");
 }
 
 function exTplHTML(t){

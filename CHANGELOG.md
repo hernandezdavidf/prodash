@@ -2,6 +2,29 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-09-24 — The ready-made programs become visible (v4.22)
+
+Phase 1 and Phase 2 now have their own **Ready-made programs** card in the
+Library: each row shows the name, what it is for, how many exercises and sets
+it contains and the schedule it suggests, with an **Add to library** button.
+A program already installed says "in your library" and offers "Add again".
+
+**Why:** 4.20 put them in a `<select>` and David could not find them — twice.
+A dropdown reads as a filter over what is already on screen, not as a shelf
+holding things you don't have yet, and an offer nobody opens is an offer that
+does not exist. Anything on offer has to be visible without opening anything.
+
+The rows are deliberately *not* the `.ex-card` idiom the saved workouts use
+(dashed terracotta border, no disclosure chevron): they are not yours yet and
+must not read as something already in your library that happens to be
+collapsed. New class prefix `.ex-pgm`, because `.ex-prog` is already the day's
+progress bar and one class with two meanings is a stylesheet that breaks at a
+distance.
+
+`renderExPrograms()` runs with the rest of the library rather than filling
+once, since "in your library" is the one thing on that card that changes while
+you are looking at it.
+
 ## 2026-09-24 — Phase 2, and phases that queue (v4.21)
 
 **Phase 2 — Early Intermediate** joins the catalogue: sixteen movements over
