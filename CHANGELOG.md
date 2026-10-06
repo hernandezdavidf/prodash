@@ -2,6 +2,38 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-10-06 — A chapter is verse rows, not a wall of prose (v4.25)
+
+`bbPaint()` now renders a chapter as one row per verse: the number in a
+left-hand gutter, the text in its own column, a dashed rule between verses.
+
+**Why:** it was a single flowed paragraph with superscript numbers, the way a
+printed Bible sets it. That reads beautifully and scans terribly — finding
+verse 23 meant running your eye through prose hunting for a small raised
+number. Rows put every number on the same left edge, so finding one is a
+glance. A verse arrived at from a search result is now a highlighted **row**
+rather than a tinted fragment mid-sentence.
+
+- It is an `<ol>` with `value="N"`, because that is what it is: a numbered
+  sequence in order. The numbers are drawn by us rather than by list markers,
+  which cannot be aligned or styled reliably across browsers.
+- The gutter is sized in `em`, so it grows with the three text sizes instead
+  of cramping the number at the large one. The number's own size has a 10px
+  floor — a plain `.6em` put it at 8.7px on the small setting, which is
+  decoration, not a label.
+- `min-width:0` on the text cell keeps a long unbroken string inside its
+  column instead of widening the grid.
+- The visible number is `aria-hidden` with a visually-hidden "Verse N."
+  before the text: a screen reader announcing a bare "3" against the start of
+  a sentence is ambiguous.
+- `.bb-txt` stayed on the list, so the existing size rules (including the
+  expanded-dock ones) keep working untouched.
+
+Search results, the KJV/NKJV switch, the size buttons, chapter paging and the
+offline cache are unchanged. Verified against John 3 in the browser: 36 rows,
+verse 16 highlighted and scrolled to, no horizontal overflow at 375px, and
+the reopen served from cache rather than re-fetching (bolls.life's terms).
+
 ## 2026-10-06 — The keypad follows a Casio fx-82MS (v4.24)
 
 Relaid out after the calculator David actually uses. Two grids, as the real

@@ -4295,10 +4295,35 @@ return {
     .bb-txt{font-family:var(--serif);font-size:16px;line-height:1.78;color:var(--note-ink);max-width:34em}
     .bb-size-s .bb-txt{font-size:14.5px;line-height:1.7}
     .bb-size-l .bb-txt{font-size:19px;line-height:1.85}
-    .bb-verse{display:inline;border-radius:4px}
-    .bb-n{font-family:var(--sans);font-size:.62em;font-weight:800;color:var(--muted);
-      vertical-align:.45em;margin-right:3px;font-variant-numeric:tabular-nums}
-    .bb-verse.hit{background:var(--olive-lt);box-shadow:0 0 0 3px var(--olive-lt)}
+    /* ---- a chapter as verse rows ----
+       One row per verse, numbers down a gutter so they all sit on the same
+       left edge and the eye can run down them. The gutter is in `em`, so it
+       grows with the three text sizes instead of cramping the number at the
+       large one. */
+    .bb-vs{list-style:none;margin:0;padding:0}
+    .bb-v{display:grid;grid-template-columns:2.1em 1fr;column-gap:.55em;
+      padding:6px 6px 7px;margin:0 -6px;border-radius:7px;
+      border-bottom:1px dashed var(--line)}
+    .bb-v:last-child{border-bottom:0}
+    /* The number is a label, not scripture: sans, small, quiet, and tabular so
+       9 and 10 line up rather than drifting a pixel apart. Right-aligned
+       against the text column for the same reason. */
+    /* Scales with the reading size, but never below 10px: at the small
+       setting a plain .6em put the numbers at 8.7px, which is decoration
+       rather than a label you can read at arm's length. */
+    .bb-vn{font-family:var(--sans);font-size:max(.6em,10px);font-weight:800;color:var(--muted);
+      text-align:right;padding-top:.45em;font-variant-numeric:tabular-nums;
+      user-select:none}
+    /* min-width:0 is what keeps a long unbroken string (a transliterated name,
+       a URL in a footnote) inside its column instead of widening the grid. */
+    .bb-vt{min-width:0;overflow-wrap:break-word}
+    .bb-v.hit{background:var(--olive-lt);border-bottom-color:var(--olive)}
+    .bb-v.hit .bb-vn{color:var(--forest-ink)}
+    /* Spoken only. The visible number is aria-hidden, because a screen reader
+       announcing "3" against the start of the text is ambiguous; "Verse 3."
+       is not. */
+    .bb-sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;
+      overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
     .bb-pager{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:12px}
     .bb-pager button{padding:8px 13px;border:1px solid var(--line);border-radius:9px;
       background:var(--paper);font-size:12px;font-weight:700;color:var(--ink)}
@@ -5479,7 +5504,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="4.24";
+var APP_VERSION="4.25";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -5490,6 +5515,7 @@ var APP_VERSION="4.24";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-10-06T22:30:00+08:00",text:"A chapter in the Bible widget is now one verse per row instead of a single block of prose. The verse numbers run down a gutter on the left so they all line up and you can find one at a glance, each verse is separated by a faint rule, and long verses wrap inside their own row rather than running into the next. Landing on a verse from a search result highlights the whole row instead of a fragment in the middle of a paragraph. The three text sizes, the KJV and NKJV switch, search, and the previous and next chapter buttons all work exactly as before."},
   {ts:"2026-10-06T19:00:00+08:00",text:"The calculator keypad is laid out like a Casio fx-82MS now. The bottom block is the same arrangement you already know without looking -- 7 8 9 with DEL and AC, 4 5 6 with times and divide, 1 2 3 with plus and minus, then 0, the point, EXP, Ans and equals -- and above it sit six columns of functions: the modifiers, the powers and roots, the logs, the trig, and memory with the brackets. 2nd works like SHIFT and gives you what is printed above a key (x! above the reciprocal, the cube root above the cube, 10 to the x above log, inverse sine above sine), and there is a real hyp key, so hyp then sin is sinh and hyp then 2nd then sin is sinh inverse. Both light up while they are armed and are used up by the next key you press, exactly like the real one. Things the Casio has that this cannot honestly do -- fractions, polar conversion, the statistics modes -- are left off rather than put there as keys that do nothing."},
   {ts:"2026-10-06T12:00:00+08:00",text:"Two things. Every password box now has an eye in it -- on the login and sign-up screens, the Google setup, the password reset, and the three in your profile -- so you can check what you typed before you commit to it. It goes back to hidden whenever the sign-in screen is reopened, and nothing about how passwords are handled or stored has changed. Second, there is a new Calculator in the widget dock, beside the clocks, the Bible and the teleprompter. It is a full scientific calculator: brackets and proper precedence, powers and roots, sin/cos/tan with their inverses and the hyperbolics, ln, log, log base 2, factorial, percent, pi and e, scientific notation, degrees or radians, memory keys and a history you can tap to reuse an answer. Type on a keyboard or tap the pad; Enter works out the answer. It needs no internet at all -- the maths is built into the app itself, so it works on a plane, and your history and memory stay on the device."},
   {ts:"2026-09-24T21:30:00+08:00",text:"The ready-made programs are now visible. Phase 1 and Phase 2 sit in their own \"Ready-made programs\" section in the Library, each showing what is in it -- how many exercises, how many sets, and the schedule it suggests -- with an Add to library button. They were hidden inside a dropdown before, which nobody opened, because a dropdown looks like a way to filter what is already on screen rather than a shelf holding things you do not have yet. One already in your library says so and offers to add another copy."},
@@ -12317,14 +12343,31 @@ function bbGo(bid,ch,verse){
   });
 }
 
+/* A chapter, one verse per row.
+   It used to be a single flowed paragraph with superscript numbers, the way a
+   printed Bible sets it. That reads beautifully and scans terribly: finding
+   verse 23 meant running your eye along the prose hunting for a small raised
+   number. Rows put every number in the same place down a left gutter, so
+   finding one is a glance rather than a search, and a verse you land on from
+   a search result is a whole highlighted row instead of a tinted fragment
+   mid-sentence.
+
+   It is an <ol> because that is what it is - a numbered sequence, in order -
+   and `value` carries the real verse number so the list stays correct for
+   anything that does not start at 1. The numbers are drawn by us rather than
+   by list markers, which cannot be aligned or styled reliably across
+   browsers. */
 function bbPaint(b,ch,verses,verse){
   var h='<div class="bb-read bb-size-'+esc(S.bibleSize)+'">'+
-    '<h4 class="bb-ref">'+esc(b.n+" "+ch)+'</h4><div class="bb-txt">';
+    '<h4 class="bb-ref">'+esc(b.n+" "+ch)+'</h4><ol class="bb-txt bb-vs">';
   verses.forEach(function(v){
-    h+='<span class="bb-verse" id="bbv'+(+v.verse)+'">'+
-       '<span class="bb-n">'+(+v.verse)+'</span>'+bbClean(v.text,false)+'</span> ';
+    var n=+v.verse;
+    h+='<li class="bb-v" id="bbv'+n+'" value="'+n+'">'+
+       '<span class="bb-vn" aria-hidden="true">'+n+'</span>'+
+       '<span class="bb-vt"><span class="bb-sr">Verse '+n+'. </span>'+
+       bbClean(v.text,false)+'</span></li>';
   });
-  h+='</div><div class="bb-cite">'+esc(S.bibleVer==="NKJV"
+  h+='</ol><div class="bb-cite">'+esc(S.bibleVer==="NKJV"
       ? "New King James Version · © Thomas Nelson. Text served by bolls.life."
       : "King James Version · public domain. Text served by bolls.life.")+'</div></div>'+
     '<div class="bb-pager">'+
