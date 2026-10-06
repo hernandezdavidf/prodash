@@ -2,6 +2,45 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-10-06 — The Bible works with no internet at all (v4.26)
+
+The whole KJV now ships with the app in `bible/kjv.json` (4.25 MB, 1.2 MB on
+the wire). Any book, any chapter, and **search**, with the network off — not
+just the chapters that happened to be in the 80-chapter `localStorage` cache.
+
+**Why a bundled file.** "Cache harder" was not available: filling a cache
+means pulling 1,189 chapters from bolls.life one at a time, which is the bulk
+download their terms forbid, done slowly. The KJV is public domain, so it can
+simply be here. NKJV is Thomas Nelson's and cannot be redistributed, so it
+still comes from the API and still works offline only for chapters already
+read — and now says so usefully instead of failing.
+
+- **Source:** `thiagobodruk/bible` (`json/en_kjv.json`), MIT, text public
+  domain, kept byte-identical and documented in [bible/README.md](bible/README.md).
+- **Verified against canonical landmarks** before wiring anything: 66 books,
+  31,102 verses, Genesis 50 chapters, Psalm 119 = 176 verses, Revelation 22.
+- **Its own service-worker cache** (`prodash-bible-kjv-v1`), which `activate`
+  deliberately does not clear. This is load-bearing: `CACHE_VERSION` is bumped
+  on essentially every release, so in the app-shell cache this would be
+  thrown away and re-downloaded — 4 MB, on a phone, possibly on mobile data —
+  every single update.
+- **Its `cache.add` is a second `waitUntil`, not part of the shell's**, so a
+  slow or failed 4 MB download cannot fail the whole SW install and leave the
+  app with no offline copy of *itself*.
+- **Loaded lazily** on first widget open, kept for the session. Nobody opening
+  the dashboard to tick a task should pay to parse a Bible. Parse: ~143 ms.
+- **KJV search is now local**, which is the offline answer and the better
+  online one: a straight scan of 31,102 verses runs in 4–10 ms and puts no
+  load on someone else's free service. No index — it would be another 4 MB of
+  memory and a build step to get wrong, to save nothing anyone can perceive.
+- The citation line now credits what actually produced the words, rather than
+  crediting bolls.life for text that came off the device.
+
+Tested with `fetch` to every non-local origin rejected and `navigator.onLine`
+forced false: Habakkuk 2 (never opened before) rendered from the bundle with
+**zero** network calls, "shepherd" returned 40 highlighted hits, jumping to
+Ezekiel 34 worked, and NKJV explained itself instead of erroring.
+
 ## 2026-10-06 — A chapter is verse rows, not a wall of prose (v4.25)
 
 `bbPaint()` now renders a chapter as one row per verse: the number in a

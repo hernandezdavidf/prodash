@@ -5504,7 +5504,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="4.25";
+var APP_VERSION="4.26";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -5515,6 +5515,7 @@ var APP_VERSION="4.25";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-10-06T23:40:00+08:00",text:"The whole King James Version now ships inside the app, so the Bible widget works with no internet at all -- any book, any chapter, and search too, not just the chapters you happened to open while online. It is about four megabytes, downloaded once in the background the first time you open the app with a connection, and it is kept in a cache of its own so ordinary app updates never make you download it again. Searching the KJV is now instant and never leaves your phone. NKJV still needs a connection, because unlike the KJV it is under copyright and cannot be stored here -- if you are offline on NKJV the widget now tells you to switch to KJV rather than just failing."},
   {ts:"2026-10-06T22:30:00+08:00",text:"A chapter in the Bible widget is now one verse per row instead of a single block of prose. The verse numbers run down a gutter on the left so they all line up and you can find one at a glance, each verse is separated by a faint rule, and long verses wrap inside their own row rather than running into the next. Landing on a verse from a search result highlights the whole row instead of a fragment in the middle of a paragraph. The three text sizes, the KJV and NKJV switch, search, and the previous and next chapter buttons all work exactly as before."},
   {ts:"2026-10-06T19:00:00+08:00",text:"The calculator keypad is laid out like a Casio fx-82MS now. The bottom block is the same arrangement you already know without looking -- 7 8 9 with DEL and AC, 4 5 6 with times and divide, 1 2 3 with plus and minus, then 0, the point, EXP, Ans and equals -- and above it sit six columns of functions: the modifiers, the powers and roots, the logs, the trig, and memory with the brackets. 2nd works like SHIFT and gives you what is printed above a key (x! above the reciprocal, the cube root above the cube, 10 to the x above log, inverse sine above sine), and there is a real hyp key, so hyp then sin is sinh and hyp then 2nd then sin is sinh inverse. Both light up while they are armed and are used up by the next key you press, exactly like the real one. Things the Casio has that this cannot honestly do -- fractions, polar conversion, the statistics modes -- are left off rather than put there as keys that do nothing."},
   {ts:"2026-10-06T12:00:00+08:00",text:"Two things. Every password box now has an eye in it -- on the login and sign-up screens, the Google setup, the password reset, and the three in your profile -- so you can check what you typed before you commit to it. It goes back to hidden whenever the sign-in screen is reopened, and nothing about how passwords are handled or stored has changed. Second, there is a new Calculator in the widget dock, beside the clocks, the Bible and the teleprompter. It is a full scientific calculator: brackets and proper precedence, powers and roots, sin/cos/tan with their inverses and the hyperbolics, ln, log, log base 2, factorial, percent, pi and e, scientific notation, degrees or radians, memory keys and a history you can tap to reuse an answer. Type on a keyboard or tap the pad; Enter works out the answer. It needs no internet at all -- the maths is built into the app itself, so it works on a plane, and your history and memory stay on the device."},
@@ -12306,9 +12307,78 @@ function bbShowChapters(){
   });
 }
 
+/* ---- the offline Bible ----------------------------------------------------
+   A complete KJV ships with the app in bible/kjv.json, so the widget works
+   with no connection at all rather than only for the chapters you happened
+   to open while online. See bible/README.md for provenance and licence.
+
+   Why a bundled file and not "cache harder": bulk-downloading the whole
+   Bible from bolls.life is against their terms, and 1,189 chapters fetched
+   one at a time to fill a cache is the same thing done slowly. The KJV is
+   public domain, so it can simply be here. NKJV cannot - it is Thomas
+   Nelson's - so that one still comes from the API and still works offline
+   only for chapters already read.
+
+   Loaded LAZILY, on first use of the widget, and kept for the session. The
+   file is 4 MB; nobody opening the dashboard to tick a task should pay for
+   parsing a Bible they did not ask for. */
+var BB_LOCAL_URL="./bible/kjv.json";
+var bbLocal=null;          // the parsed book array, once it has arrived
+var bbLocalP=null;         // the in-flight promise, so two callers share one load
+function bbLoadLocal(){
+  if(bbLocal)return Promise.resolve(bbLocal);
+  if(bbLocalP)return bbLocalP;
+  bbLocalP=fetch(BB_LOCAL_URL)
+    .then(function(r){ if(!r.ok)throw new Error("HTTP "+r.status); return r.json(); })
+    .then(function(j){
+      if(!Array.isArray(j)||j.length<66)throw new Error("unexpected shape");
+      bbLocal=j;
+      return j;
+    })
+    .catch(function(e){
+      /* Null the promise, not just the data: a load that failed because the
+         service worker had not cached it yet must be retryable on the next
+         open rather than remembered as "no local Bible, ever". */
+      bbLocalP=null;
+      throw e;
+    });
+  return bbLocalP;
+}
+/** [{verse,text}] for a book/chapter from the bundled text, or null. */
+function bbLocalChapter(b,c){
+  if(!bbLocal)return null;
+  var bk=bbLocal[(+b)-1];
+  if(!bk||!bk.chapters)return null;
+  var rows=bk.chapters[(+c)-1];
+  if(!rows||!rows.length)return null;
+  return rows.map(function(t,i){ return {verse:i+1,text:String(t==null?"":t)}; });
+}
+/** True when this version can be read without a connection. */
+function bbLocalHas(ver){ return ver==="KJV"&&!!bbLocal; }
+
 function bbFetchChapter(ver,b,c,cb){
   var k=ver+":"+b+":"+c, hit=bbCacheGet(k);
   if(hit){cb(null,hit);return;}
+  /* The bundled text beats the network even when there IS a network: it is
+     instant, it is the same words, and it is one request this app does not
+     make of someone else's free service. */
+  if(ver==="KJV"){
+    var go=function(){
+      var local=bbLocalChapter(b,c);
+      if(local){cb(null,local);return true;}
+      return false;
+    };
+    if(bbLocal){ if(go())return; }
+    else{
+      bbLoadLocal().then(function(){ if(!go())bbFetchRemote(ver,b,c,cb); })
+                   .catch(function(){ bbFetchRemote(ver,b,c,cb); });
+      return;
+    }
+  }
+  bbFetchRemote(ver,b,c,cb);
+}
+function bbFetchRemote(ver,b,c,cb){
+  var k=ver+":"+b+":"+c;
   fetch(BB_API+"/get-chapter/"+encodeURIComponent(ver)+"/"+(+b)+"/"+(+c)+"/")
     .then(function(r){ if(!r.ok)throw new Error("HTTP "+r.status); return r.json(); })
     .then(function(j){
@@ -12334,9 +12404,15 @@ function bbGo(bid,ch,verse){
   bbFetchChapter(S.bibleVer,b.id,ch,function(err,verses){
     if(my!==bbSeq)return;
     if(err||!verses){
-      bbStage(bbNote(navigator.onLine===false
-        ? "You're offline. Chapters you've already opened are still available — this one isn't cached yet."
-        : "Couldn't load "+b.n+" "+ch+" just now. It'll work again once you're back online.",true));
+      /* With the KJV on the device, failing to load it means the bundled file
+         never arrived - a first run that has been offline the whole time.
+         NKJV failing offline is ordinary and has a real answer, so say it. */
+      bbStage(bbNote(
+        S.bibleVer!=="KJV"
+          ? "NKJV needs a connection — it can't be stored on the device. Switch to KJV above; the whole of it is here and works offline."
+        : navigator.onLine===false
+          ? "The offline Bible hasn't finished downloading to this device yet. Open the app once with a connection and the whole KJV stays available after that."
+          : "Couldn't load "+b.n+" "+ch+" just now.",true));
       return;
     }
     bbPaint(b,ch,verses,verse);
@@ -12367,9 +12443,14 @@ function bbPaint(b,ch,verses,verse){
        '<span class="bb-vt"><span class="bb-sr">Verse '+n+'. </span>'+
        bbClean(v.text,false)+'</span></li>';
   });
+  /* Credit what actually produced these words. The KJV is now normally read
+     from the copy stored in the app, and claiming bolls.life served it would
+     be both wrong and unfair to them. */
   h+='</ol><div class="bb-cite">'+esc(S.bibleVer==="NKJV"
       ? "New King James Version · © Thomas Nelson. Text served by bolls.life."
-      : "King James Version · public domain. Text served by bolls.life.")+'</div></div>'+
+      : bbLocalHas("KJV")
+        ? "King James Version · public domain. Stored on this device — works offline."
+        : "King James Version · public domain. Text served by bolls.life.")+'</div></div>'+
     '<div class="bb-pager">'+
       '<button data-bprev'+(b.id===1&&ch===1?" disabled":"")+'>&#8592; Previous</button>'+
       '<button data-bnext'+(b.id===66&&ch===b.c?" disabled":"")+'>Next &#8594;</button>'+
@@ -12428,6 +12509,83 @@ function bbSearch(q){
   bbStage(head+bbNote("Searching "+S.bibleVer+" for “"+q+"”…"));
   bbBind();
 
+  /* KJV searches the bundled text, which is both the offline answer and the
+     better online one: no round trip, and no load put on a free service for
+     something this device can already do. NKJV has no local copy, so it goes
+     on asking the API. */
+  if(S.bibleVer==="KJV"){
+    bbLoadLocal().then(function(){
+      if(my!==bbSeq)return;
+      bbRenderHits(head,bbLocalSearch(q),q,!!ref);
+    }).catch(function(){
+      if(my!==bbSeq)return;
+      bbSearchRemote(head,q,my,!!ref);  // no local copy yet - fall back to the API
+    });
+    return;
+  }
+  bbSearchRemote(head,q,my,!!ref);
+}
+
+/* Straight scan of 31,102 verses. An index would be faster in theory and is
+   not worth it here: this runs in a few milliseconds on a phone, and an index
+   is another 4 MB of memory plus a build step to get wrong. Stops at
+   BB_FIND_MAX so a search for "the" cannot try to draw 60,000 rows. */
+var BB_FIND_MAX=40;
+function bbLocalSearch(q){
+  var needle=String(q).toLowerCase(), out=[];
+  if(!needle)return out;
+  for(var b=0;b<66&&out.length<BB_FIND_MAX;b++){
+    var chs=(bbLocal[b]||{}).chapters||[];
+    for(var c=0;c<chs.length&&out.length<BB_FIND_MAX;c++){
+      var vs=chs[c];
+      for(var v=0;v<vs.length;v++){
+        var t=vs[v];
+        var at=t.toLowerCase().indexOf(needle);
+        if(at<0)continue;
+        out.push({book:b+1,chapter:c+1,verse:v+1,html:bbMark(t,needle)});
+        if(out.length>=BB_FIND_MAX)break;
+      }
+    }
+  }
+  return out;
+}
+/** Escape the verse, then wrap each match in <mark>. Built this way round so
+    the highlight is the only markup that can exist in the result - the same
+    guarantee bbClean() gives the API's HTML. */
+function bbMark(text,needle){
+  var s=String(text), low=s.toLowerCase(), n=needle.length, out="", i=0;
+  for(;;){
+    var at=low.indexOf(needle,i);
+    if(at<0){ out+=esc(s.slice(i)); break; }
+    out+=esc(s.slice(i,at))+"<mark>"+esc(s.slice(at,at+n))+"</mark>";
+    i=at+n;
+  }
+  return out;
+}
+/** One renderer for local and remote hits; remote ones arrive as HTML that
+    still has to go through bbClean(), local ones are already safe. */
+function bbRenderHits(head,hits,q,hasRef){
+  if(!hits.length){
+    /* "psalm 23" finds no verse containing that string, which is true and
+       unhelpful when the card directly above it is already offering to take
+       you to Psalms 23. Say what is actually going on instead. */
+    bbStage(head+bbNote(hasRef
+      ? "No verse contains the words “"+q+"” — but the passage above is what you asked for."
+      : "No results for “"+q+"” in "+S.bibleVer+"."));
+    bbBind(); return;
+  }
+  var h=head+'<div class="bb-eyebrow">'+hits.length+(hits.length>=BB_FIND_MAX?"+":"")+
+    ' result'+(hits.length===1?"":"s")+' · '+esc(S.bibleVer)+'</div>';
+  hits.forEach(function(x){
+    var bk=bbBook(x.book);
+    h+='<button class="bb-hit" data-bref="'+bk.id+":"+(+x.chapter)+":"+(+x.verse)+'">'+
+       '<span class="bb-hit-ref">'+esc(bk.n+" "+x.chapter+":"+x.verse)+'</span>'+
+       '<div class="bb-hit-tx">'+(x.html||bbClean(x.text,true))+'</div></button>';
+  });
+  bbStage(h);bbBind();
+}
+
+function bbSearchRemote(head,q,my,hasRef){
   fetch(BB_API+"/v2/find/"+encodeURIComponent(S.bibleVer)+"?search="+encodeURIComponent(q)+
         "&match_case=false&match_whole=false&limit=40&page=1")
     .then(function(r){ if(!r.ok)throw new Error("HTTP "+r.status); return r.json(); })
@@ -12436,21 +12594,14 @@ function bbSearch(q){
       // The index also covers apocryphal books, which are in neither KJV nor
       // NKJV as this widget presents them. Anything past 66 is dropped.
       var hits=((j&&j.results)||[]).filter(function(x){return +x.book>=1&&+x.book<=66;});
-      if(!hits.length){ bbStage(head+bbNote("No results for “"+q+"” in "+S.bibleVer+".")); bbBind(); return; }
-      var h=head+'<div class="bb-eyebrow">'+hits.length+' result'+(hits.length===1?"":"s")+
-        ' · '+esc(S.bibleVer)+'</div>';
-      hits.forEach(function(x){
-        var bk=bbBook(x.book);
-        h+='<button class="bb-hit" data-bref="'+bk.id+":"+(+x.chapter)+":"+(+x.verse)+'">'+
-           '<span class="bb-hit-ref">'+esc(bk.n+" "+x.chapter+":"+x.verse)+'</span>'+
-           '<div class="bb-hit-tx">'+bbClean(x.text,true)+'</div></button>';
-      });
-      bbStage(h);bbBind();
+      bbRenderHits(head,hits,q,hasRef);
     })
     .catch(function(){
       if(my!==bbSeq)return;
+      /* Only NKJV can land here now, so the offline message says the useful
+         thing rather than the generic one: the KJV beside it needs nothing. */
       bbStage(head+bbNote(navigator.onLine===false
-        ? "Search needs a connection. Book and chapter browsing still works offline, and so do chapters you've already read."
+        ? "Searching "+S.bibleVer+" needs a connection. Switch to KJV above — it is stored on this device and searches offline."
         : "Search couldn't reach the server just now. Try again in a moment.",true));
       bbBind();
     });
@@ -12469,6 +12620,11 @@ function bbMount(){
   bbCrumbs();bbSizeSync();
   var at=bbAt();
   bbGo(at.b.id,at.c,0);
+  /* Warm the bundled text even when this chapter came from somewhere else
+     (NKJV, or the localStorage cache), so the first search and the first
+     offline chapter do not each wait on a 4 MB parse. Failure is silent and
+     harmless: every path that needs it calls bbLoadLocal() itself. */
+  bbLoadLocal().catch(function(){});
 }
 function bbUnmount(){ /* nothing running to stop - kept so the registry shape holds */ }
 
