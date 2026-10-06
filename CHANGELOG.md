@@ -2,6 +2,39 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-10-06 — The keypad follows a Casio fx-82MS (v4.24)
+
+Relaid out after the calculator David actually uses. Two grids, as the real
+one is organised:
+
+| | |
+|---|---|
+| six-column function block | modifiers, powers, logs, trig, memory + brackets |
+| five-column numeric block | `7 8 9 DEL AC` / `4 5 6 × ÷` / `1 2 3 + −` / `0 . EXP Ans =` |
+
+The numeric block is copied position for position — × ÷ beside 456, + −
+beside 123, DEL/AC above them on the right, `=` a single key in the corner
+rather than the double-height slab every phone calculator has. That block is
+muscle memory and the one place where being "nicer" than the original is
+just slower to use.
+
+**Two modifiers, both one-shot**, as on the real device. `2nd` is SHIFT and
+gives the function printed above a key, using Casio's own pairings: x⁻¹/x!,
+x³/∛, log/10ˣ, ln/eˣ, sin/sin⁻¹. `hyp` makes the three trig keys hyperbolic
+and composes with 2nd, so hyp → 2nd → sin is sinh⁻¹. Each is consumed by the
+next key press and lights while armed — a sticky modifier you can't see is
+how a sin silently becomes an asin three calculations later.
+
+Key faces use Unicode superscripts (x⁻¹, xʸ, 10ˣ) rather than `<sup>`: they
+are the glyphs the real keys are printed with, every face stays one line, and
+no stylesheet that knows nothing about this pad can squash them.
+
+**Left off rather than faked:** nCr/nPr, Pol(/Rec(, a b/c, ENG, °'" and the
+statistics modes. Each needs machinery this calculator does not have —
+fraction and complex types, a stats register — and a key that looks real and
+does nothing is worse than a key that is absent. The chip strip keeps the
+two-argument functions, the constants, and the comma they need.
+
 ## 2026-10-06 — Show/hide password, and a scientific calculator (v4.23)
 
 ### 1. An eye in every password field

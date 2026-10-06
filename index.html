@@ -4511,8 +4511,13 @@ return {
       border:1px solid var(--line);background:var(--paper);color:var(--muted);white-space:nowrap}
     .cc-more button:hover{color:var(--ink);border-color:var(--sage)}
 
-    .cc-pad{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
-    .cc-k{min-height:44px;padding:0 2px;border:1px solid var(--line);border-radius:10px;
+    /* Six columns of functions over five of digits, the way the Casio is
+       organised. The function keys are smaller because there are more of them
+       in the same width - which is also true of the real thing. */
+    .cc-pad{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;margin-bottom:5px}
+    .cc-num{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+    .cc-pad .cc-k{min-height:40px;font-size:13px}
+    .cc-k{min-height:46px;padding:0 2px;border:1px solid var(--line);border-radius:10px;
       background:var(--paper);color:var(--ink);font:inherit;font-size:15px;font-weight:700;
       cursor:pointer;display:flex;align-items:center;justify-content:center;
       transition:background .12s,border-color .12s}
@@ -4525,7 +4530,9 @@ return {
     .cc-k.fn:hover{color:var(--ink)}
     .cc-k.op{color:var(--forest-ink);background:var(--olive-lt);border-color:var(--olive)}
     .cc-k.warn{color:var(--terra-ink)}
-    .cc-k.eq{grid-row:span 2;background:var(--forest);border-color:var(--forest);
+    /* = is a single key in the bottom-right corner, where the Casio puts it -
+       not the tall double-height slab every phone calculator has. */
+    .cc-k.eq{background:var(--forest);border-color:var(--forest);
       color:var(--on-brand);font-size:19px}
     .cc-k.eq:hover{background:var(--forest-dk);border-color:var(--forest-dk)}
     .cc-k.on{background:var(--terra);border-color:var(--terra);color:var(--on-warm)}
@@ -4665,7 +4672,10 @@ return {
           </div>
         </div>
         <div class="cc-more" id="ccMore" role="group" aria-label="More functions"></div>
+        <!-- Two grids, after the Casio: six columns of functions over five
+             columns of digits and operators. See CC_FKEYS. -->
         <div class="cc-pad" id="ccPad"></div>
+        <div class="cc-num" id="ccNum"></div>
         <div class="cc-hwrap">
           <div class="cc-hhead">
             <h4>History</h4>
@@ -5469,7 +5479,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="4.23";
+var APP_VERSION="4.24";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -5480,6 +5490,7 @@ var APP_VERSION="4.23";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-10-06T19:00:00+08:00",text:"The calculator keypad is laid out like a Casio fx-82MS now. The bottom block is the same arrangement you already know without looking -- 7 8 9 with DEL and AC, 4 5 6 with times and divide, 1 2 3 with plus and minus, then 0, the point, EXP, Ans and equals -- and above it sit six columns of functions: the modifiers, the powers and roots, the logs, the trig, and memory with the brackets. 2nd works like SHIFT and gives you what is printed above a key (x! above the reciprocal, the cube root above the cube, 10 to the x above log, inverse sine above sine), and there is a real hyp key, so hyp then sin is sinh and hyp then 2nd then sin is sinh inverse. Both light up while they are armed and are used up by the next key you press, exactly like the real one. Things the Casio has that this cannot honestly do -- fractions, polar conversion, the statistics modes -- are left off rather than put there as keys that do nothing."},
   {ts:"2026-10-06T12:00:00+08:00",text:"Two things. Every password box now has an eye in it -- on the login and sign-up screens, the Google setup, the password reset, and the three in your profile -- so you can check what you typed before you commit to it. It goes back to hidden whenever the sign-in screen is reopened, and nothing about how passwords are handled or stored has changed. Second, there is a new Calculator in the widget dock, beside the clocks, the Bible and the teleprompter. It is a full scientific calculator: brackets and proper precedence, powers and roots, sin/cos/tan with their inverses and the hyperbolics, ln, log, log base 2, factorial, percent, pi and e, scientific notation, degrees or radians, memory keys and a history you can tap to reuse an answer. Type on a keyboard or tap the pad; Enter works out the answer. It needs no internet at all -- the maths is built into the app itself, so it works on a plane, and your history and memory stay on the device."},
   {ts:"2026-09-24T21:30:00+08:00",text:"The ready-made programs are now visible. Phase 1 and Phase 2 sit in their own \"Ready-made programs\" section in the Library, each showing what is in it -- how many exercises, how many sets, and the schedule it suggests -- with an Add to library button. They were hidden inside a dropdown before, which nobody opened, because a dropdown looks like a way to filter what is already on screen rather than a shelf holding things you do not have yet. One already in your library says so and offers to add another copy."},
   {ts:"2026-09-24T18:00:00+08:00",text:"Phase 2, Early Intermediate, joins Phase 1 in the ready-made programs: sixteen movements across the same three circuits, built on harder variations -- Bulgarian split squats, Romanian deadlift hinges, lateral lunges, single-leg glute bridges, side planks and shoulder taps. Phases now queue instead of colliding. If a program is already scheduled with an end date, a new one starts the day after that finishes rather than on top of it, so adding Phase 2 while Phase 1 is still running puts it in weeks 5 to 8 where it belongs. The date is in the question it asks, so you can see where it landed before agreeing to it."},
@@ -12967,7 +12978,8 @@ window.addEventListener("resize",function(){
 var CC_KEY="prodash.calc";
 var CC_HIST_MAX=40;
 var ccState={hist:[],mem:0,deg:true,ans:0};
-var ccSecond=false;            // the 2nd layer (inverse trig) is showing
+var ccSecond=false;            // 2nd (SHIFT) layer is lit
+var ccHyp=false;               // hyp layer is lit - combines with 2nd
 
 function ccEl(id){return document.getElementById(id);}
 function ccLoad(){
@@ -13210,61 +13222,114 @@ function ccFmt(x){
   return s;
 }
 
-/* ---- the keypad ----
-   One table, two layers. The 2nd layer swaps the three circular functions
-   for their inverses and nothing else: a layer that moves everything is a
-   layer you have to re-read every time you press it. */
-var CC_KEYS=[
-  [{l:"2nd",k:"second",c:"fn"},{l:"DEG",k:"ang",c:"fn",id:"ccKAng"},{l:"(",i:"(",c:"fn"},{l:")",i:")",c:"fn"},{l:"⌫",k:"back",c:"fn warn"}],
-  [{l:"MC",k:"mc",c:"fn"},{l:"MR",k:"mr",c:"fn"},{l:"M+",k:"m+",c:"fn"},{l:"M−",k:"m-",c:"fn"},{l:"C",k:"clear",c:"fn warn"}],
-  [{l:"sin",i:"sin(",c:"fn",alt:{l:"sin⁻¹",i:"asin("}},
-   {l:"cos",i:"cos(",c:"fn",alt:{l:"cos⁻¹",i:"acos("}},
-   {l:"tan",i:"tan(",c:"fn",alt:{l:"tan⁻¹",i:"atan("}},
-   {l:"x<sup>y</sup>",i:"^",c:"op"},{l:"÷",i:"/",c:"op"}],
-  [{l:"ln",i:"ln(",c:"fn",alt:{l:"e<sup>x</sup>",i:"exp("}},
-   {l:"log",i:"log(",c:"fn",alt:{l:"10<sup>x</sup>",i:"10^"}},
-   {l:"log₂",i:"log2(",c:"fn",alt:{l:"2<sup>x</sup>",i:"2^"}},
-   {l:"√",i:"sqrt(",c:"op",alt:{l:"∛",i:"cbrt("}},{l:"×",i:"*",c:"op"}],
-  [{l:"7",i:"7"},{l:"8",i:"8"},{l:"9",i:"9"},{l:"!",i:"!",c:"op"},{l:"−",i:"-",c:"op"}],
-  [{l:"4",i:"4"},{l:"5",i:"5"},{l:"6",i:"6"},{l:"%",i:"%",c:"op"},{l:"+",i:"+",c:"op"}],
-  [{l:"1",i:"1"},{l:"2",i:"2"},{l:"3",i:"3"},{l:"π",i:"π",c:"op"},{l:"=",k:"eq",c:"eq"}],
+/* ---- the keypad ------------------------------------------------------------
+   Laid out after a Casio fx-82MS, which is the calculator David actually
+   uses. Two grids, exactly as the real one is organised:
+
+     a SIX-column function block        rows of modifiers, powers, logs,
+                                        trig, memory and brackets
+     a FIVE-column numeric block        7 8 9 DEL AC
+                                        4 5 6  ×  ÷
+                                        1 2 3  +  −
+                                        0 .  EXP Ans =
+
+   The numeric block is copied position for position, including × ÷ beside
+   456 and + − beside 123, and DEL/AC sitting above them on the right. That
+   block is pure muscle memory and the one part where being "nicer" than the
+   original would just be slower to use.
+
+   TWO MODIFIERS, like the real thing. 2nd is SHIFT: it swaps a key for the
+   function printed above it, and the choices here are Casio's own pairings -
+   x⁻¹/x!, x³/∛, log/10ˣ, ln/eˣ, sin/sin⁻¹. hyp works as it does on the
+   Casio, turning the three trig keys hyperbolic, and the two combine, so
+   hyp then 2nd then sin gives sinh⁻¹. Both are one-shot, consumed by the
+   next key press as SHIFT is on the real thing, and both light while armed -
+   a modifier you cannot see the state of is a trap.
+
+   WHAT IS NOT HERE, and why: nCr/nPr, Pol(/Rec(, a b/c, ENG, °'" and the
+   statistics modes. Each needs machinery this calculator does not have
+   (fraction and complex types, a stats register), and a key that looks real
+   and does nothing is worse than a key that is absent. The chip strip above
+   the pad carries what is left - the two-argument functions, the constants
+   and the comma they need. */
+var CC_FKEYS=[
+  /* Unicode superscripts rather than <sup>: they are the glyphs the real keys
+     are printed with, they keep every face a single line of text, and they
+     cannot be squashed by a stylesheet that knows nothing about this pad. */
+  [{l:"2nd",k:"second",c:"fn"},{l:"hyp",k:"hyp",c:"fn"},{l:"DEG",k:"ang",c:"fn",id:"ccKAng"},
+   {l:"x⁻¹",i:"^-1",c:"fn",alt:{l:"x!",i:"!"}},
+   {l:"x²",i:"^2",c:"fn"},
+   {l:"x³",i:"^3",c:"fn",alt:{l:"∛",i:"cbrt("}}],
+  [{l:"√",i:"sqrt(",c:"fn"},{l:"xʸ",i:"^",c:"fn"},
+   {l:"log",i:"log(",c:"fn",alt:{l:"10ˣ",i:"10^"}},
+   {l:"ln",i:"ln(",c:"fn",alt:{l:"eˣ",i:"exp("}},
+   {l:"log₂",i:"log2(",c:"fn",alt:{l:"2ˣ",i:"2^"}},
+   {l:"%",i:"%",c:"fn"}],
+  [{l:"(−)",i:"-",c:"fn"},{l:"abs",i:"abs(",c:"fn"},
+   {tri:"sin",c:"fn"},{tri:"cos",c:"fn"},{tri:"tan",c:"fn"},
+   {l:"π",i:"π",c:"fn"}],
+  [{l:"MC",k:"mc",c:"fn"},{l:"MR",k:"mr",c:"fn"},{l:"M+",k:"m+",c:"fn"},{l:"M−",k:"m-",c:"fn"},
+   {l:"(",i:"(",c:"fn"},{l:")",i:")",c:"fn"}]
+];
+var CC_NKEYS=[
+  [{l:"7",i:"7"},{l:"8",i:"8"},{l:"9",i:"9"},{l:"DEL",k:"back",c:"warn"},{l:"AC",k:"clear",c:"warn"}],
+  [{l:"4",i:"4"},{l:"5",i:"5"},{l:"6",i:"6"},{l:"×",i:"*",c:"op"},{l:"÷",i:"/",c:"op"}],
+  [{l:"1",i:"1"},{l:"2",i:"2"},{l:"3",i:"3"},{l:"+",i:"+",c:"op"},{l:"−",i:"-",c:"op"}],
   /* EXP and Euler's e are the SAME character and that is not a slip: "2e8"
      is scientific notation and "2e" is 2×e, and ccTokens decides which by
-     what follows. Two keys inserting one letter would just be two ways to
-     press the same thing, so there is one key, and e-the-constant lives in
-     the strip above with the other named values. */
-  [{l:"0",i:"0"},{l:".",i:"."},{l:"EXP",i:"e",c:"fn"},{l:"Ans",i:"Ans",c:"fn"}]
+     what follows. The Casio has the same key in the same place. */
+  [{l:"0",i:"0"},{l:".",i:"."},{l:"EXP",i:"e",c:"fn"},{l:"Ans",i:"Ans",c:"fn"},{l:"=",k:"eq",c:"eq"}]
 ];
-var CC_MORE=["sinh(","cosh(","tanh(","asinh(","acosh(","atanh(","abs(","exp(",
-  "mod(","nroot(","logb(","round(","floor(","ceil(","e","τ","φ"];
+var CC_MORE=[",","mod(","nroot(","logb(","exp(","round(","floor(","ceil(","e","τ","φ"];
 
+/** What a trig key currently is, given the two modifiers. Mirrors the Casio:
+    hyp makes it hyperbolic, 2nd makes it the inverse, and both together give
+    the inverse hyperbolic - which it labels sinh⁻¹, not asinh. */
+function ccTri(base){
+  var stem=ccHyp?(base+"h"):base;
+  return {l:stem+(ccSecond?"⁻¹":""), i:(ccSecond?"a":"")+stem+"("};
+}
+function ccFace(k){
+  if(k.tri)return ccTri(k.tri);
+  return (ccSecond&&k.alt)?k.alt:k;
+}
+function ccKeyHTML(k){
+  var d=ccFace(k);
+  var lit=(k.k==="second"&&ccSecond)||(k.k==="hyp"&&ccHyp);
+  var cls="cc-k"+(k.c?" "+k.c:"")+(lit?" on":"");
+  var attr=d.i!==undefined?' data-cci="'+esc(d.i)+'"':' data-cck="'+esc(k.k)+'"';
+  return '<button type="button" class="'+cls+'"'+attr+(k.id?' id="'+k.id+'"':'')+
+    ' aria-label="'+esc(ccLabel(d,k))+'">'+d.l+'</button>';
+}
 function ccPad(){
-  var pad=ccEl("ccPad");
-  pad.innerHTML=CC_KEYS.map(function(row){
-    return row.map(function(k){
-      var d=(ccSecond&&k.alt)?k.alt:k;
-      var cls="cc-k"+(k.c?" "+k.c:"")+((k.k==="second"&&ccSecond)?" on":"");
-      var attr=d.i!==undefined?' data-cci="'+esc(d.i)+'"':' data-cck="'+esc(k.k)+'"';
-      return '<button type="button" class="'+cls+'"'+attr+
-        (k.id?' id="'+k.id+'"':'')+
-        ' aria-label="'+esc(ccLabel(d,k))+'">'+d.l+'</button>';
-    }).join("");
+  ccEl("ccPad").innerHTML=CC_FKEYS.map(function(row){
+    return row.map(ccKeyHTML).join("");
+  }).join("");
+  ccEl("ccNum").innerHTML=CC_NKEYS.map(function(row){
+    return row.map(ccKeyHTML).join("");
   }).join("");
   ccSyncFlags();
 }
 /* Buttons whose face is a symbol need a spoken name; ones whose face is
    already a word do not, and repeating it only makes a screen reader say
    everything twice. */
-var CC_SPEAK={"⌫":"Backspace","C":"Clear","÷":"Divide","×":"Multiply","−":"Minus","+":"Plus",
-  "=":"Equals","√":"Square root","∛":"Cube root","π":"Pi","!":"Factorial","%":"Percent",
+var CC_SPEAK={"DEL":"Delete","AC":"All clear","÷":"Divide","×":"Multiply","−":"Minus","+":"Plus",
+  "=":"Equals","√":"Square root","∛":"Cube root","π":"Pi","x!":"Factorial","%":"Percent",
   "(":"Open bracket",")":"Close bracket","MC":"Memory clear","MR":"Memory recall",
-  "M+":"Memory add","M−":"Memory subtract","x<sup>y</sup>":"To the power of",
-  "e<sup>x</sup>":"e to the power of x","10<sup>x</sup>":"10 to the power of x",
-  "2<sup>x</sup>":"2 to the power of x","2nd":"Second function","EXP":"Times ten to the power of",
-  "e":"Euler's number","sin⁻¹":"Inverse sine","cos⁻¹":"Inverse cosine","tan⁻¹":"Inverse tangent",
-  "log₂":"Log base 2"};
+  "M+":"Memory add","M−":"Memory subtract","xʸ":"To the power of",
+  "x²":"Squared","x³":"Cubed","x⁻¹":"Reciprocal",
+  "eˣ":"e to the power of x","10ˣ":"10 to the power of x",
+  "2ˣ":"2 to the power of x","2nd":"Second function","EXP":"Times ten to the power of",
+  "e":"Euler's number","(−)":"Negative","abs":"Absolute value","log₂":"Log base 2",
+  "sin":"Sine","cos":"Cosine","tan":"Tangent",
+  "sin⁻¹":"Inverse sine","cos⁻¹":"Inverse cosine","tan⁻¹":"Inverse tangent",
+  "sinh":"Hyperbolic sine","cosh":"Hyperbolic cosine","tanh":"Hyperbolic tangent",
+  "sinh⁻¹":"Inverse hyperbolic sine","cosh⁻¹":"Inverse hyperbolic cosine",
+  "tanh⁻¹":"Inverse hyperbolic tangent","Ans":"Last answer"};
 function ccLabel(d,k){
   if(k.k==="ang")return "Angle mode, currently "+(ccState.deg?"degrees":"radians");
+  if(k.k==="hyp")return "Hyperbolic functions, currently "+(ccHyp?"on":"off");
+  if(k.k==="second")return "Second function, currently "+(ccSecond?"on":"off");
   return CC_SPEAK[d.l]||d.l;
 }
 function ccMore(){
@@ -13372,16 +13437,32 @@ function ccMem(op){
 }
 
 /* ---- wiring ---- */
-ccEl("ccPad").addEventListener("click",function(ev){
-  var b=ev.target.closest("button"); if(!b)return;
-  if(b.dataset.cci!==undefined){ ccInsert(b.dataset.cci); return; }
+/* One handler, both grids. The modifiers are ONE-SHOT: pressing any ordinary
+   key consumes 2nd and hyp, which is how SHIFT behaves on the calculator this
+   is modelled on, and it is what stops a forgotten modifier from silently
+   turning the next sin into an asin three calculations later. */
+function ccKeyPress(b){
+  var used=(ccSecond||ccHyp);
+  if(b.dataset.cci!==undefined){
+    ccInsert(b.dataset.cci);
+    if(used){ ccSecond=false; ccHyp=false; ccPad(); }
+    return;
+  }
   var k=b.dataset.cck;
+  if(k==="second"){ ccSecond=!ccSecond; ccPad(); return; }
+  if(k==="hyp"){ ccHyp=!ccHyp; ccPad(); return; }
   if(k==="eq")ccEquals();
   else if(k==="clear")ccClear();
   else if(k==="back")ccBack();
-  else if(k==="second"){ ccSecond=!ccSecond; ccPad(); }
   else if(k==="ang"){ ccState.deg=!ccState.deg; ccSave(); ccSyncFlags(); ccPreview(); }
   else if(k&&k.indexOf("m")===0)ccMem(k);
+  if(used){ ccSecond=false; ccHyp=false; ccPad(); }
+}
+["ccPad","ccNum"].forEach(function(id){
+  ccEl(id).addEventListener("click",function(ev){
+    var b=ev.target.closest("button");
+    if(b)ccKeyPress(b);
+  });
 });
 ccEl("ccMore").addEventListener("click",function(ev){
   var b=ev.target.closest("button"); if(!b)return;
