@@ -1323,6 +1323,27 @@ body.reports-only .board-only:not(.bview):not(#view-reports){display:none}
 .ag-f input,.ag-f select{width:100%;box-sizing:border-box;padding:9px 11px;font:inherit;font-size:14px;
   color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px}
 .ag-f input:focus,.ag-f select:focus{outline:2px solid var(--forest);outline-offset:-1px;border-color:var(--forest)}
+/* ---- show/hide password ----
+   Written here, in the gate's own stylesheet, but it dresses password fields
+   ANYWHERE - the profile screen's three and the Google confirmations too. The
+   padding rule is `.pw-wrap input.pw-in` rather than `.pw-wrap input` so it
+   outranks both `.ag-f input` and `.pf-stack input` on specificity instead of
+   on which <style> block happens to come last. */
+.pw-wrap{position:relative;display:block;width:100%}
+.pw-wrap input.pw-in{width:100%;box-sizing:border-box;padding-right:42px}
+.pw-eye{position:absolute;top:50%;right:4px;transform:translateY(-50%);
+  width:34px;height:34px;display:flex;align-items:center;justify-content:center;
+  padding:0;border:0;border-radius:8px;background:none;cursor:pointer;color:var(--muted)}
+/* The icon is a line drawing, so it has to be stroked rather than filled -
+   every other inline SVG in this file is set up the same way. */
+.pw-eye svg{fill:none;stroke:currentColor;stroke-width:1.5;
+  stroke-linecap:round;stroke-linejoin:round}
+.pw-eye:hover{background:var(--ivory);color:var(--ink)}
+.pw-eye:focus-visible{outline:2px solid var(--forest);outline-offset:-1px;color:var(--ink)}
+/* Pressed is a real state here, not decoration: it is the only thing on screen
+   that says the password is currently legible to anyone looking. */
+.pw-eye[aria-pressed="true"]{color:var(--forest-ink)}
+@media(pointer:coarse){ .pw-eye{width:40px;height:40px} .pw-wrap input.pw-in{padding-right:46px} }
 .ag-hint{font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.45}
 .ag-row{display:flex;gap:10px}
 .ag-row>.ag-f{flex:1}
@@ -1928,8 +1949,82 @@ function gsStartSignup(res){
     "Google confirmed you as " + (p.email || "this account") + ". Two things left that Google cannot answer for you: a password, and a way back in if you ever lose both.";
 }
 
+/* ---- show/hide password ---------------------------------------------------
+   An eye inside every password field, so you can check what you typed before
+   you commit to it. Typing a 10-character password with an uppercase, a
+   lowercase and a digit into an invisible box on a phone at 3am is how you
+   end up locked out of your own board.
+
+   Mechanically this is ONE attribute: type flips between "password" and
+   "text". Nothing is read out of the field, nothing is copied anywhere, and
+   nothing is remembered - there is no new place a password exists. The field
+   also goes back to hidden whenever the gate is reopened, so a password left
+   visible cannot survive into the next time the screen is shown.
+
+   It decorates fields rather than being written into each one by hand because
+   several of them (the profile screen's, the Google unlink confirmation) are
+   built with innerHTML at the moment they are needed, and a toggle that only
+   worked on the markup present at boot would be missing from exactly the
+   fields typed into least often. Exposed as window.pwEyes for those callers. */
+var PW_EYE='<svg viewBox="0 0 20 20" width="17" height="17" aria-hidden="true" focusable="false">'+
+  '<path d="M1.7 10S4.8 4.8 10 4.8 18.3 10 18.3 10 15.2 15.2 10 15.2 1.7 10 1.7 10z"/>'+
+  '<circle cx="10" cy="10" r="2.6"/></svg>';
+var PW_EYE_OFF='<svg viewBox="0 0 20 20" width="17" height="17" aria-hidden="true" focusable="false">'+
+  '<path d="M1.7 10S4.8 4.8 10 4.8c1.5 0 2.8.4 3.9 1M18.3 10s-3.1 5.2-8.3 5.2c-1.5 0-2.8-.4-3.9-1"/>'+
+  '<path d="M8.2 8.2a2.6 2.6 0 0 0 3.6 3.6"/><path d="M3 3l14 14"/></svg>';
+function pwEye(inp){
+  if(!inp || inp.dataset.pweye) return;
+  inp.dataset.pweye = "1";
+  inp.classList.add("pw-in");
+  var wrap = document.createElement("div");
+  wrap.className = "pw-wrap";
+  inp.parentNode.insertBefore(wrap, inp);
+  wrap.appendChild(inp);
+  var b = document.createElement("button");
+  b.type = "button";                       // never submits the form it sits in
+  b.className = "pw-eye";
+  b.setAttribute("aria-pressed","false");
+  b.setAttribute("aria-label","Show password");
+  b.title = "Show password";
+  b.innerHTML = PW_EYE;
+  b.addEventListener("click", function(){
+    var showing = (inp.type === "text");
+    inp.type = showing ? "password" : "text";
+    b.setAttribute("aria-pressed", showing ? "false" : "true");
+    b.setAttribute("aria-label", showing ? "Show password" : "Hide password");
+    b.title = b.getAttribute("aria-label");
+    b.innerHTML = showing ? PW_EYE : PW_EYE_OFF;
+    /* Put the caret back where it was. Changing `type` moves it to the end in
+       every browser, which turns "let me check the character I just typed"
+       into "my cursor jumped" if you were editing the middle. */
+    try{ var s=inp.selectionStart, e=inp.selectionEnd; inp.focus(); inp.setSelectionRange(s,e); }catch(err){}
+  });
+  wrap.appendChild(b);
+}
+/** Decorate every password field inside `root` (default: the whole page). */
+function pwEyes(root){
+  (root||document).querySelectorAll('input[type="password"]').forEach(pwEye);
+}
+/** Back to hidden, wherever they are. Called when the gate opens. */
+function pwEyesReset(root){
+  (root||document).querySelectorAll('input.pw-in').forEach(function(inp){
+    if(inp.type !== "text") return;
+    inp.type = "password";
+    var b = inp.parentNode.querySelector(".pw-eye");
+    if(!b) return;
+    b.setAttribute("aria-pressed","false");
+    b.setAttribute("aria-label","Show password");
+    b.title = "Show password";
+    b.innerHTML = PW_EYE;
+  });
+}
+window.pwEyes = pwEyes;
+pwEyes(document);
+
 function openGate(){
   gate.hidden = false;
+  pwEyes(gate);                 // covers anything added to the gate since boot
+  pwEyesReset(gate);            // never reopen a gate with a password on show
   show(serverUrl ? "agChoose" : "agSetup");
   // Mounted after the card is visible so renderButton can measure its width.
   gsMountGate();
@@ -4384,6 +4479,75 @@ return {
       .tp-txtbtn{min-height:44px;padding-left:16px;padding-right:16px}
     }
 
+    /* ---- Scientific calculator ----
+       The display is two lines and they are not the same kind of thing: what
+       you typed (editable, monospaced, machine) and what it comes to (read
+       only, serif, large). Every other number in this app that means something
+       is set in the serif - the streak, the report totals - and a result is
+       the most "this is the number" thing the app has. */
+    .cc-disp{border:1px solid var(--line);border-radius:12px;background:var(--panel);
+      padding:9px 11px 7px;margin-bottom:9px}
+    .cc-in{width:100%;box-sizing:border-box;border:0;background:none;color:var(--ink);
+      font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:16px;
+      padding:2px 0;outline:none;text-align:right;direction:ltr}
+    .cc-in::placeholder{color:var(--muted);opacity:.7}
+    .cc-out{min-height:30px;text-align:right;font-family:var(--serif);font-size:25px;
+      font-weight:800;line-height:1.2;color:var(--forest-ink);overflow-wrap:anywhere;
+      font-variant-numeric:tabular-nums}
+    .cc-out.err{font-family:inherit;font-size:12.5px;font-weight:600;color:var(--alert-ink)}
+    .cc-out.pend{color:var(--muted)}
+    .cc-flags{display:flex;gap:6px;align-items:center;min-height:16px;margin-top:2px}
+    .cc-flag{font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;
+      color:var(--muted);border:1px solid var(--line);border-radius:5px;padding:1px 5px}
+    .cc-flag.on{color:var(--terra-ink);border-color:var(--terra)}
+    .cc-flag.sp{margin-left:auto}
+
+    /* The extra functions. A scrolling chip strip, the same device the dock's
+       own widget switcher uses, because the alternative was a sixth keypad
+       column nobody could hit with a thumb. */
+    .cc-more{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin-bottom:9px;padding-bottom:1px}
+    .cc-more::-webkit-scrollbar{display:none}
+    .cc-more button{flex:none;font-size:11.5px;font-weight:700;padding:5px 10px;border-radius:999px;
+      border:1px solid var(--line);background:var(--paper);color:var(--muted);white-space:nowrap}
+    .cc-more button:hover{color:var(--ink);border-color:var(--sage)}
+
+    .cc-pad{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+    .cc-k{min-height:44px;padding:0 2px;border:1px solid var(--line);border-radius:10px;
+      background:var(--paper);color:var(--ink);font:inherit;font-size:15px;font-weight:700;
+      cursor:pointer;display:flex;align-items:center;justify-content:center;
+      transition:background .12s,border-color .12s}
+    .cc-k:hover{background:var(--ivory);border-color:var(--sage)}
+    .cc-k:active{transform:translateY(1px)}
+    .cc-k:focus-visible{outline:2px solid var(--forest);outline-offset:-2px}
+    /* Four weights of key, so the pad can be read without labels being parsed:
+       digits plain, functions quiet, operators tinted, equals solid. */
+    .cc-k.fn{font-size:12.5px;font-weight:700;color:var(--muted);background:var(--panel)}
+    .cc-k.fn:hover{color:var(--ink)}
+    .cc-k.op{color:var(--forest-ink);background:var(--olive-lt);border-color:var(--olive)}
+    .cc-k.warn{color:var(--terra-ink)}
+    .cc-k.eq{grid-row:span 2;background:var(--forest);border-color:var(--forest);
+      color:var(--on-brand);font-size:19px}
+    .cc-k.eq:hover{background:var(--forest-dk);border-color:var(--forest-dk)}
+    .cc-k.on{background:var(--terra);border-color:var(--terra);color:var(--on-warm)}
+    .cc-k sup{font-size:.7em;line-height:0}
+
+    .cc-hwrap{margin-top:13px;border-top:1px solid var(--line);padding-top:10px}
+    .cc-hhead{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+    .cc-hhead h4{flex:1;font-size:11.5px;letter-spacing:.5px;text-transform:uppercase;
+      color:var(--muted);margin:0}
+    .cc-hclr{font-size:11.5px;font-weight:700;color:var(--terra-ink);background:none;border:0;
+      padding:4px 6px;border-radius:7px;cursor:pointer}
+    .cc-hclr:hover{background:var(--terra-lt)}
+    .cc-h{display:block;width:100%;text-align:right;border:0;border-bottom:1px dashed var(--line);
+      background:none;padding:6px 2px;cursor:pointer}
+    .cc-h:last-child{border-bottom:0}
+    .cc-h:hover{background:var(--ivory)}
+    .cc-he{display:block;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+    .cc-hr{display:block;font-family:var(--serif);font-size:15px;font-weight:700;color:var(--ink);
+      overflow-wrap:anywhere}
+    .cc-hnone{font-size:12px;color:var(--muted);padding:2px}
+
     @media(max-width:620px){
       /* Bottom sheet. Full-bleed and anchored to the bottom edge because that
          is where a thumb is, and because a floating card on a 375px screen is
@@ -4479,6 +4643,35 @@ return {
             <button class="ag-btn ghost" id="tpSave">Save</button>
             <button class="hist-btn am-del" id="tpDel">Delete</button>
           </div>
+        </div>
+      </section>
+
+      <!-- Scientific calculator.
+           Everything it needs is in this file: the parser is ~200 lines below
+           and there is no library, no CDN and no request, so "works offline"
+           is not a cache strategy here, it is the absence of anything to
+           fetch. The keypad is built by ccPad() rather than written out,
+           because the 2nd layer swaps six of its labels and two copies of the
+           same grid would drift. -->
+      <section class="wg-panel" id="wgp-calc" role="tabpanel" aria-labelledby="wgc-calc" hidden>
+        <div class="cc-disp">
+          <input id="ccIn" class="cc-in" type="text" inputmode="text" autocomplete="off"
+                 autocapitalize="off" spellcheck="false" placeholder="0"
+                 aria-label="Calculation">
+          <div class="cc-out pend" id="ccOut" aria-live="polite"></div>
+          <div class="cc-flags">
+            <span class="cc-flag" id="ccFlagM" hidden>M</span>
+            <span class="cc-flag sp" id="ccFlagAng">DEG</span>
+          </div>
+        </div>
+        <div class="cc-more" id="ccMore" role="group" aria-label="More functions"></div>
+        <div class="cc-pad" id="ccPad"></div>
+        <div class="cc-hwrap">
+          <div class="cc-hhead">
+            <h4>History</h4>
+            <button class="cc-hclr" id="ccHClear" hidden>Clear</button>
+          </div>
+          <div id="ccHist"></div>
         </div>
       </section>
 
@@ -5276,7 +5469,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="4.22";
+var APP_VERSION="4.23";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -5287,6 +5480,7 @@ var APP_VERSION="4.22";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-10-06T12:00:00+08:00",text:"Two things. Every password box now has an eye in it -- on the login and sign-up screens, the Google setup, the password reset, and the three in your profile -- so you can check what you typed before you commit to it. It goes back to hidden whenever the sign-in screen is reopened, and nothing about how passwords are handled or stored has changed. Second, there is a new Calculator in the widget dock, beside the clocks, the Bible and the teleprompter. It is a full scientific calculator: brackets and proper precedence, powers and roots, sin/cos/tan with their inverses and the hyperbolics, ln, log, log base 2, factorial, percent, pi and e, scientific notation, degrees or radians, memory keys and a history you can tap to reuse an answer. Type on a keyboard or tap the pad; Enter works out the answer. It needs no internet at all -- the maths is built into the app itself, so it works on a plane, and your history and memory stay on the device."},
   {ts:"2026-09-24T21:30:00+08:00",text:"The ready-made programs are now visible. Phase 1 and Phase 2 sit in their own \"Ready-made programs\" section in the Library, each showing what is in it -- how many exercises, how many sets, and the schedule it suggests -- with an Add to library button. They were hidden inside a dropdown before, which nobody opened, because a dropdown looks like a way to filter what is already on screen rather than a shelf holding things you do not have yet. One already in your library says so and offers to add another copy."},
   {ts:"2026-09-24T18:00:00+08:00",text:"Phase 2, Early Intermediate, joins Phase 1 in the ready-made programs: sixteen movements across the same three circuits, built on harder variations -- Bulgarian split squats, Romanian deadlift hinges, lateral lunges, single-leg glute bridges, side planks and shoulder taps. Phases now queue instead of colliding. If a program is already scheduled with an end date, a new one starts the day after that finishes rather than on top of it, so adding Phase 2 while Phase 1 is still running puts it in weeks 5 to 8 where it belongs. The date is in the question it asks, so you can see where it landed before agreeing to it."},
   {ts:"2026-09-24T12:00:00+08:00",text:"The Exercise Library can now install a whole program in one tap. Open Exercise, then Library, and use \"Add a ready-made program\" -- the first one is Phase 1, Beginner Foundation: the warm-up, the five-exercise leg circuit and the four-exercise core circuit, all fifteen movements with their rounds and target reps already filled in. It then offers to put it on your calendar every Monday and Thursday for four weeks. Say yes and those days fill themselves in on the Exercise calendar and in Today, with a Start this workout button waiting; nothing is recorded until you actually start one. Exercises can now carry a circuit heading, so Warm-up, Leg circuit and Abs/core stay visibly separate while you work through them. It is an ordinary saved workout once installed -- rename it, change the reps, reschedule it or delete it like any other."},
@@ -8007,6 +8201,7 @@ function pfRenderGoogle(){
       '<input id="pfGUnlinkPw" type="password" autocomplete="current-password" placeholder="Your password, to confirm">' +
       '<div class="um-acts"><button type="button" class="um-btn danger" id="pfGUnlinkGo">Disconnect Google</button>' +
       '<button type="button" class="um-btn" id="pfGUnlinkCancel">Cancel</button></div></div>';
+    if(window.pwEyes) pwEyes(state);   // this field was built just now
     pfEl("pfGUnlink").addEventListener("click", function(){ pfEl("pfGUnlinkForm").hidden = false; });
     pfEl("pfGUnlinkCancel").addEventListener("click", function(){ pfEl("pfGUnlinkForm").hidden = true; });
     pfEl("pfGUnlinkGo").addEventListener("click", pfGoogleUnlink);
@@ -8022,6 +8217,7 @@ function pfRenderGoogle(){
   state.innerHTML = '<div class="pf-stack">' +
     '<input id="pfGLinkPw" type="password" autocomplete="current-password" placeholder="Your password, to confirm it is you">' +
     '</div>';
+  if(window.pwEyes) pwEyes(state);
   PDAuth.googleButton(host, "continue_with", pfGoogleLinkCredential).then(function(ok){
     if(ok) return;
     state.innerHTML = "";
@@ -11581,7 +11777,8 @@ function wgEl(id){return document.getElementById(id);}
 var WG_LIST=[
   {id:"clocks",name:"World Clocks",mount:wcMount,unmount:wcUnmount},
   {id:"bible", name:"Bible",       mount:bbMount, unmount:bbUnmount},
-  {id:"prompter",name:"Teleprompter",mount:tpMount,unmount:tpUnmount}
+  {id:"prompter",name:"Teleprompter",mount:tpMount,unmount:tpUnmount},
+  {id:"calc",  name:"Calculator",  mount:ccMount, unmount:ccUnmount}
 ];
 var wgCur="";           // id of the mounted widget, "" when the dock is closed
 
@@ -12744,6 +12941,477 @@ window.addEventListener("resize",function(){
   if(tpEl("tpStage").hidden)return;
   tpPos=Math.min(tpPos,tpMaxPos()); tpApply(); tpSyncFsButtons();
 });
+
+/* ============================================================
+   SCIENTIFIC CALCULATOR  (cc*)
+
+   WHY THERE IS NO LIBRARY HERE. The obvious move was math.js - Apache-2.0,
+   excellent, and it would have brought matrices and symbolic solving along
+   for free. Its browser bundle is 646 KB. ProDash is one HTML file that has
+   to open from file://, work with no network, and load on a phone at 3am;
+   646 KB of vendored engine for a keypad is the wrong trade, and it would
+   have ended the file's one-file property for a feature nobody asked to be
+   a computer algebra system. So: ~200 lines of parser, below, covering
+   exactly the scientific set. Offline here is not a cache strategy, it is
+   the absence of anything to fetch.
+
+   THE PARSER IS NOT eval(). It is a tokeniser plus shunting-yard into RPN,
+   evaluated over a fixed table of functions. Nothing typed into the box can
+   name a variable, reach a global, or run a statement: an unknown word is an
+   error, not a lookup. That is the whole reason to write it out rather than
+   hand a string to the engine the rest of the app runs on.
+
+   State lives in its own localStorage key, NOT in S. A scratch calculation
+   is not board data: it should not travel to other devices, enter the
+   revision history, or be a thing a sync conflict can be about. */
+var CC_KEY="prodash.calc";
+var CC_HIST_MAX=40;
+var ccState={hist:[],mem:0,deg:true,ans:0};
+var ccSecond=false;            // the 2nd layer (inverse trig) is showing
+
+function ccEl(id){return document.getElementById(id);}
+function ccLoad(){
+  try{
+    var raw=localStorage.getItem(CC_KEY);
+    if(!raw)return;
+    var o=JSON.parse(raw);
+    if(!o||typeof o!=="object")return;
+    if(Array.isArray(o.hist)){
+      ccState.hist=o.hist.filter(function(h){
+        return h&&typeof h==="object"&&typeof h.e==="string"&&typeof h.r==="string";
+      }).slice(0,CC_HIST_MAX);
+    }
+    if(typeof o.mem==="number"&&isFinite(o.mem))ccState.mem=o.mem;
+    if(typeof o.ans==="number"&&isFinite(o.ans))ccState.ans=o.ans;
+    ccState.deg=(o.deg!==false);
+  }catch(e){}            // private mode, file://, full disk - all non-fatal
+}
+function ccSave(){
+  try{ localStorage.setItem(CC_KEY,JSON.stringify(ccState)); }catch(e){}
+}
+
+/* ---- the engine ----------------------------------------------------------
+   Angles: the DEG/RAD switch applies to the circular functions only, on the
+   way in for sin/cos/tan and on the way out for their inverses. Hyperbolics
+   are not angles and are deliberately untouched by it - sinh(1) is sinh(1)
+   in either mode, and "fixing" that is a bug people file against calculators
+   every year. */
+function ccRad(x){ return ccState.deg ? x*Math.PI/180 : x; }
+function ccDeg(x){ return ccState.deg ? x*180/Math.PI : x; }
+function ccFact(n){
+  if(!isFinite(n)||n<0||Math.abs(n-Math.round(n))>1e-9)
+    throw new Error("! needs a whole number of 0 or more");
+  n=Math.round(n);
+  if(n>170)return Infinity;          // 171! overflows a double anyway
+  var r=1; for(var i=2;i<=n;i++)r*=i;
+  return r;
+}
+/* Guarded wrappers. Math.asin(2) is NaN and a bare NaN on the display tells
+   you nothing about which step was impossible, so the domain errors speak. */
+function ccDomain(name,ok,fn){
+  return function(x){ if(!ok(x))throw new Error(name); return fn(x); };
+}
+var CC_FN={
+  sin:function(x){return Math.sin(ccRad(x));},
+  cos:function(x){return Math.cos(ccRad(x));},
+  tan:function(x){return Math.tan(ccRad(x));},
+  asin:ccDomain("asin needs a number between -1 and 1",function(x){return x>=-1&&x<=1;},
+    function(x){return ccDeg(Math.asin(x));}),
+  acos:ccDomain("acos needs a number between -1 and 1",function(x){return x>=-1&&x<=1;},
+    function(x){return ccDeg(Math.acos(x));}),
+  atan:function(x){return ccDeg(Math.atan(x));},
+  sinh:Math.sinh, cosh:Math.cosh, tanh:Math.tanh,
+  asinh:Math.asinh,
+  acosh:ccDomain("acosh needs a number of 1 or more",function(x){return x>=1;},Math.acosh),
+  atanh:ccDomain("atanh needs a number between -1 and 1",function(x){return x>-1&&x<1;},Math.atanh),
+  ln:ccDomain("ln needs a number above 0",function(x){return x>0;},Math.log),
+  log:ccDomain("log needs a number above 0",function(x){return x>0;},Math.log10),
+  log2:ccDomain("log2 needs a number above 0",function(x){return x>0;},Math.log2),
+  exp:Math.exp,
+  sqrt:ccDomain("√ needs a number of 0 or more",function(x){return x>=0;},Math.sqrt),
+  cbrt:Math.cbrt, abs:Math.abs,
+  round:Math.round, floor:Math.floor, ceil:Math.ceil,
+  sign:Math.sign, fact:ccFact
+};
+var CC_FN2={                      // two-argument functions, comma separated
+  mod:function(a,b){ if(b===0)throw new Error("mod by zero"); return a-b*Math.floor(a/b); },
+  pow:Math.pow,
+  nroot:function(x,n){ if(n===0)throw new Error("0th root");
+    return x<0&&Math.abs(n%2)===1 ? -Math.pow(-x,1/n) : Math.pow(x,1/n); },
+  logb:function(x,b){ if(x<=0||b<=0||b===1)throw new Error("logb needs positive numbers");
+    return Math.log(x)/Math.log(b); }
+};
+var CC_CONST={ pi:Math.PI, "π":Math.PI, e:Math.E, tau:2*Math.PI, phi:(1+Math.sqrt(5))/2,
+               inf:Infinity };
+/* Precedence and associativity. ^ is right-associative, so 2^3^2 is 512 and
+   not 64. Unary minus ("u") sits BELOW ^ and above × ÷, which is what makes
+   -2^2 come out as -4: the minus applies to the square, not to the 2. Every
+   maths convention and every scientific calculator agrees on that one, and
+   spreadsheets are the famous exception - this follows the calculators. */
+var CC_OP={ "+":{p:1,a:"L"}, "-":{p:1,a:"L"}, "*":{p:2,a:"L"}, "/":{p:2,a:"L"},
+            "u":{p:3,a:"R"}, "^":{p:4,a:"R"} };
+
+/** Text to tokens. Throws on anything it does not recognise - there is no
+    "ignore it and hope" branch, because a silently dropped character is a
+    wrong answer that looks like a right one. */
+function ccTokens(src){
+  var s=String(src), out=[], i=0;
+  // Typed or tapped, these all mean the same operators.
+  s=s.replace(/×/g,"*").replace(/÷/g,"/").replace(/−/g,"-").replace(/–/g,"-")
+     .replace(/√/g,"sqrt").replace(/∛/g,"cbrt")
+     .replace(/π/g,"pi").replace(/τ/g,"tau").replace(/φ/g,"phi");
+  while(i<s.length){
+    var c=s[i];
+    if(c===" "||c==="\t"){ i++; continue; }
+    if(/[0-9.]/.test(c)){
+      var j=i, seenDot=false;
+      while(j<s.length&&/[0-9.]/.test(s[j])){ if(s[j]==="."){ if(seenDot)throw new Error("Two decimal points in one number"); seenDot=true; } j++; }
+      /* Scientific notation, but only when it really is one: 2e3 is a number,
+         while 2e is 2×e and 2exp(1) is 2×exp(1). The lookahead is what keeps
+         Euler's constant usable as a constant. */
+      if(j<s.length&&/[eE]/.test(s[j])){
+        var k=j+1;
+        if(k<s.length&&/[+-]/.test(s[k]))k++;
+        if(k<s.length&&/[0-9]/.test(s[k])){
+          while(k<s.length&&/[0-9]/.test(s[k]))k++;
+          j=k;
+        }
+      }
+      var numText=s.slice(i,j);
+      var num=Number(numText);
+      if(!isFinite(num)&&!/^[0-9.]+$/.test(numText))throw new Error("“"+numText+"” is not a number");
+      if(isNaN(num))throw new Error("“"+numText+"” is not a number");
+      out.push({t:"num",v:num}); i=j; continue;
+    }
+    if(/[a-zA-Z_]/.test(c)){
+      var m=i; while(m<s.length&&/[a-zA-Z0-9_]/.test(s[m]))m++;
+      var w=s.slice(i,m), lw=w.toLowerCase();
+      if(CC_FN[lw])out.push({t:"fn",v:lw});
+      else if(CC_FN2[lw])out.push({t:"fn2",v:lw});
+      else if(CC_CONST[lw]!==undefined)out.push({t:"num",v:CC_CONST[lw]});
+      else if(lw==="ans")out.push({t:"num",v:ccState.ans});
+      else if(lw==="m")out.push({t:"num",v:ccState.mem});
+      else throw new Error("I don't know “"+w+"”");
+      i=m; continue;
+    }
+    if(c==="("||c===")"){ out.push({t:c}); i++; continue; }
+    if(c===","){ out.push({t:","}); i++; continue; }
+    if(c==="!"){ out.push({t:"post",v:"fact"}); i++; continue; }
+    if(c==="%"){ out.push({t:"post",v:"pct"}); i++; continue; }
+    if(CC_OP[c]){ out.push({t:"op",v:c}); i++; continue; }
+    throw new Error("“"+c+"” can't be used here");
+  }
+  return out;
+}
+/** Insert the multiplications people leave out: 2(3+4), 3π, (1+2)(3+4), 2sin(1). */
+function ccImplicit(tok){
+  var out=[];
+  for(var i=0;i<tok.length;i++){
+    var a=tok[i], b=tok[i+1];
+    out.push(a);
+    if(!b)continue;
+    var aEnds=(a.t==="num"||a.t===")"||a.t==="post");
+    var bStarts=(b.t==="num"||b.t==="fn"||b.t==="fn2"||b.t==="(");
+    if(aEnds&&bStarts)out.push({t:"op",v:"*"});
+  }
+  return out;
+}
+/** Shunting-yard: tokens to RPN. Unary minus becomes the marker "u". */
+function ccRPN(tok){
+  var out=[], ops=[], prev=null;
+  tok.forEach(function(t){
+    if(t.t==="num"){ out.push(t); }
+    else if(t.t==="fn"||t.t==="fn2"){ ops.push(t); }
+    else if(t.t===","){
+      while(ops.length&&ops[ops.length-1].t!=="(")out.push(ops.pop());
+      if(!ops.length)throw new Error("Misplaced comma");
+    }
+    else if(t.t==="post"){ out.push(t); }
+    else if(t.t==="op"){
+      // A minus with nothing usable before it is a sign, not a subtraction.
+      var unary=(t.v==="-"||t.v==="+")&&
+        (prev===null||prev.t==="op"||prev.t==="("||prev.t===",");
+      if(unary){ if(t.v==="-")ops.push({t:"op",v:"u"}); }
+      else{
+        var o=CC_OP[t.v];
+        while(ops.length){
+          var top=ops[ops.length-1];
+          if(top.t==="fn"||top.t==="fn2"){ out.push(ops.pop()); continue; }
+          if(top.t!=="op")break;
+          var to=CC_OP[top.v];
+          if(to&&(to.p>o.p||(to.p===o.p&&o.a==="L")))out.push(ops.pop());
+          else break;
+        }
+        ops.push(t);
+      }
+    }
+    else if(t.t==="("){ ops.push(t); }
+    else if(t.t===")"){
+      while(ops.length&&ops[ops.length-1].t!=="(")out.push(ops.pop());
+      if(!ops.length)throw new Error("One too many closing brackets");
+      ops.pop();
+      if(ops.length&&(ops[ops.length-1].t==="fn"||ops[ops.length-1].t==="fn2"))out.push(ops.pop());
+    }
+    prev=t;
+  });
+  while(ops.length){
+    var last=ops.pop();
+    if(last.t==="(")throw new Error("A bracket is still open");
+    out.push(last);
+  }
+  return out;
+}
+function ccEvalRPN(rpn){
+  var st=[];
+  function pop(){ if(!st.length)throw new Error("Something is missing from that"); return st.pop(); }
+  rpn.forEach(function(t){
+    if(t.t==="num"){ st.push(t.v); return; }
+    if(t.t==="post"){
+      var x=pop();
+      st.push(t.v==="fact"?ccFact(x):x/100);
+      return;
+    }
+    if(t.t==="fn"){ st.push(CC_FN[t.v](pop())); return; }
+    if(t.t==="fn2"){ var b=pop(), a=pop(); st.push(CC_FN2[t.v](a,b)); return; }
+    if(t.t==="op"){
+      if(t.v==="u"){ st.push(-pop()); return; }
+      var y=pop(), x2=pop();
+      if(t.v==="+")st.push(x2+y);
+      else if(t.v==="-")st.push(x2-y);
+      else if(t.v==="*")st.push(x2*y);
+      else if(t.v==="/"){ if(y===0)throw new Error("Can't divide by zero"); st.push(x2/y); }
+      else if(t.v==="^")st.push(Math.pow(x2,y));
+      return;
+    }
+    throw new Error("That expression doesn't make sense");
+  });
+  if(st.length!==1)throw new Error("That expression doesn't make sense");
+  var r=st[0];
+  if(typeof r!=="number"||isNaN(r))throw new Error("Not a number");
+  return r;
+}
+function ccEval(src){
+  if(!String(src).trim())return null;
+  return ccEvalRPN(ccRPN(ccImplicit(ccTokens(src))));
+}
+/** Display form. Rounded to 12 significant figures first, because binary
+    floats are why 0.1+0.2 shows 0.30000000000000004 on calculators that
+    don't, and nobody wants to see it. */
+function ccFmt(x){
+  if(!isFinite(x))return x>0?"∞":(x<0?"-∞":"Not a number");
+  if(x===0)return "0";
+  var a=Math.abs(x);
+  if(a>=1e13||a<1e-9){
+    // 1.267650600e+30 -> 1.2676506×10^30: drop the trailing zeros the fixed
+    // precision added, and the "+" nobody writes on a positive exponent.
+    return x.toExponential(9).replace(/\.?0+e/,"e").replace("e+","e").replace("e","×10^");
+  }
+  var s=Number(x.toPrecision(12)).toString();
+  return s;
+}
+
+/* ---- the keypad ----
+   One table, two layers. The 2nd layer swaps the three circular functions
+   for their inverses and nothing else: a layer that moves everything is a
+   layer you have to re-read every time you press it. */
+var CC_KEYS=[
+  [{l:"2nd",k:"second",c:"fn"},{l:"DEG",k:"ang",c:"fn",id:"ccKAng"},{l:"(",i:"(",c:"fn"},{l:")",i:")",c:"fn"},{l:"⌫",k:"back",c:"fn warn"}],
+  [{l:"MC",k:"mc",c:"fn"},{l:"MR",k:"mr",c:"fn"},{l:"M+",k:"m+",c:"fn"},{l:"M−",k:"m-",c:"fn"},{l:"C",k:"clear",c:"fn warn"}],
+  [{l:"sin",i:"sin(",c:"fn",alt:{l:"sin⁻¹",i:"asin("}},
+   {l:"cos",i:"cos(",c:"fn",alt:{l:"cos⁻¹",i:"acos("}},
+   {l:"tan",i:"tan(",c:"fn",alt:{l:"tan⁻¹",i:"atan("}},
+   {l:"x<sup>y</sup>",i:"^",c:"op"},{l:"÷",i:"/",c:"op"}],
+  [{l:"ln",i:"ln(",c:"fn",alt:{l:"e<sup>x</sup>",i:"exp("}},
+   {l:"log",i:"log(",c:"fn",alt:{l:"10<sup>x</sup>",i:"10^"}},
+   {l:"log₂",i:"log2(",c:"fn",alt:{l:"2<sup>x</sup>",i:"2^"}},
+   {l:"√",i:"sqrt(",c:"op",alt:{l:"∛",i:"cbrt("}},{l:"×",i:"*",c:"op"}],
+  [{l:"7",i:"7"},{l:"8",i:"8"},{l:"9",i:"9"},{l:"!",i:"!",c:"op"},{l:"−",i:"-",c:"op"}],
+  [{l:"4",i:"4"},{l:"5",i:"5"},{l:"6",i:"6"},{l:"%",i:"%",c:"op"},{l:"+",i:"+",c:"op"}],
+  [{l:"1",i:"1"},{l:"2",i:"2"},{l:"3",i:"3"},{l:"π",i:"π",c:"op"},{l:"=",k:"eq",c:"eq"}],
+  /* EXP and Euler's e are the SAME character and that is not a slip: "2e8"
+     is scientific notation and "2e" is 2×e, and ccTokens decides which by
+     what follows. Two keys inserting one letter would just be two ways to
+     press the same thing, so there is one key, and e-the-constant lives in
+     the strip above with the other named values. */
+  [{l:"0",i:"0"},{l:".",i:"."},{l:"EXP",i:"e",c:"fn"},{l:"Ans",i:"Ans",c:"fn"}]
+];
+var CC_MORE=["sinh(","cosh(","tanh(","asinh(","acosh(","atanh(","abs(","exp(",
+  "mod(","nroot(","logb(","round(","floor(","ceil(","e","τ","φ"];
+
+function ccPad(){
+  var pad=ccEl("ccPad");
+  pad.innerHTML=CC_KEYS.map(function(row){
+    return row.map(function(k){
+      var d=(ccSecond&&k.alt)?k.alt:k;
+      var cls="cc-k"+(k.c?" "+k.c:"")+((k.k==="second"&&ccSecond)?" on":"");
+      var attr=d.i!==undefined?' data-cci="'+esc(d.i)+'"':' data-cck="'+esc(k.k)+'"';
+      return '<button type="button" class="'+cls+'"'+attr+
+        (k.id?' id="'+k.id+'"':'')+
+        ' aria-label="'+esc(ccLabel(d,k))+'">'+d.l+'</button>';
+    }).join("");
+  }).join("");
+  ccSyncFlags();
+}
+/* Buttons whose face is a symbol need a spoken name; ones whose face is
+   already a word do not, and repeating it only makes a screen reader say
+   everything twice. */
+var CC_SPEAK={"⌫":"Backspace","C":"Clear","÷":"Divide","×":"Multiply","−":"Minus","+":"Plus",
+  "=":"Equals","√":"Square root","∛":"Cube root","π":"Pi","!":"Factorial","%":"Percent",
+  "(":"Open bracket",")":"Close bracket","MC":"Memory clear","MR":"Memory recall",
+  "M+":"Memory add","M−":"Memory subtract","x<sup>y</sup>":"To the power of",
+  "e<sup>x</sup>":"e to the power of x","10<sup>x</sup>":"10 to the power of x",
+  "2<sup>x</sup>":"2 to the power of x","2nd":"Second function","EXP":"Times ten to the power of",
+  "e":"Euler's number","sin⁻¹":"Inverse sine","cos⁻¹":"Inverse cosine","tan⁻¹":"Inverse tangent",
+  "log₂":"Log base 2"};
+function ccLabel(d,k){
+  if(k.k==="ang")return "Angle mode, currently "+(ccState.deg?"degrees":"radians");
+  return CC_SPEAK[d.l]||d.l;
+}
+function ccMore(){
+  ccEl("ccMore").innerHTML=CC_MORE.map(function(f){
+    return '<button type="button" data-cci="'+esc(f)+'">'+esc(f.replace("(",""))+'</button>';
+  }).join("");
+}
+
+/* ---- display ---- */
+function ccSyncFlags(){
+  var m=ccEl("ccFlagM"), a=ccEl("ccFlagAng"), k=ccEl("ccKAng");
+  if(m){ m.hidden=(ccState.mem===0); m.classList.toggle("on",ccState.mem!==0);
+         m.title="Memory holds "+ccFmt(ccState.mem); }
+  if(a)a.textContent=ccState.deg?"DEG":"RAD";
+  if(k){ k.textContent=ccState.deg?"DEG":"RAD";
+         k.setAttribute("aria-label","Angle mode, currently "+(ccState.deg?"degrees":"radians")); }
+}
+/** The live answer under the expression. While you are still typing, an error
+    is almost always "you have not finished yet", so a half-written formula
+    shows nothing rather than shouting. Pressing = is when it speaks. */
+function ccPreview(){
+  var out=ccEl("ccOut"), src=ccEl("ccIn").value;
+  out.classList.remove("err");
+  if(!src.trim()){ out.textContent=""; out.classList.add("pend"); return; }
+  try{
+    var r=ccEval(src);
+    out.textContent=(r===null)?"":ccFmt(r);
+    out.classList.add("pend");
+  }catch(e){ out.textContent=""; out.classList.add("pend"); }
+}
+function ccShowErr(msg){
+  var out=ccEl("ccOut");
+  out.textContent=msg;
+  out.classList.add("err"); out.classList.remove("pend");
+}
+function ccRenderHist(){
+  var host=ccEl("ccHist"), clr=ccEl("ccHClear");
+  if(!host)return;
+  clr.hidden=!ccState.hist.length;
+  host.innerHTML=ccState.hist.length
+    ? ccState.hist.map(function(h,i){
+        return '<button type="button" class="cc-h" data-cch="'+i+'" '+
+          'title="Tap to use this result">'+
+          '<span class="cc-he">'+esc(h.e)+'</span>'+
+          '<span class="cc-hr">'+esc(h.r)+'</span></button>';
+      }).join("")
+    : '<div class="cc-hnone">Nothing yet. Answers you work out land here, and tapping one puts it back in the box.</div>';
+}
+
+/* ---- editing ---- */
+function ccInsert(text){
+  var inp=ccEl("ccIn");
+  var s=inp.selectionStart, e=inp.selectionEnd;
+  if(s===null||s===undefined){ inp.value+=text; }
+  else{ inp.setRangeText(text,s,e,"end"); }
+  ccAfterEdit();
+}
+function ccAfterEdit(){
+  var inp=ccEl("ccIn");
+  // Keep the keyboard away on touch: focus() there pops the OS keypad over
+  // the pad you are tapping. On a pointer device the caret belongs in the box.
+  if(ccFine())inp.focus();
+  ccPreview();
+}
+function ccFine(){
+  try{ return window.matchMedia("(pointer:fine)").matches; }catch(e){ return true; }
+}
+function ccBack(){
+  var inp=ccEl("ccIn"), s=inp.selectionStart, e=inp.selectionEnd;
+  if(s===e&&s>0)inp.setRangeText("",s-1,s,"end");
+  else if(s!==e)inp.setRangeText("",s,e,"end");
+  ccAfterEdit();
+}
+function ccClear(){
+  ccEl("ccIn").value="";
+  ccEl("ccOut").textContent=""; ccEl("ccOut").classList.add("pend");
+  ccEl("ccOut").classList.remove("err");
+  ccAfterEdit();
+}
+/** = : commit. The expression stays on screen so you can keep working on it,
+    the answer becomes Ans, and the pair goes to history. */
+function ccEquals(){
+  var inp=ccEl("ccIn"), src=inp.value.trim();
+  if(!src)return;
+  var r;
+  try{ r=ccEval(src); }catch(e){ ccShowErr(e.message||"That doesn't work"); return; }
+  if(r===null)return;
+  var txt=ccFmt(r);
+  var out=ccEl("ccOut");
+  out.textContent=txt; out.classList.remove("pend","err");
+  ccState.ans=r;
+  ccState.hist.unshift({e:src,r:txt});
+  if(ccState.hist.length>CC_HIST_MAX)ccState.hist.length=CC_HIST_MAX;
+  ccSave(); ccRenderHist();
+}
+function ccMem(op){
+  var cur=null;
+  try{ cur=ccEval(ccEl("ccIn").value); }catch(e){ cur=null; }
+  if(cur===null)cur=ccState.ans;
+  if(op==="mc")ccState.mem=0;
+  else if(op==="mr"){ ccInsert(ccFmt(ccState.mem).replace("×10^","e")); }
+  else if(op==="m+")ccState.mem+=cur;
+  else if(op==="m-")ccState.mem-=cur;
+  ccSave(); ccSyncFlags();
+}
+
+/* ---- wiring ---- */
+ccEl("ccPad").addEventListener("click",function(ev){
+  var b=ev.target.closest("button"); if(!b)return;
+  if(b.dataset.cci!==undefined){ ccInsert(b.dataset.cci); return; }
+  var k=b.dataset.cck;
+  if(k==="eq")ccEquals();
+  else if(k==="clear")ccClear();
+  else if(k==="back")ccBack();
+  else if(k==="second"){ ccSecond=!ccSecond; ccPad(); }
+  else if(k==="ang"){ ccState.deg=!ccState.deg; ccSave(); ccSyncFlags(); ccPreview(); }
+  else if(k&&k.indexOf("m")===0)ccMem(k);
+});
+ccEl("ccMore").addEventListener("click",function(ev){
+  var b=ev.target.closest("button"); if(!b)return;
+  ccInsert(b.dataset.cci);
+});
+ccEl("ccHist").addEventListener("click",function(ev){
+  var b=ev.target.closest("[data-cch]"); if(!b)return;
+  var h=ccState.hist[+b.dataset.cch]; if(!h)return;
+  // The RESULT, not the expression: reusing an answer is the common case by
+  // a wide margin. The expression is still readable above it either way.
+  ccInsert(h.r.replace("×10^","e"));
+});
+ccEl("ccHClear").addEventListener("click",function(){
+  ccState.hist=[]; ccSave(); ccRenderHist();
+});
+ccEl("ccIn").addEventListener("input",ccPreview);
+/* Enter only. Escape is deliberately NOT bound: the dock already owns it
+   (expanded shrinks, docked closes) and it runs on capture, so taking it over
+   here would mean one key doing two different things depending on which box
+   had focus. C and ⌫ are right there. */
+ccEl("ccIn").addEventListener("keydown",function(ev){
+  if(ev.key==="Enter"){ ev.preventDefault(); ccEquals(); }
+});
+
+function ccMount(){
+  ccLoad();
+  ccPad(); ccMore(); ccRenderHist(); ccSyncFlags(); ccPreview();
+  if(ccFine())setTimeout(function(){ try{ccEl("ccIn").focus();}catch(e){} },30);
+}
+function ccUnmount(){ ccSave(); }
 
 // console hooks:  dfDebug.dayBlocks("2026-08-15")  ·  dfDebug.state()
 window.dfDebug={dayBlocks:dayBlocks,today:today,norm:norm,state:function(){return S;},

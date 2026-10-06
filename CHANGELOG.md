@@ -2,6 +2,72 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-10-06 — Show/hide password, and a scientific calculator (v4.23)
+
+### 1. An eye in every password field
+
+All seven static password inputs (login, sign-up, the Google setup, both
+reset fields) plus the three built at runtime on the profile screen now carry
+a show/hide toggle. `pwEye()` decorates a field rather than each field being
+written by hand, because several of them are injected with `innerHTML` at the
+moment they are needed — a toggle written into the markup would have been
+missing from exactly the fields typed into least often. `window.pwEyes(root)`
+is exposed for those callers.
+
+- **Nothing new holds a password.** The whole mechanism is the `type`
+  attribute flipping between `password` and `text`. Nothing is read out of
+  the field, copied, or stored, and `openGate()` resets every field to hidden
+  so a visible password cannot survive into the next time the gate is shown.
+- The caret is restored after the flip; changing `type` sends it to the end
+  in every browser, which turns "check the character I just typed" into "my
+  cursor jumped".
+- `type="button"`, `aria-pressed`, and an `aria-label` that swaps between
+  Show/Hide password. 40px target on coarse pointers.
+- The padding rule is `.pw-wrap input.pw-in`, which outranks both `.ag-f
+  input` and `.pf-stack input` on **specificity** rather than on which
+  `<style>` block happens to come last.
+
+### 2. Scientific calculator widget
+
+Fourth widget in the dock, beside the clocks, Bible and teleprompter.
+Brackets with real precedence, powers and roots, sin/cos/tan with inverses
+(2nd layer) and hyperbolics (chip strip), ln/log/log₂, factorial, percent,
+π/e/τ/φ, scientific notation, DEG/RAD, MC/MR/M+/M−, Ans, and a tappable
+history. Keyboard on desktop, 44px keys on touch.
+
+**No library.** math.js was the obvious choice — Apache-2.0, excellent — but
+its browser bundle is 646 KB against a one-file app that must open from
+`file://` on a phone at 3am. That is the wrong trade for a keypad, and it
+would have ended the single-file property to ship a computer algebra system
+nobody asked for. ~200 lines of parser instead. **Offline here is not a cache
+strategy, it is the absence of anything to fetch** — verified: zero network
+requests from the calculator.
+
+**Not `eval()`.** Tokeniser → shunting-yard → RPN over a fixed function
+table. Nothing typed in the box can name a variable, reach a global or run a
+statement; an unknown word is an error, not a lookup.
+
+Decisions worth keeping:
+
+- **Unary minus sits below `^`**, so `-2^2` is `-4` (calculator convention,
+  not the spreadsheet one) and `2^3^2` is `512` (right-associative).
+- **Results round to 12 significant figures** before display, which is why
+  `0.1+0.2` reads `0.3`.
+- **DEG/RAD applies to circular functions only.** Hyperbolics are not angles
+  and are deliberately untouched by the switch.
+- **EXP and Euler's `e` are one character.** `2e8` is notation, `2e` is 2×e;
+  the tokeniser decides by what follows, so there is one key and the constant
+  lives in the chip strip.
+- **State lives in `prodash.calc`, not in `S`.** A scratch calculation is not
+  board data: it should not sync to other devices, enter the revision history
+  or be something a merge conflict can be about.
+- **Escape is not bound.** The dock already owns it on capture; one key doing
+  two things depending on focus is worse than having C and ⌫ right there.
+
+Tested against 23 known results (precedence, associativity, float noise,
+implicit multiplication, notation, two-argument functions) and the domain and
+syntax error paths.
+
 ## 2026-09-24 — The ready-made programs become visible (v4.22)
 
 Phase 1 and Phase 2 now have their own **Ready-made programs** card in the
