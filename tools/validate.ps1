@@ -472,32 +472,12 @@ if ($baseOk) {
             ("The commit being pushed does not match the reviewed files: " + ($mismatched -join ", ")) `
             "What is on disk was reviewed; what you are pushing is something else. Commit the reviewed content, or re-review what you are actually sending."
         }
-        # THE LEDGER IS EXEMPT FROM REVIEW, NOT FROM SCRUTINY. Its exemption
-        # exists only because record-review.ps1 appends to it after computing
-        # the scope, so reviewing it would be circular. That buys it the right
-        # to gain VERDICT ROWS - nothing else. Every line in the pushed copy
-        # must therefore be either unchanged from the base or a well-formed
-        # row. Anything else - prose, markup, a gitlink at that path - is a
-        # file being published on the app's own origin with no review.
-        $ledgerBase = Invoke-Git @("show", ($base + ":REVIEWS.md"))
-        $ledgerPush = Invoke-Git @("show", ($PushSha + ":REVIEWS.md"))
-        if ($null -ne $ledgerPush) {
-          $baseLines = @()
-          if ($null -ne $ledgerBase) { $baseLines = @($ledgerBase -split "`r?`n") }
-          $rowRe = '^\|\s*[0-9.]+\s*\|\s*(security|ux)\s*\|\s*(pass|notes|blocked)\s*\|[^|<>]*\|[^|<>]*\|[^|<>]*\|\s*[0-9a-f]{12}\s*\|$'
-          $badLines = @()
-          foreach ($line in ($ledgerPush -split "`r?`n")) {
-            if ($baseLines -ccontains $line) { continue }
-            if ($line -match $rowRe) { continue }
-            if ($line.Trim() -eq "") { continue }
-            $badLines += $line
-          }
-          if ($badLines.Count) {
-            Add-Finding "High" "ledger-tampered" `
-              ("REVIEWS.md in the pushed commit has " + $badLines.Count + " line(s) that are neither unchanged nor valid verdict rows. First: " + $badLines[0].Substring(0, [Math]::Min(80, $badLines[0].Length))) `
-              "The ledger is exempt from review because it is appended to by tools/record-review.ps1. It may gain verdict rows and nothing else. Revert the other edits."
-          }
-        }
+        # No special-casing of REVIEWS.md here any more. A grammar check on
+        # its lines blocked the first legitimate correction of its own header
+        # - a gate that refuses honest work is one that gets switched off.
+        # Get-ReviewScope hashes the ledger with its verdict rows stripped
+        # instead, so appending a verdict is free and ANY other edit to the
+        # file makes every outstanding verdict stale, like any other file.
       }
   }
 

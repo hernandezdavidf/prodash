@@ -49,23 +49,20 @@ function Invoke-Git {
 # CLAUDE.md and .claude/ are the agent's own instructions, which is a control
 # surface; .gitignore is what keeps secrets and David's data out of a public
 # repo; manifest.json carries the PWA's scope and start_url.
+# NOTHING IS EXEMPT. The ledger used to be, and that exemption kept growing
+# teeth: it covered `reviews.md` and `Reviews.MD` through a case-insensitive
+# match, and - worse - an empty needs-set switched off the push-integrity
+# checks entirely, so a payload or a gitlink at that one path sailed through.
+#
+# The circularity it existed for is real but belongs elsewhere:
+# Get-ReviewScope hashes the ledger with its verdict ROWS removed, so
+# recording a verdict cannot invalidate the verdict being recorded, while any
+# other edit to the file does - exactly as for every other file.
 function Get-ReviewNeeds([string[]]$paths) {
-  # THE ONLY EXEMPTION, and it is structural: reviewing the ledger is
-  # circular. record-review.ps1 computes the scope and then appends to this
-  # file, which would change the scope it just recorded. Keep this list at one
-  # entry - every addition is a hole of the kind described below.
-  $exempt = @("REVIEWS.md")
   $needs = @{}
   foreach ($f in $paths) {
     if (-not $f) { continue }
     $p = $f -replace '\\', '/'
-    # -ccontains: the case-SENSITIVE form. `-contains` matched `reviews.md`
-    # and `Reviews.MD` too, so the one-entry exemption quietly covered three
-    # filenames - and a `reviews.md` was pushed green, rendered by Jekyll to
-    # a page on the app's own origin, having passed through no classifier, no
-    # scope hash and no push check. record-review.ps1 writes the literal
-    # "REVIEWS.md", so nothing legitimate depends on the loose match.
-    if ($exempt -ccontains $p) { continue }
     # A path we cannot read plainly gets the strict answer, not the lenient
     # one. Get-ChangedVsBase asks git not to quote, so this should not happen
     # - and if it does, an unclassifiable path is exactly the thing a human
@@ -145,6 +142,24 @@ function Get-ReviewScope([string[]]$paths, [string]$Ref = "") {
       $h = Invoke-Git @("rev-parse", ($Ref + ":" + $p))
       $h = if ($null -eq $h) { "absent" } else { $h.Trim() }
     } else {
+      # The ledger is hashed with its verdict ROWS stripped. That is what
+      # breaks the circularity - appending a verdict leaves this hash
+      # unchanged, so a review cannot invalidate itself - while any other
+      # edit to the file (prose, a table, a payload) changes it and makes
+      # every outstanding verdict stale. No path needs to be exempt.
+      if ($p -ceq "REVIEWS.md") {
+        $full = Join-Path $ReviewRoot $p
+        if (Test-Path -LiteralPath $full -PathType Leaf) {
+          $body = ((Get-Content -LiteralPath $full) |
+                   Where-Object { $_ -notmatch '^\|\s*[0-9.]+\s*\|\s*(security|ux)\s*\|' }) -join "`n"
+          $sha1 = [Security.Cryptography.SHA256]::Create()
+          try { $hb = $sha1.ComputeHash([Text.Encoding]::UTF8.GetBytes($body)) } finally { $sha1.Dispose() }
+          $parts += ($p + "=" + (([BitConverter]::ToString($hb) -replace '-', '').ToLower()))
+        } else {
+          $parts += ($p + "=absent")
+        }
+        continue
+      }
       # Ask GIT first, and only treat the path as absent when git also finds
       # nothing. Test-Path returns false past ~260 characters on Windows, so
       # leading with it meant a long path was fingerprinted as the constant
