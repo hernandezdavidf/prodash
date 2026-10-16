@@ -62,13 +62,28 @@ if (-not $Version) {
 
 # One line, pipe-separated, machine-readable by validate.ps1 and still
 # readable by a person. Newlines in free text would break both, so they go.
-# Pipes and newlines would forge a row. Angle brackets are a separate
-# problem: REVIEWS.md is the one path exempt from review, and Jekyll renders
-# it to a page on the app's own origin - so an <img onerror=...> in a summary
-# is a script on the live site that nothing reviewed. Strip both.
+# Pipes and newlines would forge a row. Everything else here is because
+# REVIEWS.md is exempt from review and Jekyll renders it to a page on the
+# app's own origin, so a summary is published markup.
+#
+# Stripping `<` and `>` was not enough: MARKDOWN IS MARKUP TOO. kramdown's
+# inline attribute lists mean `![a](data:,){: onerror="..."}` becomes an
+# <img> with a handler that fires on load, from a string containing no angle
+# bracket, pipe or newline. So this removes the characters markdown gives
+# meaning to, rather than the ones HTML does, plus the control and
+# bidi-override ranges that can make a row display as something it is not.
+# Printable ASCII only, by character code rather than by a Unicode regex
+# class - the escape form was rejected outright by this PowerShell and, worse,
+# failed AFTER the row had been built. Filtering on the code point removes
+# every control character, zero-width space and bidi override in one pass,
+# with nothing to get subtly wrong. A machine-read ledger does not need
+# accents; the project's scripts are ASCII-only anyway.
 $clean = {
   param([string]$s)
-  ((($s -replace '[\r\n|]+', ' ') -replace '[<>]', '')).Trim()
+  $s = $s -replace '[\r\n]+', ' '
+  $s = $s -replace '[|<>\[\]{}`*_!#&\\]', ''
+  $s = -join ($s.ToCharArray() | Where-Object { [int]$_ -ge 32 -and [int]$_ -le 126 })
+  $s.Trim()
 }
 $Summary  = & $clean $Summary
 $Evidence = & $clean $Evidence

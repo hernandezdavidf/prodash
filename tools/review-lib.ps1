@@ -145,14 +145,19 @@ function Get-ReviewScope([string[]]$paths, [string]$Ref = "") {
       $h = Invoke-Git @("rev-parse", ($Ref + ":" + $p))
       $h = if ($null -eq $h) { "absent" } else { $h.Trim() }
     } else {
-      $full = Join-Path $ReviewRoot $p
-      # -PathType Leaf: a DIRECTORY at that path is not a file git can hash.
-      # Without it, a leftover folder (an emptied submodule, a stale build
-      # dir) hashed as "unhashable" and never matched anything again.
-      if (Test-Path -LiteralPath $full -PathType Leaf) {
-        $h = Invoke-Git @("hash-object", "--", $p)
-        # A path git cannot hash is not a path to wave through.
-        $h = if ($null -eq $h) { "unhashable:" + $p } else { $h.Trim() }
+      # Ask GIT first, and only treat the path as absent when git also finds
+      # nothing. Test-Path returns false past ~260 characters on Windows, so
+      # leading with it meant a long path was fingerprinted as the constant
+      # "absent" - its content never hashed, and a recorded verdict never
+      # going stale over it. git has no such limit.
+      #
+      # -PathType Leaf on the fallback: a DIRECTORY at that path is not a file
+      # git can hash, and calling that "unhashable" made it mismatch for ever.
+      $h = Invoke-Git @("hash-object", "--", $p)
+      if ($null -ne $h) {
+        $h = $h.Trim()
+      } elseif (Test-Path -LiteralPath $full -PathType Leaf) {
+        $h = "unhashable:" + $p     # exists, but git will not hash it
       } else {
         $h = "absent"
       }
@@ -215,11 +220,14 @@ function Get-RefMismatches([string]$Ref, [string[]]$paths) {
     $inRef = Invoke-Git @("rev-parse", ($Ref + ":" + $p))
     $inRef = if ($null -eq $inRef) { "absent" } else { $inRef.Trim() }
     $full = Join-Path $ReviewRoot $p
-    # -PathType Leaf, as in Get-ReviewScope: a directory is not a blob, and
-    # treating one as "unhashable" made it mismatch for ever.
-    if (Test-Path -LiteralPath $full -PathType Leaf) {
-      $onDisk = Invoke-Git @("hash-object", "--", $p)
-      $onDisk = if ($null -eq $onDisk) { "unhashable" } else { $onDisk.Trim() }
+    # git first, Test-Path only as the fallback - same reasoning as
+    # Get-ReviewScope: Test-Path is blind past ~260 characters, and a
+    # directory is not a blob.
+    $onDisk = Invoke-Git @("hash-object", "--", $p)
+    if ($null -ne $onDisk) {
+      $onDisk = $onDisk.Trim()
+    } elseif (Test-Path -LiteralPath $full -PathType Leaf) {
+      $onDisk = "unhashable"
     } else {
       # "absent", matching the sentinel used for the ref side above. These
       # were "absent" and "deleted" - two names for the same state - so a
