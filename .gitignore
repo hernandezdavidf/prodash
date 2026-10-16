@@ -20,3 +20,6 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+
+# Personal notes, never part of the app or the deploy
+Personal Files/

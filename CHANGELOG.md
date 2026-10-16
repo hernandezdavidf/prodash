@@ -2,6 +2,90 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-10-16 — Two review subagents, as enforceable gates
+
+Implements `ProDash Subagent Architecture Sec.md`. **No app code changed** —
+`index.html`, `sw.js` and `cloud-worker/worker.js` are untouched, so there is
+no version bump and nothing to deploy.
+
+### The two gates
+
+| Subagent | Scope |
+|---|---|
+| `security-reviewer` (was `code-reviewer`) | Security engineer + code reviewer. Never-trust-the-client, fail-closed, cross-user exposure, least privilege, secrets, injection, dependencies. |
+| `ux-reviewer` (new) | Product designer, UX researcher, accessibility specialist. Drives the real app at three widths, WCAG 2.2 AA measured not guessed, the five states, honest feedback, discoverability. |
+
+Both block on Critical/High rather than advising.
+
+### Enforcement, in four layers
+
+1. `tools/validate.ps1` check 9 reads `REVIEWS.md` and fails on a missing,
+   `blocked` or **stale** verdict.
+2. The Stop hook, as before.
+3. `.git/hooks/pre-push` (`tools/install-hooks.ps1`) — pushing to `main` *is*
+   deploying, so this is the last point anything can be stopped.
+4. GitHub Actions runs the same validator on GitHub's machine.
+
+Supporting pieces: `tools/review-lib.ps1` (shared gate logic, so the recorder
+and the reader cannot drift), `tools/record-review.ps1` (writes verdicts),
+`workflows/error-recovery.md` (the loop), `ERRORS.md` (the record).
+
+### The gate blocked its own release seven times
+
+Seven independent reviews, seven BLOCKED verdicts, and from round 3 onward
+each one found that the previous round's fix was wrong — twice the new fix
+opened the hole it was meant to close. The reviews reproduced, among others:
+a payload pushed to `main` with a green run via `git push origin <sha>:main`;
+an unreviewed `.md` rendered by Jekyll into a page on the app's own origin; a
+submodule publishing code no diff here can show; and a second refspec
+skipping validation of the branch being deployed.
+
+Shipped at David's decision with round 8 still running and **no review yet
+returned clean** — recorded as such in `REVIEWS.md`. What the rounds changed:
+
+- **Approval is bound to content, not to `APP_VERSION`.** Only `index.html`
+  bumps a version, so one pass had approved every future change to `tools/`,
+  `.claude/`, `sw.js` and the Worker. Verdicts now carry a hash of the
+  reviewed files.
+- **Everything measures against `origin/main`,** including the version-bump
+  check, which compared against `HEAD` and so went quiet once work was
+  committed.
+- **Untracked files count.** Three files in this very change were invisible
+  to the gate they implemented.
+- **An unreachable base fails closed** in the validator *and* in CI. The
+  `HEAD~1` fallback made a backdoor committed earlier in a push invisible.
+- **Git's path quoting defeated three parsers,** including the Critical
+  tracked-secret scan: a tracked `café/.env` walked straight through it.
+- **`-Verdict Blocked` used to be silently dropped** by a case-sensitive
+  reader, losing the release block entirely.
+- **`-PrePush` refuses a push while reviewable files are dirty,** because the
+  scope hashes the working tree while a push sends commits.
+- **The classifier is default-deny.** Two allowlists were defeated — first by
+  filename, then by extension, the latter on the false premise that markdown
+  is not served. There is no `.nojekyll`, so Pages renders every `.md` into a
+  same-origin page (verified live: `/CHANGELOG.html` is 200 `text/html`,
+  generator Jekyll 3.10.0). Everything needs a security review now; the one
+  exemption is `REVIEWS.md`, matched case-**sensitively** because `-contains`
+  had quietly exempted `reviews.md` too.
+- **Submodules are refused outright**, in the index and in the pushed commit:
+  Pages fetches them at build time, so they publish bytes no diff here shows.
+- **The hook validates every deploying refspec**, not the last one it read.
+- **`"absent"` is one sentinel, not two.** A renamed or deleted file used to
+  mismatch for ever, which made this very change unpushable while
+  `validate.ps1` reported PASS.
+- `-BaseRef` and `-CI` are ignored outside Actions; `-Version` is pattern-
+  validated; ledger text is stripped of `<`, `>` and pipes; `actions/checkout`
+  is pinned to a SHA.
+
+### What this does not do
+
+Honestly, in `CLAUDE.md`: `REVIEWS.md` is forgeable by anything that can write
+to the repo, `GITHUB_ACTIONS=true` re-enables the restricted flags locally,
+`--no-verify` skips the hook, and on a push to `main` the Actions run happens
+after Pages already has the commit. **Branch protection with `validate` as a
+required check is David's to enable** (free, Settings → Branches) and is what
+turns the CI run from a report into a block.
+
 ## 2026-10-06 — The Bible works with no internet at all (v4.26)
 
 The whole KJV now ships with the app in `bible/kjv.json` (4.25 MB, 1.2 MB on

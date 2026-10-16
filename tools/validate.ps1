@@ -14,7 +14,24 @@
 # Medium and Low are reported and do not block, because a gate that cries wolf
 # gets switched off, and a switched-off gate catches nothing.
 
-param([switch]$Quiet)
+# -CI        running on a machine with no browser and no .tmp: the
+#            browser-verification check becomes informational instead of
+#            blocking, because there is nothing there that could satisfy it.
+#            Everything else is checked exactly as it is locally.
+# -BaseRef   what "the change under review" is measured against. Locally that
+#            is origin/main - everything not yet deployed. In CI it is the
+#            commit the push started from.
+# -PrePush   run from .git/hooks/pre-push, with -PushSha.
+# -PushSha   the commit git is actually sending, read from the hook's stdin.
+#
+# The scope fingerprint is computed from the WORKING TREE, while a push sends
+# COMMITS. An earlier attempt at this compared the worktree against HEAD,
+# which is the same untrustworthy source twice: `git push origin <sha>:main`
+# never touches HEAD, and `git update-index --assume-unchanged` hides a
+# divergence from `git diff` entirely. Both landed a backdoor on main with a
+# green run. So the hook now says WHAT it is pushing, and this compares that
+# commit's blobs against the files that were reviewed.
+param([switch]$Quiet,[switch]$CI,[string]$BaseRef = "",[switch]$PrePush,[string]$PushSha = "")
 
 # Deliberately NOT "Stop". git writes ordinary notices to stderr - the CRLF
 # warning fires on nearly every call in this repo - and under Stop those become
@@ -26,23 +43,6 @@ param([switch]$Quiet)
 $ErrorActionPreference = "Continue"
 $root = Split-Path -Parent $PSScriptRoot
 $findings = @()
-
-# Runs git, returns its stdout as one string, or $null if it failed. Never
-# throws, never lets git's stderr reach the caller.
-function Invoke-Git {
-  param([string[]]$GitArgs)
-  $old = $ErrorActionPreference
-  $ErrorActionPreference = "Continue"
-  try {
-    $out = & git @GitArgs 2>$null
-    if ($LASTEXITCODE -ne 0) { return $null }
-    return ($out | Out-String)
-  } catch {
-    return $null
-  } finally {
-    $ErrorActionPreference = $old
-  }
-}
 
 function Add-Finding {
   param([string]$Severity, [string]$Check, [string]$Message, [string]$Fix = "")
@@ -56,6 +56,11 @@ function Read-Repo([string]$rel) {
   if (-not (Test-Path $p)) { return $null }
   return [IO.File]::ReadAllText($p)
 }
+
+# Review-gate logic lives in tools/review-lib.ps1 and is shared with
+# record-review.ps1, so the scope a reviewer records and the scope this
+# recomputes cannot drift apart. It also defines Invoke-Git.
+. (Join-Path $PSScriptRoot "review-lib.ps1")
 
 $index  = Read-Repo "index.html"
 $worker = Read-Repo "cloud-worker/worker.js"
@@ -125,36 +130,93 @@ if ($index -and $worker) {
 }
 
 # ---------------------------------------------------------------------------
+# THE BASE: what "the change under review" is measured against.
+#
+# origin/main is the DEPLOYED state - GitHub Pages serves that branch - so
+# everything differing from it is unreleased, whether or not it is committed.
+# An earlier version of this file compared against HEAD, which meant every
+# check below went quiet the moment work was committed: commit first, and the
+# gate waved it through. That hole was found by the security review of
+# 2026-10-15 and is why this is resolved once, here, for every check.
+#
+# -BaseRef and -CI are honoured ONLY under GitHub Actions. Locally they would
+# be a self-service bypass: `validate.ps1 -BaseRef HEAD` reports clean on work
+# that the default base flags.
+# ---------------------------------------------------------------------------
+$underCI = [bool]$env:GITHUB_ACTIONS
+if (-not $underCI) {
+  if ($BaseRef) { Add-Finding "Medium" "flag-ignored" "-BaseRef is ignored outside GitHub Actions; comparing against origin/main." }
+  if ($CI)      { Add-Finding "Medium" "flag-ignored" "-CI is ignored outside GitHub Actions; the browser check still blocks." }
+  $BaseRef = ""; $CI = $false
+}
+
+Push-Location $root
+$base = Resolve-ReviewBase $BaseRef
+$changed = @()
+$baseOk = $false
+if ($base) {
+  $c = Get-ChangedVsBase $base
+  if ($null -ne $c) { $baseOk = $true; $changed = $c }
+}
+
+# Under -PrePush the set has to include what the PUSHED COMMIT changes, not
+# only what the worktree changes.
+#
+# This is the third time the same hole has been plugged in the wrong place.
+# The push check itself was correct, but it sat behind a path list derived
+# from the worktree - so with a clean tree that list was empty, every gate
+# below it was skipped, and `git push origin <sha>:main` put anything at all
+# on main with "PASS - all ProDash validation checks clean." A check that is
+# right but unreachable is not a check.
+if ($PrePush -and $baseOk -and $PushSha) {
+  $pc = Invoke-Git @("-c", "core.quotepath=false", "diff", $base, $PushSha, "--name-only", "--no-renames", "-z")
+  if ($null -eq $pc) {
+    Add-Finding "High" "push-unidentified" "Could not diff the commit being pushed ($PushSha) against $base."
+  } else {
+    $changed = @(@($changed) + @($pc -split "`0" | Where-Object { $_ }) | Sort-Object -Unique)
+  }
+}
+# Always, not only when something is deemed reviewable: a push we cannot
+# identify is one we cannot vouch for, and that must not depend on a list we
+# derived from somewhere else.
+if ($PrePush -and -not $PushSha) {
+  Add-Finding "High" "push-unidentified" `
+    "Running as a pre-push gate but no -PushSha was supplied, so what is being pushed is unknown." `
+    "Reinstall the hook: pwsh tools/install-hooks.ps1"
+}
+
+if (-not $baseOk) {
+  # Fail closed. An unresolvable base means the gates below cannot run, and a
+  # green run that checked nothing is the worst possible answer.
+  Add-Finding "High" "base-unresolved" `
+    "Could not resolve a base commit to compare against, so the version and review gates did not run." `
+    "Locally: git fetch origin. In CI: check the checkout step's fetch-depth and the base SHA."
+}
+
+# ---------------------------------------------------------------------------
 # 3. Version bumps on a changed app  (HIGH)
 # v4.1 shipped without an APP_VERSION bump, so the live app reported 4.0 for two
 # releases and there was no way to tell the builds apart. CACHE_VERSION is the
 # same story for the OFFLINE copy, which is the one that matters at 3am.
-# Compares the working tree against HEAD: the moment index.html is touched, its
-# version must differ from the committed one.
 # ---------------------------------------------------------------------------
-Push-Location $root
-$changedRaw = Invoke-Git @("diff", "HEAD", "--name-only")
-if ($null -eq $changedRaw) {
-  Add-Finding "Low" "check-skipped" "git diff failed, so the version-bump checks did not run."
-} else {
-  $changed = @($changedRaw -split "`r?`n" | Where-Object { $_ })
+if ($baseOk) {
   if ($changed -contains "index.html") {
-    $headIndex = Invoke-Git @("show", "HEAD:index.html")
+    $baseIndex = Invoke-Git @("show", ($base + ":index.html"))
     $now = [regex]::Match($index, 'var\s+APP_VERSION\s*=\s*"([0-9.]+)"')
-    $was = if ($headIndex) { [regex]::Match($headIndex, 'var\s+APP_VERSION\s*=\s*"([0-9.]+)"') } else { $null }
+    $was = if ($baseIndex) { [regex]::Match($baseIndex, 'var\s+APP_VERSION\s*=\s*"([0-9.]+)"') } else { $null }
     if ($now.Success -and $was -and $was.Success -and $now.Groups[1].Value -eq $was.Groups[1].Value) {
       Add-Finding "High" "version-bump" `
-        "index.html has uncommitted changes but APP_VERSION is still $($now.Groups[1].Value)." `
+        "index.html differs from $base but APP_VERSION is still $($now.Groups[1].Value)." `
         "Bump APP_VERSION and add a matching line to the top of APP_VERSION_HISTORY."
     }
   }
   if (($changed -contains "index.html") -or ($changed -contains "sw.js")) {
-    $headSw = Invoke-Git @("show", "HEAD:sw.js")
+    $baseSw = Invoke-Git @("show", ($base + ":sw.js"))
     $nowC = [regex]::Match($sw, 'CACHE_VERSION\s*=\s*"([^"]+)"')
-    $wasC = if ($headSw) { [regex]::Match($headSw, 'CACHE_VERSION\s*=\s*"([^"]+)"') } else { $null }
+    $wasC = if ($baseSw) { [regex]::Match($baseSw, 'CACHE_VERSION\s*=\s*"([^"]+)"') } else { $null }
     if ($nowC.Success -and $wasC -and $wasC.Success -and $nowC.Groups[1].Value -eq $wasC.Groups[1].Value) {
       Add-Finding "High" "version-bump" `
-        "index.html or sw.js changed but CACHE_VERSION is still $($nowC.Groups[1].Value)." `
+        "index.html or sw.js differs from $base but CACHE_VERSION is still $($nowC.Groups[1].Value)." `
         "Bump CACHE_VERSION in sw.js so the offline copy is evicted on the next activate."
     }
   }
@@ -246,11 +308,18 @@ if ($index) {
 # check that nothing slipped past.
 # ---------------------------------------------------------------------------
 Push-Location $root
-$trackedRaw = Invoke-Git @("ls-files")
+# quotepath=false and -z for the same reason Get-ChangedVsBase uses them: git
+# otherwise QUOTES a path containing a non-ASCII byte, and the surrounding
+# double quote defeated the `(^|/)\.env$` anchor. A tracked secret in a
+# directory with an accent in its name walked straight through this Critical
+# check. Found by the security review of 2026-10-16.
+$trackedRaw = Invoke-Git @("-c", "core.quotepath=false", "ls-files", "-z")
 if ($null -eq $trackedRaw) {
-  Add-Finding "Low" "check-skipped" "git ls-files failed, so the tracked-secret check did not run."
+  # A secret check that could not run is not a pass. This was Low, which meant
+  # a git failure silently downgraded the repo's only secret scan.
+  Add-Finding "High" "check-skipped" "git ls-files failed, so the tracked-secret check did not run."
 } else {
-  $tracked = @($trackedRaw -split "`r?`n" | Where-Object { $_ })
+  $tracked = @($trackedRaw -split "`0" | Where-Object { $_ })
   $bad = $tracked | Where-Object {
       $_ -match '(^|/)\.env$' -or $_ -match '(^|/)credentials\.json$' -or
       $_ -match '(^|/)token\.json$' -or $_ -match 'client_secret.*\.json$' -or
@@ -262,6 +331,27 @@ if ($null -eq $trackedRaw) {
       "Remove from the index, add to .gitignore, and rotate the secret - history is forever."
   }
 }
+# No submodules, ever.
+#
+# A gitlink's content is not in this repository, so no diff here can show what
+# it publishes - a reviewer reading the whole change sees a 40-character sha
+# and nothing else. GitHub Pages fetches public submodules during the build,
+# so those bytes become part of the deployed site, and they can change after
+# the review without any commit here at all. There is no version of that this
+# gate can usefully review, so the answer is no.
+$stage = Invoke-Git @("-c", "core.quotepath=false", "ls-files", "-s", "-z")
+if ($null -eq $stage) {
+  Add-Finding "High" "check-skipped" "git ls-files -s failed, so the submodule check did not run."
+} else {
+  $links = @($stage -split "`0" | Where-Object { $_ -match '^160000\s' } |
+             ForEach-Object { ($_ -split "`t", 2)[1] })
+  if ($links.Count) {
+    Add-Finding "Critical" "submodule-present" `
+      ("Submodule (gitlink) entries on this branch: " + ($links -join ", ")) `
+      "Pages fetches submodules at build time, so this publishes code no diff here can show. Remove the gitlink and .gitmodules, and vendor the files into the repo where they can be read."
+  }
+}
+
 # Also refuse an OAuth client-secret file sitting in the working tree, even
 # untracked: auth-setup.md's rule is that it should never be in the folder.
 $loose = @(Get-ChildItem -Path $root -Recurse -File -Include "client_secret*.json","*service-account*.json" `
@@ -320,15 +410,115 @@ foreach ($rel in @("index.html", "cloud-worker/worker.js")) {
   if (-not $h) { continue }
   $recorded = if ($mark) { $mark.$rel } else { $null }
   if ($recorded -ne $h) {
-    Add-Finding "High" "unverified-in-browser" `
+    # In CI there is no browser and .tmp is not committed, so this could never
+    # be satisfied there. Reporting it as Low keeps it visible without making
+    # every CI run red for a condition CI cannot fix - the check still blocks
+    # locally, which is where it can actually be acted on.
+    Add-Finding $(if ($CI) { "Low" } else { "High" }) "unverified-in-browser" `
       "$rel has changed since it was last confirmed to parse in a browser." `
       "Load it (the local harness for index.html, a module import for worker.js), confirm no syntax or console errors, then run: pwsh tools/mark-verified.ps1"
   }
 }
 
 # ---------------------------------------------------------------------------
+# 9. Review gates  (HIGH)
+#
+# The two review subagents (.claude/agents/) are only gates if something
+# deterministic reads their verdicts. This is that something.
+#
+# "The change under review" is everything that differs from the DEPLOYED state
+# - origin/main - not from HEAD. That matters: the version-bump check above
+# compares against HEAD and therefore goes quiet the moment work is committed,
+# which is a hole an agent can walk through by committing first. Measuring
+# against origin/main closes it, because what is unpushed is exactly what is
+# unreleased.
+#
+# A `blocked` verdict fails this suite outright. That is the release block.
+# ---------------------------------------------------------------------------
+Push-Location $root
+if ($baseOk) {
+  $needs = Get-ReviewNeeds $changed
+  if ($needs.Count) {
+    # At push time, what was reviewed must be what is being sent. See -PrePush.
+    if ($PrePush -and $PushSha) {
+      if ($null -eq (Invoke-Git @("cat-file", "-e", ($PushSha + "^{commit}")))) {
+        Add-Finding "High" "push-unidentified" "The commit being pushed ($PushSha) could not be read."
+      } else {
+        # The commit being pushed is what deploys, so look for gitlinks THERE
+        # as well as in the index. Committing a submodule and then `git rm
+        # --cached`ing it left the index clean; the push was still refused,
+        # but by a confusing path-mismatch message rather than the finding
+        # that explains what is wrong.
+        $pushTree = Invoke-Git @("-c", "core.quotepath=false", "ls-tree", "-r", "-z", "--full-tree", $PushSha)
+        if ($null -ne $pushTree) {
+          $pushLinks = @($pushTree -split "`0" | Where-Object { $_ -match '^160000\s' } |
+                         ForEach-Object { ($_ -split "`t", 2)[1] })
+          if ($pushLinks.Count) {
+            Add-Finding "Critical" "submodule-present" `
+              ("The commit being pushed contains submodule (gitlink) entries: " + ($pushLinks -join ", ")) `
+              "Pages fetches submodules at build time, so this publishes code no diff here can show. Remove the gitlink and .gitmodules, and vendor the files in."
+          }
+        }
+        $mismatched = Get-RefMismatches $PushSha $changed
+        if ($mismatched.Count) {
+          Add-Finding "High" "push-differs-from-review" `
+            ("The commit being pushed does not match the reviewed files: " + ($mismatched -join ", ")) `
+            "What is on disk was reviewed; what you are pushing is something else. Commit the reviewed content, or re-review what you are actually sending."
+        }
+      }
+    }
+    $scope = Get-ReviewScope $changed
+    $ledgerPath = Join-Path $root "REVIEWS.md"
+    $ledger = if (Test-Path $ledgerPath) { [IO.File]::ReadAllText($ledgerPath) } else { "" }
+
+    foreach ($agent in @("security", "ux")) {
+      if (-not $needs[$agent]) { continue }
+      # Newest line wins, so blocked -> fixed -> re-reviewed -> pass reads the
+      # way a person would read it.
+      # (?i) is load-bearing: a verdict recorded as "Blocked" used to slip past
+      # a case-sensitive pattern, leaving an older `pass` as the newest match
+      # and silently discarding the release block.
+      $verdict = $null; $rowScope = ""
+      foreach ($line in ($ledger -split "`r?`n")) {
+        $lm = [regex]::Match($line,
+          '(?i)^\|\s*([0-9.]+)\s*\|\s*(security|ux)\s*\|\s*(pass|notes|blocked)\s*\|[^|]*\|[^|]*\|[^|]*\|\s*([0-9a-f]{12})\s*\|\s*$')
+        if ($lm.Success -and $lm.Groups[2].Value.ToLowerInvariant() -eq $agent) {
+          $verdict = $lm.Groups[3].Value.ToLowerInvariant()
+          $rowScope = $lm.Groups[4].Value.ToLowerInvariant()
+        }
+      }
+      if (-not $verdict) {
+        Add-Finding "High" "review-missing" `
+          "This change touches files needing the $agent review, and REVIEWS.md has no usable $agent verdict." `
+          "Run the $agent-reviewer subagent, then record it: pwsh tools/record-review.ps1 -Agent $agent -Verdict pass -Summary '...' -Evidence '...'"
+      } elseif ($verdict -eq "blocked") {
+        Add-Finding "High" "review-blocked" `
+          "The $agent review is recorded as BLOCKED in REVIEWS.md." `
+          "Fix the findings and re-record the review. Do not edit the ledger to clear this."
+      } elseif ($rowScope -ne $scope) {
+        # THE POINT OF THE SCOPE HASH. Keying approval to APP_VERSION meant one
+        # recorded pass approved every later change to tools/, .claude/, sw.js
+        # and the Worker - none of which bump a version - forever. Binding the
+        # verdict to the CONTENT of the reviewed files means a verdict covers
+        # the thing that was actually read, and nothing else.
+        Add-Finding "High" "review-stale" `
+          "The $agent verdict in REVIEWS.md was recorded for different content (scope $rowScope, now $scope)." `
+          "The reviewable files changed after that review. Re-run the $agent review and record it again."
+      }
+    }
+  }
+}
+Pop-Location
+
+# ---------------------------------------------------------------------------
 # Report
 # ---------------------------------------------------------------------------
+# Report in UTF-8. Invoke-Git pins the encoding for READING git, but the
+# console code page still mangled what we print: a tracked secret under a
+# non-ASCII directory was detected correctly and then reported as "caf?/.env",
+# which is not a path anyone can act on.
+try { [Console]::OutputEncoding = New-Object Text.UTF8Encoding $false } catch { }
+
 $order = @{ "Critical" = 0; "High" = 1; "Medium" = 2; "Low" = 3 }
 # @() around the sort: a single finding comes back as a bare object, whose
 # .Count is not the 1 you expect, and the advisory total printed as -1.

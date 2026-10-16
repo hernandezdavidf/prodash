@@ -1,0 +1,95 @@
+# ProDash validation, run by GitHub rather than by the agent that wrote the code.
+#
+# WHY THIS EXISTS, STATED ACCURATELY: tools/validate.ps1 already runs locally
+# via the Stop hook and the pre-push hook. This re-runs it where a LOCAL-ONLY
+# skip cannot help - an uninstalled hook, `--no-verify`, a hand-edited
+# .tmp/verified.json, a machine that simply never ran it.
+#
+# What it is NOT is an independent second opinion. It executes the validator
+# FROM THE PUSHED COMMIT, so whoever controls that commit controls this job
+# exactly as much as they control the local run. Claiming otherwise would be
+# the false assurance ERRORS.md warns about. The only controls that survive a
+# compromised tools/validate.ps1 are branch protection with this job required,
+# and a human reading the .github/ and tools/ diff.
+#
+# WHAT IT CANNOT DO, said plainly: on a push to main this runs AFTER GitHub
+# Pages has already started serving the commit. It reports; it does not
+# prevent. The things that actually prevent are .git/hooks/pre-push (local,
+# installed by tools/install-hooks.ps1) and branch protection with this job
+# as a required status check - which only David can switch on, and which is
+# why that item is load-bearing rather than nice to have.
+#
+# Free: GitHub Actions is unmetered for public repositories, and this needs no
+# runner beyond the ubuntu image's preinstalled pwsh. No action from the
+# Marketplace is used except actions/checkout, which is GitHub's own and is
+# pinned to a commit SHA rather than a moving tag - it is the only third-party
+# code in this pipeline, so it is the only one that could be retagged under us.
+name: validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+# No workflow_dispatch: a manual run carries neither a pull-request base nor
+# `github.event.before`, so it has no trustworthy base and would always fail
+# at the check below - a button whose only outcome is a red tick. To re-run
+# this deliberately, use "Re-run jobs" on an existing run, which keeps the
+# event that produced it.
+
+permissions:
+  contents: read        # least privilege: this job only ever reads the repo
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          # The review gates diff against a base commit, so the history has to
+          # be there. A shallow clone would make every diff look like "all
+          # files changed".
+          fetch-depth: 0
+
+      - name: Work out what this push actually changed
+        id: base
+        shell: bash
+        run: |
+          # For a PR, the base is the branch being merged into. For a push,
+          # it is where the push started - except for the first push to a new
+          # branch, where GitHub sends all zeros and HEAD~1 is the honest
+          # answer.
+          if [ -n "${{ github.event.pull_request.base.sha }}" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+          else
+            base="${{ github.event.before }}"
+            if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+              base=""
+            fi
+          fi
+          # No trustworthy base means NO VALIDATION, not validation against a
+          # narrower one. Falling back to HEAD~1 here was the same bug the
+          # validator was just fixed for, moved one file along: with the real
+          # base unreachable, a push of several commits is compared only
+          # against its own last commit, so anything added earlier in that
+          # push needs no review and the run goes green over it. An echo into
+          # a log nobody reads is not a mitigation.
+          if [ -n "$base" ] && ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+            echo "Base $base is unreachable - most likely a force push orphaned the previous tip."
+            base=""
+          fi
+          if [ -z "$base" ]; then
+            echo "::error::No trustworthy base commit for this push, so the review and version gates cannot be evaluated. Re-run after a normal push, or run validation locally against origin/main."
+            exit 1
+          fi
+          echo "ref=$base" >> "$GITHUB_OUTPUT"
+          echo "Comparing against $base"
+
+      - name: Run ProDash validation
+        shell: pwsh
+        run: ./tools/validate.ps1 -CI -BaseRef "${{ steps.base.outputs.ref }}"
+
+      # Deliberately NOT here: mark-verified.ps1, or anything that writes
+      # evidence. A CI job that could record "reviewed" or "verified" would be
+      # a way to manufacture the very approval this is supposed to check for.
+      # CI reads the evidence; only a human or a reviewer subagent writes it.

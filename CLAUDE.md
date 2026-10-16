@@ -41,6 +41,83 @@ Workflows should evolve as you learn. When you find better methods, discover con
 **4. Remember what I tell you**
 Whenever I correct you, state a preference, or we settle on a decision, save it to memory right away — don't wait to be asked. Document it, and apply it automatically in every future session without me repeating it.
 
+## The two review gates
+
+> Added 2026-10-15, implementing `ProDash Subagent Architecture Sec.md`.
+
+Two subagents in `.claude/agents/` are **gates, not advisors**. You do not get
+to decide a change is fine and skip them.
+
+| Subagent | Required when the change touches |
+|---|---|
+| `security-reviewer` | `index.html`, `dayflow.html`, `manifest.json`, `sw.js`, `cloud-worker/worker.js`, `tools/`, `.claude/`, `.github/`, `.gitignore`, `CLAUDE.md` |
+| `ux-reviewer` | `index.html`, `dayflow.html`, `manifest.json` — anything user-facing |
+
+`.gitignore` and `CLAUDE.md` are on that list on purpose: one is what keeps
+secrets and David's data out of a public repo, the other is the agent's own
+instructions. Both are control surfaces. The authoritative list is
+`Get-ReviewNeeds` in `tools/review-lib.ps1`; this table mirrors it.
+
+Both are required for anything touching a security-sensitive user journey —
+sign-in, account settings, sync, anything that writes to the board.
+
+How it is enforced, in four layers, deliberately not trusting you:
+
+1. **`tools/validate.ps1`** fails when a required review is missing from
+   `REVIEWS.md`, recorded as `blocked`, or **stale** — each verdict carries a
+   fingerprint of the reviewed files, so a verdict covers the content that was
+   actually read and nothing else. It measures against `origin/main`, because
+   what is unpushed is what is unreleased, and it counts new files as well as
+   modified ones.
+2. **The Stop hook** runs that validator before a turn can be reported
+   finished, blocking up to three times before standing down loudly.
+3. **`.git/hooks/pre-push`** refuses the push itself. Pushing to `main` *is*
+   deploying, so this is the last point at which anything can be stopped.
+   Install it once per clone: `tools/install-hooks.ps1`.
+4. **GitHub Actions** re-runs the same validator on every push, which catches
+   a *local* skip: an uninstalled hook, `--no-verify`, a hand-edited
+   `.tmp/verified.json`. It is **not** an independent second opinion — it
+   executes the validator from the pushed commit, so whoever controls that
+   commit controls the job too.
+
+**What this does not do, stated plainly.** None of it is proof against an
+agent that sets out to lie:
+
+- `REVIEWS.md` is a text file in a repo you can write to. The scope
+  fingerprint defeats the realistic failure — reusing an old approval for new
+  work — not a deliberate forgery.
+- Setting `GITHUB_ACTIONS` in the local environment re-enables `-BaseRef` and
+  `-CI`, which is the bypass those flags were restricted to prevent.
+- `--no-verify` skips the pre-push hook.
+- On a push to `main`, GitHub Actions runs *after* Pages has the commit, so
+  it reports rather than prevents. It also runs the validator **from that
+  commit**, so a change to `tools/validate.ps1` changes its own check. A
+  fork's pull request runs its own copy for the same reason.
+
+Two of those gaps close only with something David does, not something an agent
+can: **branch protection** on `main` with `validate` as a required status
+check (free on public repos, Settings → Branches → Add rule), which also makes
+the Actions run prevent rather than report.
+
+Reviewers write their verdict with `tools/record-review.ps1`. **Never write a
+verdict on a review's behalf, never downgrade a finding to get a green run,
+and never edit `REVIEWS.md` by hand to clear a block.** If a finding is
+accepted rather than fixed, that is David's call and it is recorded as such.
+
+## Errors are the start of the work, not the end
+
+`workflows/error-recovery.md` is binding on you and on both subagents: detect,
+find the root cause, consult `ERRORS.md` and `CHANGELOG.md`, make the smallest
+safe fix, verify it, regression-check, write down the lesson, add a check so a
+machine catches it next time, then **continue the original task**.
+
+Never weaken a control — auth, validation, a validator check, a required
+review — to make an error go away. If a check is wrong, fix the check and say
+so.
+
+`ERRORS.md` is the record. Consult it before touching a component listed
+there; add an entry whenever you find a root cause that will recur.
+
 ## The Self-Improvement Loop
 
 Every failure is a chance to make the system stronger:
