@@ -2,6 +2,230 @@
 
 All notable changes to this project are logged here, newest entry on top.
 
+## 2026-10-17 — A system layer, and one button (v4.27)
+
+First pass of the Gravity UI work David asked for. **Gravity's contribution
+here is its discipline, not its palette** — forest stays dominant, terracotta
+stays reserved for attention, and the five theme palettes and dark mode are
+untouched. What it supplies is the thing this file never had: a fixed set of
+sizes that every control resolves to.
+
+### Measured before, so the gain is checkable
+
+| | Before | Now |
+|---|---|---|
+| Border radii | **20 distinct values** | 5 tokens (xs/s/m/l/pill) |
+| Font sizes | **28 distinct values** | 6 steps |
+| Padding declarations | **138 distinct** | one 4px-based scale |
+| Button idioms | **6** (`um-btn`, `ag-btn`, `rep-quick`, `hist-btn`, `laf-save`, `cc-k`) | 1 system, 5 migrated |
+
+### The token layer
+
+Spacing, radii, a type scale, control heights, elevation, state overlays, one
+border and one transition — all in `:root`, all additive. Nothing changed
+appearance when they landed; components move onto them one at a time, so a
+mistake is one component wrong rather than the whole app.
+
+Control heights are Gravity's xs–xl **shifted up one notch**, with a
+coarse-pointer block that lifts the floor to 44px. This app is used
+one-handed at 3am; Gravity's denser desktop defaults lose that argument.
+
+### One button
+
+`.btn` with size and variant modifiers, and the five old selectors declared
+alongside it so they inherit the same geometry. **The class names stay** —
+renaming six idioms across 600KB of markup is a huge diff for no user-visible
+gain, and the point of a token layer is that the shape is shared even where
+the name is not. Each old rule keeps only what is genuinely local to it
+(usually just a colour); everything else was deleted.
+
+Verified in the browser at both states: the sign-in gate renders correctly
+with `.ag-btn` rebuilt, and in the app the default button measures 32px tall
+with a 6px radius and a 13px label (the small size, `.hist-btn`, is 28px/
+11.5px), against the 28–40px / 7–9px spread of unrelated values they had
+before. The Reports filter row — segmented control, select, two date inputs,
+a quick button and the export button — now measures 32px for all five.
+
+### What the security review caught, and it was worth the round trip
+
+**Adding `display` to the button rules broke the `hidden` attribute.** None of
+the six old rules declared `display`, so the browser's own
+`[hidden]{display:none}` was doing the hiding. An author `display` outranks
+that regardless of specificity — so the moment the shared geometry rule
+landed, three buttons the app hides became permanently visible:
+
+- the activity dialog's **Delete**, on a *new* activity. Pressing it hit
+  `amDelete()` with nothing to delete, which silently closed the dialog and
+  discarded everything typed into it.
+- the teleprompter's **Delete**, which discarded an in-progress script.
+- the subscription form's **Cancel**, which wiped the fields.
+
+Fixed with an explicit `[hidden]{display:none}` for every selector in the
+system — the same guard `.ag-or[hidden]` already carries a few hundred lines
+down, with a comment warning about this exact hazard that I did not read
+first. The list is the thing to extend as inputs and cards migrate.
+
+Three more from the same review:
+
+- **The shared hover rule was repainting the destructive Delete grey**,
+  because `.hist-btn:hover:not(:disabled)` (0,3,0) outranked `.am-del:hover`
+  (0,2,0). Losing the red at the moment someone commits to deleting a
+  recurring series is the wrong direction; `.am-del:hover` now matches
+  specificity and keeps its colour.
+- **The touch floor missed its own target.** `--h-m` is the default button
+  size and was 40px on a coarse pointer, not 44 — the rule was satisfied only
+  by `--h-l`, which almost nothing uses. The whole coarse scale moved up.
+- **The state wash replaced the fill instead of layering on it**, which in
+  the dark palettes (`--shadow-rgb: 0,0,0`) washed a button toward the card
+  behind it. It is a `background-image` layer now, so variants keep their own
+  colour underneath.
+
+### What the UX review caught
+
+It drove the real app at three widths across all nine palettes in both modes,
+and blocked on two AA failures that only exist in the dark:
+
+- **The focus ring was invisible in dark mode, in every palette.**
+  `--st-focus` used `--forest`, the brand *fill*, which against a dark card
+  measured **1.15:1** on Blue eclipse and failed 1.4.11's 3:1 in eight of
+  nine palettes. A keyboard user had no focus indicator at all — and this was
+  a regression, because none of these buttons had a `:focus-visible` rule
+  before, so Chrome's adaptive ring had been doing the job. Now
+  `--forest-ink`: 4.44:1 at worst across all eighteen combinations, and
+  already the focus colour everywhere else in the file.
+- **Destructive hover was 2.15:1 in dark.** `background:var(--alert-ink);
+  color:#fff` reads fine in light, but `--alert-ink` is a *light* red in dark
+  (`#EF9A9A`), so white on it was unreadable — on "Delete my account",
+  "Delete permanently" and "Disconnect Google". A hardcoded `#fff` promoted
+  into the shared layer, which is the exact failure the token rule exists to
+  prevent. Now tinted: 4.92:1 light, 6.87:1 dark.
+
+And four more:
+
+- **Disabled lost its shape.** A blanket `opacity:.45` took the label to
+  2.56:1 and faded the border to 1.17:1, so Board History's "Too old" — the
+  sentence explaining why a revision can't be restored — became grey text
+  with no button around it. It is `--sage` at full opacity now: 3.20:1 light,
+  5.08:1 dark, border intact.
+- **Press feedback did nothing in dark.** `--st-active` is built from
+  `--shadow-rgb`, which every dark palette sets to `0,0,0`, so the wash moved
+  luminance by about one part in a thousand. Hover survived on its border
+  change; `:active` had nothing else, so a tap on a phone in the dark — no
+  hover, just a tap — gave no acknowledgement. The overlays now flip to white
+  in dark, once, after the palette blocks.
+- **Icon-only buttons became slivers**: the calendar's month arrows measured
+  21×28. Every size now carries `min-width`, so no button is narrower than
+  it is tall.
+- **The touch floor still missed.** `--h-s` is `.hist-btn` — every
+  Compare/Restore row and the calendar arrows — and was 40px. The small sizes
+  converge on 44 at coarse now; the scale collapsing there is the point.
+
+Also: the filled buttons no longer take a grey rim on hover, and `Restore`
+keeps terracotta *text* rather than gaining an orange outline on every row of
+Board History — that spends the one colour that means "look here" on a list.
+
+### And what the re-review caught: the destructive fix was dead code
+
+The AA fix above was correct and changed nothing. Two copies of the old rule
+survived further down the file — in the profile block and the exercise
+library block — at identical specificity, so **source order won** and
+"Delete my account…", "Delete permanently", "Disconnect Google" and the
+library's Delete were still white-on-pale-red at **2.15:1** in all nine dark
+palettes. `.btn-danger` has no consumer in the markup, so `.um-btn.danger`
+was the new rule's only client and the new rule never applied to anything.
+Both duplicates deleted; re-measured on the live control rather than trusting
+the cascade.
+
+Three more from the same pass:
+
+- **The sign-in button's loading state was a 1.36:1 label.** `busy()` only
+  set `disabled`, and a disabled `.ag-btn` faded to a pale green block with
+  the word "Log in" dissolving into it — on a phone, where `cursor:progress`
+  shows nothing, that was the only feedback between tap and outcome. It now
+  says **"Working…"** at 5.13:1, sets `aria-busy`, keeps its fill, and
+  restores the original label afterwards.
+- **The segmented control's buttons were 42.4px** at coarse — the container
+  was 44 and its border ate the difference. The height is on the segments
+  now; measured 44.
+- The dark-overlay comment claimed a specificity tie with the palette blocks.
+  It is not a tie — they are (0,3,0) and this is (0,2,0); it works only
+  because no palette sets the state tokens. Corrected, because the next
+  person adding a palette would have been misled.
+
+Measured at 375 coarse afterwards: every control in the Reports filter row —
+segmented buttons, lane select, both date fields, "Last 7 days" and "Export
+to Excel" — is exactly 44px.
+
+### Third pass: the loading state I added was itself wrong
+
+- **My own contrast measurement was false.** I recorded 5.13:1 for the busy
+  button — that is white on `--forest`, but the rule I wrote painted
+  `--olive`, which is lighter: **2.36:1 in dark Forest**, failing in 13 of
+  18 mode/palette combinations. The cause is worth knowing: `.ag-btn` has a
+  `transition`, and when the browser pane is visible but unfocused Chrome
+  freezes the transition clock, so `getComputedStyle` returns the *pre*-
+  transition colour indefinitely. Every colour measurement in this file now
+  has to be taken with transitions disabled. The fill is `--forest` again.
+- **The password reset could be left stuck on "Working…" forever.** Its
+  success path is the only one that neither reloads nor calls `busy(f,false)`,
+  so the button stayed disabled — and once it also said "Working…", the card
+  was asserting a request that had already finished, with `aria-busy` set.
+  A second reset in the same session found a dead button and no way through.
+- **The widget dock's disabled button went backwards**, from 3.41:1 to
+  2.00:1, because its own `opacity:.45` override survived and now sat on the
+  lighter fill. It uses the system's disabled treatment now.
+- **The sign-in gate announced nothing.** `aria-busy` on a button is not a
+  status; the label swap is only spoken when focus is on the button, and
+  submitting with Enter from a field leaves focus in the field. `#agMsg` is
+  now `role="status"`, so the result is announced.
+- **The segmented control had no visible focus ring** — `overflow:hidden`
+  clipped it. Inset ring added; it was the only control in that row without
+  one.
+- **"Delete my account…" was a dead control**, and had been for a long time:
+  `.pf-stack{display:flex}` beat the `hidden` attribute, so the confirmation
+  form was always open and pressing the button changed nothing. Same bug
+  class as the one this release introduced and fixed, now covered by the
+  same guard.
+
+### Fourth pass: the focus ring I added was invisible on half the control
+
+Two refinements of my own previous fixes, both on the segmented control:
+
+- **A focus ring painted in the colour it sits on.** The inset ring works on
+  the unselected segment, but the *selected* one is filled with `--forest`
+  and the ring is `--forest` — **1.00:1**, drawn inside the fill. Tabbing to
+  "Today" in the default light theme changed nothing on screen. The selected
+  segment now draws its ring in `--on-brand`, the ink that fill already
+  carries: 5.13:1 at worst across all eighteen combinations.
+- **42px, not 44.** With the border on the container the segments had to be
+  `calc(--h-m - 2px)` to fit inside it, which put them 2px under the
+  project's own floor while every neighbour was 44 — and the comment above
+  claimed they cleared it. The border moved onto the segments: container
+  keeps the row height, the tappable button fills it. Measured 44 at coarse,
+  32 at desktop, matching the rest of the row.
+
+### Fifth pass: the same duplicate-rule trap, a third time
+
+Moving the segmented control's border onto its segments added a **second**
+`.rep-modes button` rule above the original. Both were (0,1,1), the later one
+says `border:0`, and the later one wins — so the control lost its frame
+entirely and rendered as a green pill beside unframed text on the same colour
+as the card. Exactly the failure that the duplicate `.um-btn.danger` rules
+caused earlier in this same release.
+
+Merged into one rule per selector, with the reason written above it: if it
+belongs to `.rep-modes button`, it goes in that block. Verified by counting
+the matching rules in the live CSSOM (one) and re-measuring the border.
+
+**The lesson this release keeps teaching:** in a 600KB single file, adding a
+rule is not the same as changing one. Three separate times a correct new rule
+was silently overridden by an older copy further down. The check that catches
+it is enumerating the live CSSOM for the selector, not reading the diff.
+
+Inputs, cards, alerts, toasts and tables follow. The Reports fields were
+brought onto the system early, because a 44px button beside a 29px select is
+worse than the mismatch it replaced.
+
 ## 2026-10-16 — Two review subagents, as enforceable gates
 
 Implements `ProDash Subagent Architecture Sec.md`. **No app code changed** —

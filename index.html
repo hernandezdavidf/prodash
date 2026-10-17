@@ -108,7 +108,210 @@
   --hdr-a:#263238; --hdr-b:#31424A;
   --serif:Georgia,"Times New Roman",serif;
   --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+
+  /* ================= THE SYSTEM LAYER =====================================
+     Structure borrowed from Gravity UI (the design system David chose as the
+     reference), in ProDash's own colours. Gravity's contribution is NOT its
+     palette - forest and terracotta stay exactly as they are above - but its
+     discipline: a fixed set of sizes, radii, spacings and states that every
+     control resolves to, instead of each one choosing its own.
+
+     This file had drifted to 20 distinct border-radius values, 28 font sizes
+     and 138 distinct padding declarations, which is how five different
+     button idioms ended up looking almost-but-not-quite alike. These tokens
+     are the single source those collapse into.
+
+     ADDITIVE ON PURPOSE. Nothing below changes how anything currently looks;
+     components are migrated onto these one at a time, so a mistake is one
+     component wrong rather than the whole app. ---------------------------- */
+
+  /* Spacing: a 4px base with the two half-steps this UI actually needs.
+     Gravity's scale, trimmed to what gets used. */
+  --sp-1:2px;  --sp-2:4px;  --sp-3:6px;  --sp-4:8px;
+  --sp-5:12px; --sp-6:16px; --sp-7:20px; --sp-8:24px; --sp-9:32px;
+
+  /* Radii. Five, down from twenty. --r-pill for chips and toggles only. */
+  --r-xs:4px; --r-s:6px; --r-m:8px; --r-l:12px; --r-pill:999px;
+
+  /* Type scale. Six steps, down from twenty-eight. The serif sizes are
+     separate because they are a different voice, not a different size:
+     serif is for numbers that mean something and for scripture. */
+  --fs-xs:10.5px; --fs-s:11.5px; --fs-m:13px; --fs-l:15px; --fs-xl:17px;
+  --fs-display:25px;
+
+  /* Control heights. Gravity's xs-xl, shifted up one notch: this app is used
+     one-handed on a phone at 3am, so even --h-s has to be hittable. The
+     coarse-pointer rule below enforces the 44px floor the board already
+     follows - grow the target, not the glyph. */
+  --h-xs:24px; --h-s:28px; --h-m:32px; --h-l:40px; --h-xl:48px;
+
+  /* Elevation. Flat is the default; a shadow means "this floats above the
+     page", and nothing else gets one. */
+  --e-0:none;
+  --e-1:0 1px 2px rgba(var(--shadow-rgb),.08);
+  --e-2:0 2px 10px rgba(var(--shadow-rgb),.10);
+  --e-3:0 18px 60px rgba(var(--shadow-rgb),.34);
+
+  /* States, as tokens rather than as a hand-picked colour per component.
+     These are overlays, so they work on any surface in any palette. */
+  --st-hover:rgba(var(--shadow-rgb),.05);
+  --st-active:rgba(var(--shadow-rgb),.09);
+  --st-disabled-o:.45;
+  /* --forest-ink, not --forest. The brand fill is too dark to be seen as a
+     RING on a dark surface: measured against --paper in dark mode it ran
+     1.15:1 on Blue eclipse and failed WCAG 1.4.11's 3:1 in eight of the nine
+     palettes, so a keyboard user had no visible focus at all. --forest-ink
+     measures 4.44:1 at worst across all eighteen mode/palette combinations,
+     and is already this file's focus colour everywhere else. */
+  --st-focus:2px solid var(--forest-ink);
+
+  /* The one border, and the one transition. */
+  --bd:1px solid var(--line);
+  --tr:.13s ease;
 }
+
+/* The touch floor, applied to anything built from the system layer. The
+   board's existing rule is the same one: a 3am thumb needs 44px. */
+/* The touch floor applies to the sizes actually in use, not just the default.
+   An earlier version put 44 on --h-l alone, which nothing uses; the next put
+   it on --h-m and left --h-s at 40 - and --h-s is .hist-btn, which is every
+   Compare/Restore row in Board History and the calendar's month arrows. So
+   the small sizes converge on 44 here. The scale collapsing at coarse is the
+   point: on a touch screen there is a floor, and density loses to it. */
+@media(pointer:coarse){
+  :root{ --h-xs:40px; --h-s:44px; --h-m:44px; --h-l:48px; --h-xl:56px; }
+}
+
+/* ---- ONE BUTTON ----------------------------------------------------------
+   Gravity's button is a matrix: variant x size x state. This file had six
+   separate buttons instead - .um-btn, .ag-btn, .rep-quick, .hist-btn,
+   .laf-save and the calculator's .cc-k - each with its own radius, padding,
+   font size and hover colour, all nearly but not quite alike.
+
+   FIVE of the six are now one rule set. .cc-k is deliberately left alone: it
+   has its own grid, its own sizes and the one good press animation in the
+   app, and no button from this system sits beside it.
+
+   The class names stay. Renaming five idioms across 600KB of markup would be
+   a huge diff with no user-visible gain, and the whole point of a token
+   layer is that the SHAPE is shared even where the name is not. So each old
+   selector is declared alongside .btn and inherits the same geometry, and
+   the variants below carry the meaning.
+
+   Colour still means what it always meant here: forest is the brand and the
+   default action, terracotta is attention and nothing else, red is
+   destructive. Gravity's six-theme palette is deliberately not adopted. */
+.btn,.um-btn,.rep-quick,.hist-btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:var(--sp-3);
+  height:var(--h-m);min-width:var(--h-m);padding:0 var(--sp-5);
+  border:var(--bd);border-radius:var(--r-s);
+  background:var(--paper);color:var(--ink);
+  font:inherit;font-size:var(--fs-m);font-weight:600;line-height:1;
+  white-space:nowrap;cursor:pointer;
+  transition:background var(--tr),border-color var(--tr),color var(--tr);
+}
+/* The state wash is a LAYER, not a replacement fill: background-image sits
+   on top of whatever background-color the button already has, so a variant
+   keeps its own colour and the overlay darkens it. Setting background-color
+   here instead would discard --paper (and every variant's fill), which in
+   the dark palettes - where --shadow-rgb is 0,0,0 - washed the button
+   towards the card behind it rather than lifting it off. */
+.btn:hover:not(:disabled),.um-btn:hover:not(:disabled),
+.rep-quick:hover:not(:disabled),.hist-btn:hover:not(:disabled){
+  background-image:linear-gradient(var(--st-hover),var(--st-hover));
+  border-color:var(--sage);
+}
+.btn:active:not(:disabled),.um-btn:active:not(:disabled),
+.rep-quick:active:not(:disabled),.hist-btn:active:not(:disabled){
+  background-image:linear-gradient(var(--st-active),var(--st-active));
+}
+.btn:focus-visible,.um-btn:focus-visible,
+.rep-quick:focus-visible,.hist-btn:focus-visible{
+  outline:var(--st-focus);outline-offset:1px;
+}
+/* Disabled is DIMMER TEXT, not a dimmed button. A blanket opacity took the
+   label to 2.56:1 and faded the border to 1.17:1, so Board History's "Too
+   old" - the sentence explaining why a revision cannot be restored - became
+   grey text with no button around it. --sage keeps the shape and measures
+   3.20:1 light, 4.56:1 dark. */
+.btn:disabled,.um-btn:disabled,.rep-quick:disabled,.hist-btn:disabled,
+.hist-btn[disabled]{
+  cursor:not-allowed;background:var(--paper);
+  border-color:var(--line);color:var(--sage);background-image:none;
+}
+/* AN AUTHOR `display` OUTRANKS THE UA [hidden] RULE, whatever the
+   specificity. None of these selectors declared one before, so the browser's
+   own `[hidden]{display:none}` was doing the hiding - and the moment the
+   geometry rule above added `display:inline-flex`, three buttons the app
+   hides became permanently visible: the activity dialog's Delete (on a NEW
+   activity, where pressing it silently discarded everything typed), the
+   teleprompter's Delete, and the subscription form's Cancel. Say it once,
+   here, and extend this list as inputs, cards and alerts migrate.
+   `.ag-or[hidden]` further down carries the same warning for the same
+   reason. */
+.btn[hidden],.um-btn[hidden],.rep-quick[hidden],.hist-btn[hidden],
+.ag-btn[hidden],.laf-save[hidden]{display:none}
+
+/* Sizes. --h-m is the default above, so only the others need declaring.
+   The legacy name goes FIRST so an explicit modifier can still override it:
+   both are (0,1,0), so with `.btn-xs` declared earlier, `hist-btn btn-xs`
+   resolved to the hist-btn size and the modifier did nothing. */
+.hist-btn{height:var(--h-s);min-width:var(--h-s);padding:0 var(--sp-4);font-size:var(--fs-s)}
+.btn-xs{height:var(--h-xs);min-width:var(--h-xs);padding:0 var(--sp-3);font-size:var(--fs-xs)}
+.btn-s{height:var(--h-s);min-width:var(--h-s);padding:0 var(--sp-4);font-size:var(--fs-s)}
+.btn-l{height:var(--h-l);min-width:var(--h-l);padding:0 var(--sp-6);font-size:var(--fs-l)}
+.btn-xl{height:var(--h-xl);min-width:var(--h-xl);padding:0 var(--sp-7);font-size:var(--fs-l)}
+
+/* Variants. `action` is the one filled button on a screen - Gravity's rule,
+   and the reason a form has exactly one obvious next step. */
+.btn-action{background:var(--forest);border-color:var(--forest);color:var(--on-brand)}
+.btn-action:hover:not(:disabled){background:var(--forest-dk);border-color:var(--forest-dk);color:var(--on-brand)}
+.btn-flat{background:transparent;border-color:transparent}
+.btn-flat:hover:not(:disabled){background:var(--st-hover);border-color:transparent}
+
+/* Attention and danger. .warn already means terracotta in this file and
+   .danger already means destructive; both keep their names. */
+.btn-warn,.um-btn.warn{border-color:var(--terra);color:var(--terra-ink)}
+/* Restore is a per-row control repeated down the whole of Board History, so
+   it stays terracotta TEXT on a normal border. An orange outline on twenty
+   rows spends the one colour that means "look here" on a list. */
+.hist-btn.warn{color:var(--terra-ink)}
+.btn-warn:hover:not(:disabled),.um-btn.warn:hover:not(:disabled),
+.hist-btn.warn:hover:not(:disabled){background:var(--terra);color:var(--on-warm);border-color:var(--terra)}
+.btn-danger,.um-btn.danger{border-color:var(--alert);color:var(--alert-ink)}
+/* Tinted, not filled. White on --alert-ink measures 2.15:1 in every dark
+   palette, because --alert-ink is a LIGHT red there (#EF9A9A) - a hardcoded
+   #fff promoted into the shared layer is exactly what the token rule exists
+   to prevent. This reads 4.92:1 light and 6.87:1 dark, and matches what
+   .am-del and .hist-btn.warn already do. */
+.btn-danger:hover:not(:disabled),.um-btn.danger:hover:not(:disabled){
+  background:var(--alert-lt);color:var(--alert-ink);border-color:var(--alert)}
+
+/* The sign-in gate's button is the full-width form button: same system,
+   stacked and at the larger size, because it is the only action on a card
+   someone is looking at in the dark. */
+.ag-btn{
+  display:flex;align-items:center;justify-content:center;gap:var(--sp-3);
+  width:100%;height:var(--h-l);padding:0 var(--sp-6);
+  border:1px solid var(--forest);border-radius:var(--r-s);
+  background:var(--forest);color:var(--on-brand);
+  font:inherit;font-size:var(--fs-l);font-weight:600;line-height:1;cursor:pointer;
+  transition:background var(--tr),border-color var(--tr),color var(--tr);
+}
+.ag-btn:hover:not(:disabled){background:var(--forest-dk);border-color:var(--forest-dk)}
+.ag-btn:focus-visible{outline:var(--st-focus);outline-offset:1px}
+/* Keeps the ENABLED fill, not a lighter one. A blanket opacity put the
+   "Working…" text at 1.36:1; the first attempt at fixing that used --olive,
+   which is lighter still - white on it is 2.36:1 in dark/Forest and fails in
+   thirteen of the eighteen mode/palette combinations. --forest is the fill
+   the button already has, and white on it is 5.13:1 at worst. Disabled-ness
+   is carried by the label swap and aria-busy, which is the honest signal. */
+.ag-btn[disabled]{background:var(--forest);border-color:var(--forest);
+  color:var(--on-brand);cursor:progress}
+.ag-btn.ghost[disabled]{background:var(--paper);border-color:var(--line);color:var(--sage)}
+.ag-btn.ghost{background:transparent;color:var(--forest-ink);border-color:var(--line)}
+.ag-btn.ghost:hover:not(:disabled){background:var(--st-hover);border-color:var(--sage)}
 
 /* ---- DARK ----------------------------------------------------------------
    The two blocks below MUST hold identical values. One follows the OS setting,
@@ -397,6 +600,33 @@
   --panel:#0A0D0E; --tab-face:#060809; --tab-ink:#B6BCBE;
   --shadow-rgb:0,0,0; --glow-rgb:62,147,175;
   --hdr-a:#0C2028; --hdr-b:#245F73;
+}
+
+/* STATE OVERLAYS FLIP IN DARK, and this sits after every palette block on
+   purpose so it applies to all nine of them without being repeated eighteen
+   times.
+   --st-hover and --st-active are built from --shadow-rgb, which every dark
+   palette sets to 0,0,0 - so a dark wash on an already-dark surface changed
+   the luminance by about one part in a thousand. Hover still read, because
+   it also moves the border; :active sets nothing else, so pressing a button
+   on a phone in dark mode - no hover, just a tap - gave no acknowledgement
+   at all. Light overlays do the same job in the opposite direction.
+   Both selectors are needed and must hold identical values: one follows the
+   OS setting, the other the manual toggle.
+   SPECIFICITY NOTE, because the next person adding a palette will need it:
+   these are (0,2,0), while the palette blocks are [data-palette][data-theme]
+   = (0,3,0). They do NOT tie - these win only because no palette block
+   declares --st-hover or --st-active. If one ever does, it will beat this,
+   and the fix is to set the state tokens there too rather than here. */
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --st-hover:rgba(255,255,255,.07);
+    --st-active:rgba(255,255,255,.13);
+  }
+}
+:root[data-theme="dark"]{
+  --st-hover:rgba(255,255,255,.07);
+  --st-active:rgba(255,255,255,.13);
 }
 
 /* Shadows need a bump in dark: a light-mode shadow barely shows once the card
@@ -848,7 +1078,17 @@ span.apt{background:var(--terra);color:var(--on-warm);font-size:9px;font-weight:
 .swatch{width:20px;height:20px;border-radius:50%;border:2px solid transparent;padding:0;cursor:pointer}
 .swatch.on{border-color:var(--ink)}
 .laf-btns{display:flex;gap:8px;justify-content:flex-end}
-.laf-save{background:var(--forest);color:var(--on-brand);border-radius:7px;padding:6px 12px;font-weight:700;font-size:12.5px}
+/* The save/export button: the button system's `action` variant under an
+   older name. Sixth idiom folded in. */
+.laf-save{display:inline-flex;align-items:center;justify-content:center;gap:var(--sp-3);
+  height:var(--h-m);padding:0 var(--sp-5);border:1px solid var(--forest);border-radius:var(--r-s);
+  background:var(--forest);color:var(--on-brand);font:inherit;font-size:var(--fs-m);
+  font-weight:600;line-height:1;white-space:nowrap;cursor:pointer;
+  transition:background var(--tr),border-color var(--tr)}
+.laf-save:hover:not(:disabled){background:var(--forest-dk);border-color:var(--forest-dk)}
+.laf-save:focus-visible{outline:var(--st-focus);outline-offset:1px}
+.laf-save:disabled{cursor:not-allowed;background:var(--paper);
+  border-color:var(--line);color:var(--sage)}
 .laf-cancel{color:var(--muted);font-size:12.5px;padding:6px 4px}
 .laf-cancel:hover{color:var(--terra-ink)}
 /* flex-wrap is what lets the sub-notes panel live INSIDE the task row as a
@@ -1150,26 +1390,57 @@ body.reports-only .board-only:not(.bview):not(#view-reports){display:none}
    not-shrinking bug as the long-URL wrapping, different trigger. */
 .rep-fld{display:flex;flex-direction:column;gap:3px;min-width:0}
 .rep-fld label{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700}
-.rep-fld input,.rep-fld select{border:1px solid var(--line);border-radius:7px;padding:6px 9px;
-  background:var(--ivory);color:var(--ink);outline:none;font-size:12.5px;max-width:100%}
+/* On the system's height and radius so the filter row is actually a row -
+   the buttons beside these moved first, and a 44px button next to a 29px
+   select is worse than the mismatch it replaced. The rest of the input
+   migration follows; this is the one line that keeps the row honest now. */
+.rep-fld input,.rep-fld select{border:1px solid var(--line);border-radius:var(--r-s);
+  height:var(--h-m);box-sizing:border-box;padding:0 var(--sp-4);
+  background:var(--ivory);color:var(--ink);outline:none;font-size:var(--fs-m);max-width:100%}
 .rep-fld input:focus,.rep-fld select:focus{border-color:var(--olive);background:var(--paper)}
-.rep-quick{border:1px solid var(--line);border-radius:7px;padding:0 12px;font-size:12px;height:31px;
-  color:var(--forest-ink);font-weight:600;background:var(--paper)}
-.rep-quick:hover{background:var(--ivory)}
+/* .rep-quick's geometry now comes from the button system at the top of the
+   file; only its colour is local. The fields above are on the system too, so
+   the whole row measures the same height. */
+.rep-quick{color:var(--forest-ink)}
 /* The range fields are toggled with `hidden`, which .rep-fld's display:flex
    would otherwise override. */
 .rep-controls [hidden]{display:none}
 /* Same segmented idiom as the theme picker's mode switch (.th-modes), sized
-   to sit in a filter row at the height of the inputs beside it. */
-.rep-modes{display:flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;height:31px}
-.rep-modes button{padding:0 13px;font-size:12px;font-weight:700;background:var(--paper);color:var(--muted);
-  border:0;border-right:1px solid var(--line);cursor:pointer;white-space:nowrap}
-.rep-modes button:last-child{border-right:0}
+   to sit in a filter row at the same height as everything beside it.
+
+   ONE RULE PER SELECTOR, deliberately. Splitting the geometry into a second
+   `.rep-modes button` block above this one looked tidy and silently deleted
+   the control's frame: both were (0,1,1), the later `border:0` won, and the
+   toggle rendered as a green pill beside unframed text on the same colour as
+   the card. Same failure as the duplicate .um-btn.danger rules earlier in
+   this release. If it belongs to `.rep-modes button`, it goes here.
+
+   The border is on the SEGMENTS, not the container: with it on the container
+   the segments had to be `calc(--h-m - 2px)` to fit inside, which put them
+   at 42px on a coarse pointer - under this project's own floor, while every
+   neighbour was 44. */
+.rep-modes{display:flex;box-sizing:border-box;height:var(--h-m);
+  border-radius:var(--r-s);overflow:hidden}
+.rep-modes button{height:var(--h-m);padding:0 var(--sp-5);
+  font-size:var(--fs-s);font-weight:700;background:var(--paper);color:var(--muted);
+  border:1px solid var(--line);border-right:0;cursor:pointer;white-space:nowrap}
+.rep-modes button:last-child{border-right:1px solid var(--line)}
 .rep-modes button:hover{background:var(--ivory);color:var(--ink)}
 .rep-modes button[aria-checked="true"]{background:var(--forest);color:var(--on-brand)}
+/* Negative offset because the container clips with overflow:hidden - without
+   it the ring is drawn outside the box and cut off, so tabbing onto a
+   segment showed nothing while every neighbour in the row drew one. */
+.rep-modes button:focus-visible{outline:var(--st-focus);outline-offset:-2px}
+/* ...and on the SELECTED segment the ring changes colour, because drawing a
+   --forest ring inside a --forest fill is 1.00:1 - a focus indicator painted
+   in the exact colour it sits on. --on-brand is the ink that fill already
+   carries, so it is legible by construction: 5.13:1 at worst across all
+   eighteen mode/palette combinations. */
+.rep-modes button[aria-checked="true"]:focus-visible{outline-color:var(--on-brand)}
 /* Export sits at the far end of the filter row: it acts on the result of every
-   control to its left, so it reads last. Height matches the inputs. */
-.rep-export{margin-left:auto;height:31px}
+   control to its left, so it reads last. Height comes from the button
+   system; the fields beside it follow in the input migration. */
+.rep-export{margin-left:auto}
 .rep-totals{display:flex;gap:18px;font-size:12.5px;color:var(--muted);margin-bottom:12px;flex-wrap:wrap}
 .rep-totals b{font-family:var(--serif);font-size:17px;color:var(--ink);display:block;line-height:1.2}
 .rep-lane{margin-bottom:16px}
@@ -1209,14 +1480,10 @@ body.reports-only .board-only:not(.bview):not(#view-reports){display:none}
 .chip.bad{background:var(--terra);color:var(--on-warm)}
 .chip.neutral{background:var(--ivory);color:var(--muted);border-color:var(--line)}
 .chip.dev{background:var(--ivory);color:var(--ink);border-color:var(--line);text-transform:none;letter-spacing:0;font-weight:600}
-.rev-id{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:10px;color:var(--muted)}
-.hist-btn{border:1px solid var(--line);border-radius:7px;padding:4px 10px;font-size:11.5px;
-  font-weight:600;color:var(--forest-ink);background:var(--paper)}
-.hist-btn:hover{background:var(--ivory);border-color:var(--olive)}
-.hist-btn.warn{color:var(--terra-ink)}
-.hist-btn.warn:hover{background:var(--terra-lt);border-color:var(--terra)}
-.hist-btn[disabled]{color:var(--sage);border-color:var(--line);background:transparent;cursor:not-allowed}
-.hist-btn[disabled]:hover{background:transparent;border-color:var(--line)}
+.rev-id{font-family:var(--mono);font-size:var(--fs-xs);color:var(--muted)}
+/* Geometry, hover, focus and disabled all come from the button system at the
+   top of the file; .hist-btn keeps only its colour. */
+.hist-btn{color:var(--forest-ink)}
 .dev-card{border:1px solid var(--line);border-radius:10px;padding:11px 13px;margin-bottom:9px}
 .dev-card:last-child{margin-bottom:0}
 .dev-card.me{border-color:var(--olive);background:var(--olive-lt)}
@@ -1347,13 +1614,8 @@ body.reports-only .board-only:not(.bview):not(#view-reports){display:none}
 .ag-hint{font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.45}
 .ag-row{display:flex;gap:10px}
 .ag-row>.ag-f{flex:1}
-.ag-btn{width:100%;padding:11px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;
-  border-radius:8px;border:1px solid var(--forest);background:var(--forest);color:var(--on-brand)}
-.ag-btn:hover{background:var(--forest-dk);border-color:var(--forest-dk)}
-.ag-btn[disabled]{opacity:.6;cursor:progress}
-.ag-btn.ghost{background:transparent;color:var(--forest-ink);border-color:var(--line)}
-.ag-btn.ghost:hover{background:var(--ivory)}
-.ag-btns{display:flex;flex-direction:column;gap:9px;margin-top:6px}
+/* .ag-btn itself is defined with the button system at the top of the file. */
+.ag-btns{display:flex;flex-direction:column;gap:var(--sp-4);margin-top:var(--sp-3)}
 .ag-link{background:none;border:0;padding:0;font:inherit;font-size:12.5px;color:var(--forest-ink);
   cursor:pointer;text-decoration:underline}
 .ag-foot{margin-top:16px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:12.5px}
@@ -1381,7 +1643,12 @@ body.reports-only .board-only:not(.bview):not(#view-reports){display:none}
   <div class="ag-card">
     <h1 class="ag-brand">How's our Dave looking?</h1>
     <p class="ag-sub">Productivity Dashboard (ProDash)</p>
-    <div class="ag-msg" id="agMsg"></div>
+    <!-- role=status so the outcome is ANNOUNCED. The label swap on the
+         button ("Working…") is only spoken when focus is on the button, and
+         submitting with Enter from a field - the phone path - leaves focus
+         in the field, so without this a screen-reader user got silence for
+         both the wait and the result. -->
+    <div class="ag-msg" id="agMsg" role="status" aria-live="polite"></div>
 
     <!-- First run on a device: which Worker is this app talking to. Stored per
          device, never inside the board data, exactly like the old sync URL. -->
@@ -1770,9 +2037,28 @@ function msg(text, kind){
   msgEl.textContent = text || "";
   msgEl.className = "ag-msg" + (text ? " on " + (kind || "err") : "");
 }
+/* Disabling the button was the ONLY signal that anything was happening, and
+   a disabled .ag-btn is a pale green block with a label at 1.36:1 - so on a
+   phone, on a slow connection, the word vanished and nothing replaced it.
+   `cursor:progress` shows nothing on a touch screen. Say it in words, put it
+   back exactly as it was afterwards, and tell a screen reader too. */
 function busy(form, on){
-  var b = form.querySelector("button[type=submit], .ag-btn");
-  if(b) b.disabled = !!on;
+  /* Submit button first, explicitly. A single `"button[type=submit], .ag-btn"`
+     selector returns whichever comes first in DOCUMENT order, so a ghost
+     Cancel placed above the submit - which is exactly how .pf-stack orders
+     them elsewhere in this file - would silently become the "Working…"
+     button. */
+  var b = form.querySelector("button[type=submit]") || form.querySelector(".ag-btn");
+  if(!b) return;
+  b.disabled = !!on;
+  if(on){
+    if(b.dataset.label === undefined) b.dataset.label = b.textContent;
+    b.textContent = "Working…";
+    b.setAttribute("aria-busy", "true");
+  }else{
+    if(b.dataset.label !== undefined){ b.textContent = b.dataset.label; delete b.dataset.label; }
+    b.removeAttribute("aria-busy");
+  }
 }
 function val(id){ return document.getElementById(id).value; }
 
@@ -2171,6 +2457,12 @@ document.getElementById("agForgot3Form").addEventListener("submit", function(e){
   busy(f, true); msg("");
   api("/auth/forgot/reset", { method:"POST", body:{ ticket: recovery.ticket, password: val("agNew") } })
     .then(function(){
+      /* busy(false) FIRST. This is the one success path that does not end in
+         enter() -> reload, so without it the button stayed disabled forever
+         - and once it also said "Working…", the card was asserting a request
+         was in flight that had already finished. A second reset in the same
+         session then found a dead, disabled button and no way through. */
+      busy(f, false);
       // Deliberately not an automatic sign-in. Typing the new password once,
       // immediately, is what proves it was actually memorised rather than
       // typed twice into two boxes and forgotten.
@@ -2906,6 +3198,9 @@ return {
   .cal-bar{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center;margin:14px 0 6px}
   .cal-nav{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
   .cal-add{background:var(--forest);color:var(--on-brand);border-color:var(--forest)}
+  /* Matches the shared hover rule's (0,3,0), which otherwise put a grey
+     --sage rim around a green button. */
+  .cal-add:hover:not(:disabled){border-color:var(--forest-dk)}
   .cal-add:hover{background:var(--forest-dk)}
   .cal-title{font-family:var(--sans);font-weight:800;font-size:18px;letter-spacing:-.2px;color:var(--forest-ink);margin:6px 0 12px}
 
@@ -3027,7 +3322,12 @@ return {
   .am-actions{display:flex;gap:9px;align-items:center;margin-top:18px}
   .am-actions .ag-btn{width:auto;flex:1}
   .am-del{margin-left:auto;color:var(--alert-ink);border-color:var(--alert)}
-  .am-del:hover{background:var(--alert-lt)}
+  /* :not(:disabled) to match the shared hover rule's specificity, which is
+     (0,3,0) and was otherwise repainting this button grey on hover - losing
+     the red at exactly the moment someone commits to deleting a whole
+     recurring series. The colour IS the warning. */
+  .am-del:hover:not(:disabled){background:var(--alert-lt);color:var(--alert-ink);
+    border-color:var(--alert)}
   .am-msg{display:none;margin-bottom:12px;padding:9px 11px;border-radius:8px;font-size:12.5px;
     background:var(--alert-lt);color:var(--alert-ink);border:1px solid var(--alert)}
   .am-msg.on{display:block}
@@ -3419,6 +3719,12 @@ return {
      look rather than inventing a third one. */
   .pf-row{display:flex;gap:8px;align-items:center}
   .pf-stack{display:flex;flex-direction:column;gap:8px}
+  /* Same hazard as the buttons: an author `display` beats the UA [hidden]
+     rule, so #pfDelForm and #pfGUnlinkForm were ALWAYS visible - which made
+     "Delete my account…" a dead control, since pressing it only unhides a
+     form that was never hidden. Pre-dates the button system; same one-line
+     cure. */
+  .pf-stack[hidden]{display:none}
   .pf-row input,.pf-stack input{flex:1;min-width:0;box-sizing:border-box;
     padding:8px 10px;font:inherit;font-size:13px;color:var(--ink);
     background:var(--paper);border:1px solid var(--line);border-radius:9px}
@@ -3427,10 +3733,11 @@ return {
   .pf-msg{margin-top:9px;padding:8px 10px;border-radius:8px;font-size:12px;line-height:1.45;
     background:var(--olive-lt);color:var(--forest-ink);border:1px solid var(--olive)}
   .pf-msg.err{background:var(--alert-lt);color:var(--alert-ink);border-color:var(--alert)}
-  /* Terracotta is this app's attention colour and is kept for exactly this
-     kind of thing: the one irreversible control on the screen. */
-  .um-btn.danger{border-color:var(--alert);color:var(--alert-ink)}
-  .um-btn.danger:hover:not(:disabled){background:var(--alert-ink);color:#fff;border-color:var(--alert-ink)}
+  /* .um-btn.danger lives with the button system at the top of the file. The
+     copy that used to sit here set `color:#fff` on `--alert-ink`, which is a
+     LIGHT red in dark mode - 2.15:1 on "Delete my account". It tied the new
+     rule on specificity and won on source order, so the fix was dead code
+     until this was deleted. */
   .pf-danger{border-top-color:var(--alert)}
   .pf-glink{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--ink);
     padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:var(--ivory)}
@@ -3582,13 +3889,8 @@ return {
   .um-tag.add{background:var(--olive-lt);color:var(--forest-ink)}
   .um-tag.rm{background:var(--terra-lt);color:var(--terra-ink)}
   .um-acts{display:flex;gap:7px;flex-wrap:wrap}
-  .um-btn{font-size:12px;font-weight:600;border:1px solid var(--line);border-radius:9px;
-    padding:6px 12px;background:var(--paper);color:var(--ink);cursor:pointer}
-  .um-btn:hover:not(:disabled){border-color:var(--olive);color:var(--forest-ink)}
-  .um-btn:disabled{opacity:.5;cursor:not-allowed}
-  .um-btn.warn{border-color:var(--terra);color:var(--terra-ink)}
-  .um-btn.warn:hover:not(:disabled){background:var(--terra);color:var(--on-warm);
-    border-color:var(--terra)}
+  /* .um-btn, .um-btn.warn and .um-btn.danger are defined with the button
+     system at the top of the file. Nothing local is left to say. */
   .um-note{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.5}
   .um-self{font-size:9.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;
     background:var(--ivory);color:var(--muted);padding:2px 7px;border-radius:999px}
@@ -3812,8 +4114,8 @@ return {
 
   /* ---- library ---- */
   .ex-lib-acts{display:flex;gap:7px;flex-wrap:wrap;padding:10px 0 4px}
-  .um-btn.danger{border-color:var(--alert);color:var(--alert-ink)}
-  .um-btn.danger:hover:not(:disabled){background:var(--alert-ink);color:#fff;border-color:var(--alert-ink)}
+  /* The second copy of .um-btn.danger lived here; see the note where the
+     first one was, above .pf-danger. */
 
   /* One exercise inside a template. Deliberately lighter than a session's
      card - these are targets, and the screen should not look like something
@@ -4208,8 +4510,13 @@ return {
        stacked buttons). Same override the activity modal makes, same reason.
        cursor:progress is also wrong here - a disabled Add is "you can't", not
        "wait a moment". */
-    .wg-panel .ag-btn{width:auto;padding:8px 14px;font-size:13px}
-    .wg-panel .ag-btn[disabled]{cursor:not-allowed;opacity:.45}
+    /* The dock is a fixed floating panel sized around a compact button, so
+       it overrides the system's --h-l default rather than inheriting it. */
+    .wg-panel .ag-btn{width:auto;height:var(--h-s);padding:0 var(--sp-5);font-size:var(--fs-m)}
+    /* The system's disabled treatment, not a blanket opacity - 45% over the
+       dock's fill put "Start prompter" at 2.00:1. */
+    .wg-panel .ag-btn[disabled]{cursor:not-allowed;background:var(--paper);
+      border-color:var(--line);color:var(--sage)}
 
     /* ---- World clocks ---- */
     .wc-row{display:flex;align-items:center;gap:10px;padding:10px 11px;margin-bottom:8px;
@@ -5504,7 +5811,7 @@ function cloudPush(){
 // 2.0, not 1.2: the board is no longer one document on one Worker. Every
 // device now reports which app version wrote a revision, and a 1.x entry in
 // the audit trail means "from before accounts existed".
-var APP_VERSION="4.26";
+var APP_VERSION="4.27";
 /* ================= PRODASH Version History ==================================
    A plain-English, read-only mirror of CHANGELOG.md for the Board History tab
    - "what changed and when" without needing to open the repo. Newest first.
@@ -5515,6 +5822,7 @@ var APP_VERSION="4.26";
    Keep this in lockstep with CHANGELOG.md: any time a new dated entry is
    added there for a real deploy, add one line here too - short, no jargon. */
 var APP_VERSION_HISTORY=[
+  {ts:"2026-10-17T12:00:00+08:00",text:"Groundwork for a consistent look, based on the Gravity design system you picked. Buttons across the whole app now come from one definition instead of six separate ones that had drifted apart -- so a button is the same height, the same corner roundness and the same text size whether it is on the sign-in screen, in Reports, in the Exercise library or in Board History, and they all light up the same way when you hover or focus them. On a phone every one of them is at least 44 pixels tall. Nothing moved and nothing was renamed; colours are unchanged, with green still the main colour and orange still reserved for things that need your attention. More of the app follows in the next few updates."},
   {ts:"2026-10-06T23:40:00+08:00",text:"The whole King James Version now ships inside the app, so the Bible widget works with no internet at all -- any book, any chapter, and search too, not just the chapters you happened to open while online. It is about four megabytes, downloaded once in the background the first time you open the app with a connection, and it is kept in a cache of its own so ordinary app updates never make you download it again. Searching the KJV is now instant and never leaves your phone. NKJV still needs a connection, because unlike the KJV it is under copyright and cannot be stored here -- if you are offline on NKJV the widget now tells you to switch to KJV rather than just failing."},
   {ts:"2026-10-06T22:30:00+08:00",text:"A chapter in the Bible widget is now one verse per row instead of a single block of prose. The verse numbers run down a gutter on the left so they all line up and you can find one at a glance, each verse is separated by a faint rule, and long verses wrap inside their own row rather than running into the next. Landing on a verse from a search result highlights the whole row instead of a fragment in the middle of a paragraph. The three text sizes, the KJV and NKJV switch, search, and the previous and next chapter buttons all work exactly as before."},
   {ts:"2026-10-06T19:00:00+08:00",text:"The calculator keypad is laid out like a Casio fx-82MS now. The bottom block is the same arrangement you already know without looking -- 7 8 9 with DEL and AC, 4 5 6 with times and divide, 1 2 3 with plus and minus, then 0, the point, EXP, Ans and equals -- and above it sit six columns of functions: the modifiers, the powers and roots, the logs, the trig, and memory with the brackets. 2nd works like SHIFT and gives you what is printed above a key (x! above the reciprocal, the cube root above the cube, 10 to the x above log, inverse sine above sine), and there is a real hyp key, so hyp then sin is sinh and hyp then 2nd then sin is sinh inverse. Both light up while they are armed and are used up by the next key you press, exactly like the real one. Things the Casio has that this cannot honestly do -- fractions, polar conversion, the statistics modes -- are left off rather than put there as keys that do nothing."},
