@@ -24,6 +24,27 @@ Each entry carries the same fields:
 
 ---
 
+## 2026-10-17 — Harness: two reviewers share one browser tab and steal it
+
+- **Component:** the browser pane, when `security-reviewer` and `ux-reviewer`
+  run at the same time.
+- **Symptom:** mid-review, a reviewer's in-page probe returns measurements for
+  a page it never navigated to. The UX pass had probes cut off twice when the
+  security pass navigated the pane to its own port.
+- **Root cause:** the Browser pane exposes a **single tab**. Two agents driving
+  it concurrently are driving the same tab; whoever navigates last wins, and
+  neither is told.
+- **Fix:** assert the origin at the top of every in-page probe, e.g. begin the
+  script with a `location.port` check and abort if it is not the expected
+  harness port. Re-run anything that aborted.
+- **Verification:** the UX pass guarded every probe after the first collision
+  and redid the affected measurements; served length identical at 777,437
+  bytes before and after.
+- **Prevention:** written here. Prefer running the two gates **sequentially**;
+  if they must overlap, give each its own port and assert it.
+- **Residual risk:** an assertion only detects the theft, it does not prevent
+  it. The listener also died once mid-review (exit 255) and needed restarting.
+
 ## 2026-10-16 — Harness: pushing to a bare repo in the scratchpad fails
 
 - **Component:** throwaway-clone testing (every reviewer will hit this).
